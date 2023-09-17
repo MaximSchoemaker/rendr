@@ -1,0 +1,55 @@
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+
+  overflow: hidden;
+}
+
+.timeline {
+  padding: 5px;
+  background-color: black;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+
+  position: relative;
+}
+
+.cursorRow {
+  position: absolute;
+  display: flex;
+  inset: 0;
+  gap: 1px;
+}
+
+.cursor {
+  flex: 1;
+}
+
+.active {
+  outline: 4px solid #80F;
+}
+
+.row {
+  height: 10px;
+  display: flex;
+  gap: 1px;
+}
+
+.frame {
+  flex: 1;
+}
+
+.valid {
+  background-color: #0F4;
+}
+.invalid {
+  background-color: #F80;
+}
+.pending {
+  background-color: white;
+}
