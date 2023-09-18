@@ -1,38 +1,48 @@
-import { createEffect, type Component, onCleanup, createSignal, JSXElement, For, Index, untrack } from 'solid-js';
+import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show } from 'solid-js';
 
-import logo from './logo.svg';
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
 import { mod, clamp } from "../rendr/library/Utils";
 
 type Dependency = {
-  // get: () => any;
   set: (value: any) => void;
   onChange: (callback: (value: any) => void) => void;
   unsubscribe: (callback: (value: any) => void) => void;
 }
 
-type Parameter = Dependency & {
-  value: any;
+type Parameter<T> = Dependency & {
+  value: T;
 }
 
-type Cache = Dependency & {
+type Cache<T> = Dependency & {
   cache: ({
     status: "valid" | "invalid" | "pending",
-    value: any
+    value: T
   })[]
+  getLatest: (index: number) => T,
+  getLatestValid: (index: number) => T,
 }
 
-type UI = {
-  createTimeline: (
-    frames: number,
-    tick_par: Parameter,
-    running_par: Parameter,
-    caches: Cache[],
-  ) => void;
+class UI {
+  AddComponent;
+  constructor(AddComponent: (component: JSXElement) => void) {
+    this.AddComponent = AddComponent;
+  }
+  createTimeline(frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) {
+    this.AddComponent(Timeline({ frames, tick_par, running_par, caches }));
+  }
+  createView(frame_par: Parameter<ImageBitmap>) {
+    this.AddComponent(View({ frame_par }));
+  }
+  createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) {
+    this.AddComponent(CacheView({ tick_par, running_par, frame_cache }));
+  }
+  createContainer(callback: (ui: UI) => void) {
+    this.AddComponent(Container({ callback }));
+  }
 }
 
-const App: Component = () => {
+const App = () => {
 
   const [components, set_components] = createSignal<JSXElement[]>([]);
 
@@ -41,30 +51,15 @@ const App: Component = () => {
   }
 
   const createUI = (callback: (ui: UI) => void) => {
-    const ui: UI = {
-      createTimeline: (frames, tick_par, running_par, caches) => {
-        AddComponent(Timeline({ frames, tick_par, running_par, caches }));
-      }
-    }
-
+    const ui = new UI(AddComponent);
     callback(ui);
   }
 
-  createEffect(() => {
-    // console.log("setup");
-    const cleanup = Setup(createUI);
-    // console.log(untrack(components));
-
-    onCleanup(() => {
-      // console.log("cleanup");
-      cleanup();
-      set_components([]);
-    });
-  });
+  const cleanup = Setup(createUI);
+  cleanup && onCleanup(cleanup);
 
   return (
     <div class={styles.App}>
-      <div id="rendr" />
       <For each={components()}>{
         component => component
       }</For>
@@ -72,85 +67,52 @@ const App: Component = () => {
   );
 };
 
-function createRendrSignal<T>(dependency: Dependency) {
-  const _value = dependency.value ?? dependency.cache;
-  const [value, set_value] = createSignal<T>(_value);
+type ContainerProps = {
+  callback: (ui: UI) => void;
+}
 
+const Container = ({ callback }: ContainerProps) => {
+
+  const [components, set_components] = createSignal<JSXElement[]>([]);
+
+  function AddComponent(component: JSXElement) {
+    set_components(components => [...components, component]);
+  }
+
+  const ui = new UI(AddComponent);
+  callback(ui);
+
+  const stored_selected = JSON.parse(localStorage.getItem("selected") ?? "null");
+  const [selected, set_selected] = createSignal<number | null>(stored_selected);
   createEffect(() => {
-
-    function onChange() {
-      const _value = dependency.value ?? dependency.cache;
-      const new_value = typeof _value === 'object'
-        ? Array.isArray(_value)
-          ? [..._value]
-          : { ..._value }
-        : _value
-      set_value(new_value);
-
-      // console.log(...arguments);
-      // if (arguments.length == 2) set_value(arguments[1]);
-      // if (arguments.length == 3) set_value((cache) => {
-      //   cache = [...cache]
-      //   const [_, index, value] = arguments;
-      //   cache[index] = { ...cache[index], value };
-      //   return cache;
-      // });
-    }
-
-    dependency.onChange(onChange);
-
-    onCleanup(() => dependency.unsubscribe(onChange));
+    localStorage.setItem("selected", JSON.stringify(selected()))
   });
 
-  function setValue(new_value: any) {
-    dependency.set(new_value);
+  function clickComponent(component: JSXElement, i: () => number | null) {
+    (component as HTMLElement).onclick = () =>
+      set_selected(selected => selected === null ? i() : null);
+    return component;
   }
 
-  return [value, setValue] as [typeof value, typeof setValue];
-}
-
-function createAnimationLoop(callback, running = false) {
-  let animationFrame: number;
-  const loop = () => {
-    if (!ret.running) return
-    callback();
-    animationFrame = requestAnimationFrame(loop);
-  }
-  const ret = {
-    running,
-    stop() {
-      this.running = false;
-      cancelAnimationFrame(animationFrame);
-    },
-    start() {
-      this.running = true;
-      loop();
-    },
-    toggle() {
-      if (this.running)
-        this.stop();
-      else
-        this.start();
-    },
-    set(running: boolean) {
-      if (running !== this.running) this.toggle();
-    }
-  }
-  if (running) ret.start();
-  return ret;
-}
-
+  return (
+    <div class={styles.Container}>
+      <Show when={selected() === null} fallback={clickComponent(components()[selected()!], selected)}>
+        <For each={components()}>{clickComponent}</For>
+      </Show>
+    </div>
+  );
+};
 
 type TimelineProps = {
   frames: number;
-  tick_par: Parameter;
-  running_par: Parameter;
-  caches: Cache[];
+  tick_par: Parameter<number>;
+  running_par: Parameter<boolean>;
+  caches: Cache<any>[];
 }
 
 function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
-  const [tick, set_tick] = createRendrSignal<number>(tick_par);
-  const [running, set_running] = createRendrSignal<boolean>(running_par);
+  const [tick, set_tick] = createRendrParameterSignal<number>(tick_par);
+  const [running, set_running] = createRendrParameterSignal<boolean>(running_par);
 
   function getActiveClass(tick: number, index: number) {
     return tick === index ? styles.active : ''
@@ -212,11 +174,11 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   };
 
   return (
-    <div class={styles.timeline}>
+    <div class={styles.Timeline}>
       <div class={styles.rows}>
 
         <For each={caches}>{cache =>
-          <TimelineRow cache={cache} tick={tick} />
+          <Row cache={cache} />
         }</For>
 
         <div class={styles.cursorRow} >
@@ -230,26 +192,179 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   )
 }
 
-type TimelineRowProps = {
-  cache: Cache
-  tick: () => number
+type RowProps = {
+  cache: Cache<any>
 }
 
-function TimelineRow({ cache: _cache, tick }: TimelineRowProps) {
-  const [cache] = createRendrSignal<Cache["cache"]>(_cache);
+function Row({ cache: _cache }: RowProps) {
+  const [cache] = createRendrCacheSignal<Cache<any>["cache"]>(_cache);
 
-  function getStatusClass(item?: Cache["cache"][0]) {
+  function getStatusClass(item?: Cache<any>["cache"][0]) {
     return item ? styles[item.status] : '';
   }
 
   return (
-    <div class={styles.row}>
+    <div class={styles.Row}>
       <Index each={cache()}>{(item, index) => {
         return <div class={`${styles.frame} ${getStatusClass(item())}`} />
       }
       }</Index>
     </div>
   )
+}
+
+type ViewProps = {
+  frame_par: Parameter<ImageBitmap>;
+}
+
+function View({ frame_par }: ViewProps) {
+  const [frame] = createRendrParameterSignal<ImageBitmap>(frame_par);
+
+  let el: HTMLCanvasElement;
+  createEffect(() => {
+    const bitmap = frame();
+    if (!bitmap) return;
+
+    const ctx = el.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(bitmap, 0, 0);
+  });
+
+  return (
+    <canvas
+      class={styles.View}
+      ref={(ref) => el = ref}
+      width={frame()?.width}
+      height={frame()?.height}
+    />
+  );
+}
+
+type CacheViewProps = {
+  tick_par: Parameter<number>;
+  running_par: Parameter<boolean>;
+  frame_cache: Cache<ImageBitmap>;
+}
+
+function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
+  const [tick] = createRendrParameterSignal<number>(tick_par);
+  const [running] = createRendrParameterSignal<boolean>(running_par);
+  const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
+
+  let el: HTMLCanvasElement;
+  createEffect(() => {
+    cache();
+
+    const bitmap = running()
+      ? frame_cache.getLatestValid(tick())
+      : frame_cache.getLatest(tick());
+
+    if (!bitmap) return;
+
+    el.width = bitmap.width;
+    el.height = bitmap.height;
+
+    const ctx = el.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(bitmap, 0, 0);
+  });
+
+  return (
+    <canvas
+      class={styles.View}
+      ref={(ref) => el = ref}
+    />
+  );
+}
+
+
+function createRendrParameterSignal<T>(dependency: Parameter<T>) {
+  const _value = dependency.value;
+  const [value, set_value] = createSignal<T>(_value);
+
+  createEffect(() => {
+
+    function onChange() {
+      set_value(() => dependency.value);
+    }
+
+    dependency.onChange(onChange);
+
+    onCleanup(() => dependency.unsubscribe(onChange));
+  });
+
+  function setValue(new_value: any) {
+    dependency.set(new_value);
+  }
+
+  return [value, setValue] as [typeof value, typeof setValue];
+}
+
+function createRendrCacheSignal<T>(dependency: Cache<T>) {
+  const _value = dependency.cache;
+  const [value, set_value] = createSignal<Cache<T>["cache"]>(_value);
+
+  createEffect(() => {
+
+    function onChange() {
+      const _value = dependency.cache;
+      const new_value = _value.map(v => ({ ...v }));
+      set_value(new_value);
+
+      // console.log(...arguments);
+      // if (arguments.length == 2) set_value(arguments[1]);
+      // if (arguments.length == 3) set_value((cache) => {
+      //   cache = [...cache]
+      //   const [_, index, value] = arguments;
+      //   cache[index] = { ...cache[index], value };
+      //   // console.log(cache);
+      //   return cache;
+      // });
+    }
+
+    dependency.onChange(onChange);
+
+    onCleanup(() => dependency.unsubscribe(onChange));
+  });
+
+  function setValue(new_value: any) {
+    dependency.set(new_value);
+  }
+
+  return [value, setValue] as [typeof value, typeof setValue];
+}
+
+function createAnimationLoop(callback: () => void, running = false) {
+  let animationFrame: number;
+  const loop = () => {
+    if (!ret.running) return
+    callback();
+    animationFrame = requestAnimationFrame(loop);
+  }
+  const ret = {
+    running,
+    stop() {
+      this.running = false;
+      cancelAnimationFrame(animationFrame);
+    },
+    start() {
+      this.running = true;
+      loop();
+    },
+    toggle() {
+      if (this.running)
+        this.stop();
+      else
+        this.start();
+    },
+    set(running: boolean) {
+      if (running !== this.running) this.toggle();
+    }
+  }
+  if (running) ret.start();
+  return ret;
 }
 
 export default App;

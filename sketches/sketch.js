@@ -3,10 +3,10 @@ import { n_arr, mod, map, invCosn } from "/rendr/library/Utils.js"
 // import SKETCH_PATH from "./sketch.js?url"
 
 const SKETCH_PATH = "/sketches/sketch.js";
-console.log({ SKETCH_PATH });
+// console.log({ SKETCH_PATH });
 
 const WORKER_NAME = self.name;
-console.log({ WORKER_NAME });
+// console.log({ WORKER_NAME });
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
@@ -71,24 +71,24 @@ function Sketch(tick_par) {
 
    });
 
-   const frame_par = null
-   // const frame_par = sketch.draw(() => {
-   //    const t = (tick_par.get() % FRAMES) / FRAMES;
-   //    const tick = tick_par.get();
-   //    const state = [
-   //       ...state1_par.get(),
-   //       ...state2_par.get(),
-   //       ...state3_cache.getLatest(tick),
-   //       ...state4_cache.getLatest(tick),
-   //    ];
-   //    return drawScene(t, state);
-   // });
+   // const frame_par = null
+   const frame_par = sketch.draw(() => {
+      const t = (tick_par.get() % FRAMES) / FRAMES;
+      const tick = tick_par.get();
+      const state = [
+         ...state1_par.get(),
+         ...state2_par.get(),
+         ...state3_cache.getLatest(tick),
+         ...state4_cache.getLatest(tick),
+      ];
+      return drawScene(t, state);
+   });
 
-   const gen_frame_par = null
-   // const gen_frame_par = sketch.generate(100000, (i) => {
-   //    const t = (tick_par.get() % FRAMES) / FRAMES;
-   //    return generateScene(i, t);
-   // });
+   // const gen_frame_par = null
+   const gen_frame_par = sketch.generate(100000, (i) => {
+      const t = (tick_par.get() % FRAMES) / FRAMES;
+      return generateScene(i, t);
+   });
 
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
       const state = [
@@ -177,7 +177,13 @@ function Setup(createUI) {
    const running_par = createParameter(true, "running");
    const [frame_cache, frame_par, gen_frame_par, state3_cache, state4_cache] = Sketch(tick_par);
 
-   createUI((ui) => {
+   createUI(ui => {
+      ui.createContainer(ui => {
+         if (frame_par) ui.createView(frame_par);
+         if (gen_frame_par) ui.createView(gen_frame_par);
+         if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
+      });
+
       ui.createTimeline(FRAMES, tick_par, running_par, [
          frame_cache,
          state4_cache,
@@ -185,149 +191,9 @@ function Setup(createUI) {
       ]);
    })
 
-   if (!WORKER_NAME) {
-      const root_id = "rendr";
-      const root_element = document.getElementById(root_id) ?? document.body;
-      // root_element.classList.add("root");
-
-
-      if (frame_cache) {
-         const display1 = document.createElement("canvas");
-         display1.width = WIDTH;
-         display1.height = HEIGHT;
-         root_element.append(display1);
-
-         createEffect(() => {
-            const ctx = display1.getContext('2d');
-
-            const frame = tick_par.get();
-
-            ctx.clearRect(0, 0, display1.width, display1.height);
-
-            const c_frame = mod(frame, frame_cache.count);
-            const bitmap = running_par.get()
-               ? frame_cache.getLatestValid(c_frame)
-               : frame_cache.getLatest(c_frame);
-
-            if (bitmap)
-               ctx.drawImage(bitmap, 0, 0);
-
-            // {
-            //    const w = display1.width / frame_cache.count + 1;
-            //    const h = 10;
-            //    const t = mod(frame / frame_cache.count);
-
-            //    ctx.fillStyle = "black";
-            //    ctx.beginPath();
-            //    ctx.rect(0, display1.height, display1.width, - h * 3);
-            //    ctx.fill();
-
-            //    // ctx.strokeStyle = "red";
-            //    // ctx.fillStyle = "red";
-            //    // ctx.lineWidth = 3;
-            //    // ctx.beginPath();
-            //    // ctx.rect(t * display1.width, display1.height, w, - 15);
-            //    // ctx.stroke();
-            //    // ctx.fill();
-
-            //    if (state3_cache) {
-            //       // state3_cache.get();
-            //       state3_cache.cache.forEach((el, i) => {
-            //          ctx.fillStyle = ({
-            //             valid: "green",
-            //             pending: "white",
-            //             invalid: "orange",
-            //          })
-            //          [state3_cache.status(i)];
-            //          const f = i / frame_cache.count;
-            //          ctx.beginPath();
-            //          ctx.rect(f * display1.width, display1.height - 0, w, - h);
-            //          ctx.fill();
-            //       });
-            //    }
-
-            //    if (state4_cache) {
-            //       // state4_cache.get();
-            //       state4_cache.cache.forEach((el, i) => {
-            //          ctx.fillStyle = ({
-            //             valid: "green",
-            //             pending: "white",
-            //             invalid: "orange",
-            //          })
-            //          [state4_cache.status(i)];
-            //          const f = i / frame_cache.count;
-            //          ctx.beginPath();
-            //          ctx.rect(f * display1.width, display1.height - h, w, - h);
-            //          ctx.fill();
-            //       });
-            //    }
-
-            //    frame_cache.cache.forEach((el, i) => {
-            //       ctx.fillStyle = ({
-            //          valid: "green",
-            //          pending: "white",
-            //          invalid: "orange",
-            //       })
-            //       [frame_cache.status(i)];
-            //       const f = i / frame_cache.count;
-            //       ctx.beginPath();
-            //       ctx.rect(f * display1.width, display1.height - 2 * h, w, - h);
-            //       ctx.fill();
-            //    });
-
-            //    ctx.strokeStyle = "red";
-            //    ctx.lineWidth = 3;
-            //    ctx.beginPath();
-            //    ctx.rect(t * display1.width, display1.height, w, - 3 * h - ctx.lineWidth / 2);
-            //    ctx.stroke();
-
-            // }
-
-         },
-            // { batch: true }
-            // true
-         );
-      }
-
-      if (frame_par) {
-         const display2 = document.createElement("canvas");
-         display2.width = WIDTH;
-         display2.height = HEIGHT;
-         root_element.append(display2);
-
-         createEffect(() => {
-            const ctx = display2.getContext('2d');
-
-            ctx.clearRect(0, 0, display2.width, display2.height);
-
-            const bitmap = frame_par.get();
-            if (bitmap)
-               ctx.drawImage(bitmap, 0, 0);
-         });
-      }
-
-      if (gen_frame_par) {
-         const display2 = document.createElement("canvas");
-         display2.width = WIDTH;
-         display2.height = HEIGHT;
-         root_element.append(display2);
-
-         createEffect(() => {
-            const ctx = display2.getContext('2d');
-
-            ctx.clearRect(0, 0, display2.width, display2.height);
-
-            const bitmap = gen_frame_par.get();
-            if (bitmap)
-               ctx.drawImage(bitmap, 0, 0);
-         });
-      }
-
-      return () => {
-         global_dependencies.forEach(dependency => dependency.cleanup());
-         global_workers.forEach(worker => worker.terminate());
-         root_element.innerHTML = '';
-      }
+   return () => {
+      global_dependencies.forEach(dependency => dependency.cleanup());
+      global_workers.forEach(worker => worker.terminate());
    }
 }
 
@@ -792,14 +658,12 @@ function createEffect(callback, options = { batch: false }) {
       global_effect_dependencies_stack.push(new Set());
       const _cleanup = callback()
       dependencies = global_effect_dependencies_stack.pop()
-      // console.log(dependencies, dependencies);
 
       const callbacks = [...dependencies].map(({ dependency }) => dependency.onChange(_callback));
 
       cleanup = () => {
          _cleanup && _cleanup();
          dependencies.forEach(({ dependency }) => dependency.unsubscribe(_callback));
-         // console.log("cleanup", dependencies);
       }
    }
 
