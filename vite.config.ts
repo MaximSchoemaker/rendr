@@ -1,6 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 // import devtools from 'solid-devtools/vite';
+
+import { viteStaticCopy } from 'vite-plugin-static-copy'
+import path from 'node:path'
 
 export default defineConfig({
   plugins: [
@@ -10,6 +13,19 @@ export default defineConfig({
     */
     // devtools(),
     solidPlugin(),
+
+    viteStaticCopy({
+      targets: [
+        {
+          src: normalizePath(path.resolve(__dirname, './rendr')),
+          dest: './',
+        },
+        {
+          src: normalizePath(path.resolve(__dirname, './sketches')),
+          dest: './',
+        },
+      ],
+    }),
   ],
   server: {
     port: 3000,
@@ -17,4 +33,5 @@ export default defineConfig({
   build: {
     target: 'esnext',
   },
+  // base: './',
 });

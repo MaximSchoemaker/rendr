@@ -1,10 +1,12 @@
-import { Draw2dContext } from "../rendr/library/Draw2d.ts";
-import { n_arr, mod, map, invCosn } from "../rendr/library/Utils.ts"
-
-const WORKER_NAME = self.name;
-// console.log({ WORKER_NAME });
+import { Draw2dContext } from "/rendr/library/Draw2d.js";
+import { n_arr, mod, map, invCosn } from "/rendr/library/Utils.js"
+// import SKETCH_PATH from "./sketch.js?url"
 
 const SKETCH_PATH = "/sketches/sketch.js";
+console.log({ SKETCH_PATH });
+
+const WORKER_NAME = self.name;
+console.log({ WORKER_NAME });
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
@@ -587,7 +589,9 @@ function createWorker(execute, receive, onDependencyChanged) {
       }, { batch: true });
 
    } else if (WORKER_NAME === '') {
-      const worker = new Worker(SKETCH_PATH, { type: "module", name });
+      // const worker = new Worker(SKETCH_PATH, { type: "module", name });
+      const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
+      // const worker = SketchWorker({ name });
       global_workers.add(worker);
 
       worker.addEventListener("message", (evt) => {

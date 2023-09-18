@@ -3,7 +3,7 @@ import { createEffect, type Component, onCleanup, createSignal, JSXElement, For,
 import logo from './logo.svg';
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
-import { mod, clamp } from "../rendr/library/Utils.ts";
+import { mod, clamp } from "../rendr/library/Utils";
 
 type Dependency = {
   // get: () => any;
