@@ -120,44 +120,73 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
 
   let shiftDown = false;
 
-  const loop = createAnimationLoop(() => set_tick((tick() + 1) % frames));
+  const loop = createAnimationLoop(() => {
+    set_tick((tick() + 1) % frames)
+    if (running()) {
+      move = 0;
+      move_start_tick = mod(tick(), frames);
+    }
+  });
   onCleanup(loop.stop);
 
   createEffect(() => loop.set(running()));
 
   let move = 0;
-  let move_start_tick = 0;
+  let move_start_tick = tick();
+
+  function onStartScrub() {
+    move = 0;
+    move_start_tick = mod(tick(), frames);
+    shiftDown = true;
+  }
+
+  function onStopScrub() {
+    shiftDown = false;
+  }
 
   window.onkeydown = (evt) => {
     // console.log(evt.code);
 
-    if (evt.code === 'Space') {
+    if (evt.code === 'Space')
       set_running(!running());
-    }
 
-    if (evt.code === 'ArrowLeft') {
+    if (evt.code === 'ArrowLeft')
       tick_par.set(mod(tick() - 1, frames));
-    }
 
-    if (evt.code === 'ArrowRight') {
+    if (evt.code === 'ArrowRight')
       tick_par.set(mod(tick() + 1, frames));
-    }
 
     if (evt.code === "ShiftLeft" && !evt.repeat) {
-      move = 0;
-      move_start_tick = mod(tick(), frames);
-      shiftDown = true;
       set_running(false);
+      onStartScrub();
     }
   };
 
   window.onkeyup = (evt) => {
     if (evt.code === "ShiftLeft")
-      shiftDown = false;
+      onStopScrub()
   };
 
-  window.onmousemove = (evt) => {
+  let el: HTMLDivElement;
+  createEffect(() => {
+    el.onpointerdown = (evt) => {
+      evt.preventDefault();
+      onStartScrub();
+    }
+
+    el.onclick = () => {
+      if (move === 0) set_running(!running());
+    }
+  });
+
+  window.onpointerup = () => {
+    onStopScrub()
+  }
+
+  window.onpointermove = (evt) => {
     if (shiftDown) {
+      set_running(false);
+
       let _tick = mod(
         tick(),
         frames
@@ -174,7 +203,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   };
 
   return (
-    <div class={styles.Timeline}>
+    <div class={styles.Timeline} ref={ref => el = ref}>
       <div class={styles.rows}>
 
         <For each={caches}>{cache =>
@@ -225,6 +254,9 @@ function View({ frame_par }: ViewProps) {
     const bitmap = frame();
     if (!bitmap) return;
 
+    el.width = bitmap.width;
+    el.height = bitmap.height;
+
     const ctx = el.getContext('2d');
     if (!ctx) return;
 
@@ -235,8 +267,8 @@ function View({ frame_par }: ViewProps) {
     <canvas
       class={styles.View}
       ref={(ref) => el = ref}
-      width={frame()?.width}
-      height={frame()?.height}
+      width={1080}
+      height={1080}
     />
   );
 }
@@ -275,6 +307,8 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
     <canvas
       class={styles.View}
       ref={(ref) => el = ref}
+      width={1080}
+      height={1080}
     />
   );
 }

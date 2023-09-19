@@ -1,8 +1,9 @@
 .App {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   /* overflow: hidden; */
+  /* background-color: black; */
 }
 
 .Container {
@@ -69,34 +70,12 @@
   background-color: white;
 }
 
-/* .viewContainer {
-  background-color: red;
-  height: 100%;
-  width: 100%;
-  max-width: 100%;
-  max-height: 100%;
-
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-} */
-
-/* .viewElement {
-  background-color: green;
-
-  flex: 1;
-  min-width: 0;
-  max-width: fit-content;
-  max-height: 100%;
-  display: block;
-} */
-
 .View {
   flex: 1;
   min-width: 0;
   max-width: fit-content;
   max-height: 100%;
   display: block;
+  /* outline: 1px solid black; */
 }
 
