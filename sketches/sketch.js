@@ -16,10 +16,12 @@ const FRAMES = 200;
 function Sketch(tick_par) {
    const sketch = createSketch();
    const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
+   const state1_count_par = createParameter(1000, "state1_count_par");
 
    const state1_par = sketch.update([], () => {
       const t = 1; //(tick_par.get() % FRAMES) / FRAMES;
-      return n_arr(1000, () => ({
+      const count = state1_count_par.get();
+      return n_arr(count, () => ({
          x: Math.random() * t,
          y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
       }));
@@ -135,7 +137,11 @@ function Sketch(tick_par) {
       return backbuffer;
    }
 
-   return [frame_cache, frame_par, gen_frame_par, state3_cache, state4_cache];
+   return {
+      frame_cache, frame_par, gen_frame_par,
+      state3_cache, state4_cache,
+      state1_count_par
+   }
 }
 
 
@@ -175,13 +181,21 @@ function Setup(createUI) {
 
    const tick_par = createParameter(0, "tick");
    const running_par = createParameter(true, "running");
-   const [frame_cache, frame_par, gen_frame_par, state3_cache, state4_cache] = Sketch(tick_par);
+   const {
+      frame_cache, frame_par, gen_frame_par,
+      state3_cache, state4_cache,
+      state1_count_par,
+   } = Sketch(tick_par);
 
    createUI(ui => {
       ui.createContainer(ui => {
          if (frame_par) ui.createView(frame_par);
          if (gen_frame_par) ui.createView(gen_frame_par);
          if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
+      });
+
+      ui.createWindow(ui => {
+         if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
       });
 
       ui.createTimeline(FRAMES, tick_par, running_par, [

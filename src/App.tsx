@@ -1,8 +1,8 @@
-import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show } from 'solid-js';
+import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
 
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
-import { mod, clamp } from "../rendr/library/Utils";
+import { mod, clamp, floorTo } from "../rendr/library/Utils";
 
 type Dependency = {
   set: (value: any) => void;
@@ -28,6 +28,12 @@ class UI {
   constructor(AddComponent: (component: JSXElement) => void) {
     this.AddComponent = AddComponent;
   }
+  createContainer(callback: (ui: UI) => void) {
+    this.AddComponent(Container({ callback }));
+  }
+  createWindow(callback: (ui: UI) => void) {
+    this.AddComponent(Window({ callback }));
+  }
   createTimeline(frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) {
     this.AddComponent(Timeline({ frames, tick_par, running_par, caches }));
   }
@@ -37,8 +43,8 @@ class UI {
   createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) {
     this.AddComponent(CacheView({ tick_par, running_par, frame_cache }));
   }
-  createContainer(callback: (ui: UI) => void) {
-    this.AddComponent(Container({ callback }));
+  createParameterNumber(name: string, parameter: Parameter<number>, options: ParameterNumberOptions) {
+    this.AddComponent(ParameterNumber({ name, parameter, options }));
   }
 }
 
@@ -103,6 +109,30 @@ const Container = ({ callback }: ContainerProps) => {
   );
 };
 
+type WindowProps = {
+  callback: (ui: UI) => void;
+}
+
+const Window = ({ callback }: WindowProps) => {
+
+  const [components, set_components] = createSignal<JSXElement[]>([]);
+
+  function AddComponent(component: JSXElement) {
+    set_components(components => [...components, component]);
+  }
+
+  const ui = new UI(AddComponent);
+  callback(ui);
+
+  return (
+    <div class={styles.Window}>
+      <For each={components()}>{
+        component => component
+      }</For>
+    </div>
+  );
+};
+
 type TimelineProps = {
   frames: number;
   tick_par: Parameter<number>;
@@ -144,8 +174,13 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
     shiftDown = false;
   }
 
+  function hasFocus() {
+    return document.activeElement === document.body;
+  }
+
   window.onkeydown = (evt) => {
     // console.log(evt.code);
+    if (!hasFocus()) return;
 
     if (evt.code === 'Space')
       set_running(!running());
@@ -184,6 +219,8 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   }
 
   window.onpointermove = (evt) => {
+    if (!hasFocus()) return;
+
     if (shiftDown) {
       set_running(false);
 
@@ -313,6 +350,136 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   );
 }
 
+type ParameterNumberOptions = {
+  min?: number;
+  max?: number;
+  step?: number;
+  range?: number;
+}
+
+type ParameterNumberProps = {
+  name: string;
+  parameter: Parameter<number>;
+  options: ParameterNumberOptions;
+}
+
+function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps) {
+  const [value, set_value] = createRendrParameterSignal<number>(parameter);
+
+  let shiftDown = false;
+  let move = 0;
+  let move_start_value = value();
+
+  const { min, max } = options;
+
+  let range = options.range ?? value();
+  if (min === undefined && max !== undefined) range = max
+  if (min !== undefined && max !== undefined) range = max - min;
+
+  const step = options.step ?? range / 100;
+
+  const progress = () => {
+    return (min !== undefined && max !== undefined)
+      ? clamp((value() - min) / range)
+      : 0;
+  }
+
+  let el: HTMLDivElement;
+  let input_el: HTMLInputElement;
+
+  function onStartScrub() {
+    move = 0;
+    move_start_value = value();
+    shiftDown = true;
+  }
+
+  function onStopScrub() {
+    shiftDown = false;
+  }
+
+  function hasFocus() {
+    return document.activeElement === input_el;
+  }
+
+  function updateValue(new_value: number) {
+    if (step !== undefined) new_value = floorTo(new_value, step);
+    if (min !== undefined && max === undefined) new_value = Math.max(new_value, min);
+    if (min === undefined && max !== undefined) new_value = Math.min(new_value, max);
+    if (min !== undefined && max !== undefined) new_value = clamp(new_value, min, max);
+    set_value(new_value);
+  }
+
+  createEffect(() => {
+    function onKeyDown(evt: KeyboardEvent) {
+      if (!hasFocus()) return;
+
+      // console.log(evt.code);
+      if (evt.code === 'ArrowLeft' && evt.ctrlKey)
+        updateValue(untrack(value) - step);
+      if (evt.code === 'ArrowRight' && evt.ctrlKey)
+        updateValue(untrack(value) + step);
+
+      if (evt.code === "ShiftLeft" && !evt.repeat) {
+        onStartScrub();
+      }
+    }
+    function onKeyUp(evt: KeyboardEvent) {
+      if (evt.code === "ShiftLeft")
+        onStopScrub()
+    }
+    function onPointerDown(evt: PointerEvent) {
+      onStartScrub();
+    }
+    function onPointerUp(evt: PointerEvent) {
+      onStopScrub()
+    }
+    function onPointerMove(evt: PointerEvent) {
+      if (!hasFocus()) return;
+      if (shiftDown) {
+
+        // const { width } = display1.getBoundingClientRect();
+        const width = window.innerWidth;
+        const f = evt.movementX / width;
+        const inc = f * range;
+        move += inc;
+
+        updateValue(move_start_value + move);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    el.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointermove", onPointerMove);
+
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      el.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointermove", onPointerMove);
+    });
+  });
+
+  return (
+    <div
+      class={styles.Parameter}
+      ref={ref => el = ref}
+      onclick={() => input_el.focus()}
+      style={{ "--progress": progress() }}
+    >
+      <span class={styles.parameterName} >{name}</span>
+      <span class={styles.parameterSeparator}>:</span>
+      <input type="number"
+        class={styles.parameterInput}
+        ref={ref => input_el = ref}
+        value={value()}
+        onchange={evt => set_value(evt.target.value)}
+      />
+    </div>
+  )
+}
 
 function createRendrParameterSignal<T>(dependency: Parameter<T>) {
   const _value = dependency.value;

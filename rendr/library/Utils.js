@@ -17,6 +17,9 @@ export const mod = (i, n = 1) => {
 export const clamp = (val, min = 0, max = 1) => {
     return Math.max(min, Math.min(max, val));
 };
+export const floorTo = (val, step) => {
+    return Math.floor(val / step) * step;
+};
 export const map = (v, in_from, in_to, out_from, out_to) => {
     const f = (v - in_from) / (in_to - in_from);
     return out_from + f * (out_to - out_from);
