@@ -24,7 +24,7 @@
 
 
 .Window {
-  padding: 2px;
+  padding: 5px;
   background-color: black;
 }
 
@@ -64,7 +64,20 @@
 }
 
 .active {
-  outline: 4px solid #80F;
+  outline: 4px solid #84F;
+  position: relative;
+  isolation: isolate;
+}
+
+@media (orientation: landscape) {
+  .active::before {
+    z-index: -1;
+    content: '';
+    position: absolute;
+    inset: 0;
+    outline: 6px solid black;
+    outline-offset: -1px;
+  }   
 }
 
 .Row {
@@ -78,7 +91,8 @@
 }
 
 .valid {
-  background-color: #0F4;
+  /* background-color: #0F4; */
+  background-color: #0F8;
 }
 .invalid {
   background-color: #F80;
