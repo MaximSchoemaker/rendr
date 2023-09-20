@@ -123,6 +123,7 @@
 
 .parameterName {
   flex: 1;
+  user-select: none;
 }
 .parameterSeparator {
   padding: 0 3px;

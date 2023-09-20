@@ -366,7 +366,7 @@ type ParameterNumberProps = {
 function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps) {
   const [value, set_value] = createRendrParameterSignal<number>(parameter);
 
-  let shiftDown = false;
+  let scrubbing = false;
   let move = 0;
   let move_start_value = value();
 
@@ -386,15 +386,17 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
 
   let el: HTMLDivElement;
   let input_el: HTMLInputElement;
+  let scrub_type: "pointer" | "shift" = "shift";
 
-  function onStartScrub() {
+  function onStartScrub(type: "pointer" | "shift") {
     move = 0;
     move_start_value = value();
-    shiftDown = true;
+    scrubbing = true;
+    scrub_type = type;
   }
 
   function onStopScrub() {
-    shiftDown = false;
+    scrubbing = false;
   }
 
   function hasFocus() {
@@ -410,6 +412,8 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
   }
 
   createEffect(() => {
+    const containerWidth = el.getBoundingClientRect().width;
+
     function onKeyDown(evt: KeyboardEvent) {
       if (!hasFocus()) return;
 
@@ -420,7 +424,7 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
         updateValue(untrack(value) + step);
 
       if (evt.code === "ShiftLeft" && !evt.repeat) {
-        onStartScrub();
+        onStartScrub("shift");
       }
     }
     function onKeyUp(evt: KeyboardEvent) {
@@ -428,17 +432,24 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
         onStopScrub()
     }
     function onPointerDown(evt: PointerEvent) {
-      onStartScrub();
+      if (evt.target !== input_el) {
+        evt.preventDefault();
+        input_el.focus();
+      }
+      onStartScrub("pointer");
     }
     function onPointerUp(evt: PointerEvent) {
       onStopScrub()
     }
     function onPointerMove(evt: PointerEvent) {
       if (!hasFocus()) return;
-      if (shiftDown) {
+      if (scrubbing) {
 
-        // const { width } = display1.getBoundingClientRect();
-        const width = window.innerWidth;
+        const width = ({
+          shift: window.innerWidth,
+          pointer: containerWidth
+        })[scrub_type];
+
         const f = evt.movementX / width;
         const inc = f * range;
         move += inc;
@@ -464,18 +475,20 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
 
   return (
     <div
-      class={styles.Parameter}
       ref={ref => el = ref}
-      onclick={() => input_el.focus()}
+      class={styles.Parameter}
       style={{ "--progress": progress() }}
     >
       <span class={styles.parameterName} >{name}</span>
       <span class={styles.parameterSeparator}>:</span>
       <input type="number"
-        class={styles.parameterInput}
         ref={ref => input_el = ref}
+        class={styles.parameterInput}
         value={value()}
-        onchange={evt => set_value(evt.target.value)}
+        onchange={evt => set_value(+evt.target.value)}
+        step={step}
+        min={min}
+        max={max}
       />
     </div>
   )
