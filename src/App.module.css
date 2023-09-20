@@ -22,6 +22,11 @@
   flex-wrap: wrap;
 }
 
+@media (orientation: portrait) {
+  .Container {
+    flex-direction: column;
+  }
+}
 
 .Window {
   padding: 5px;
@@ -103,11 +108,24 @@
 
 .View {
   flex: 1;
-  min-width: 0;
-  max-width: fit-content;
+  align-self: center;
+
+  min-width: 0; 
+  min-height: 0;
+
+  max-width: min-content;
   max-height: 100%;
+
   display: block;
   /* outline: 1px solid black; */
+  object-fit: contain;
+}
+
+@media (orientation: portrait) {
+  .View {    
+    max-width: 100%;
+    max-height: min-content;
+   }
 }
 
 .Parameter {
@@ -125,12 +143,18 @@
   background-position: calc((1 - var(--progress)) * 100%);
 
   border: 1px solid currentColor;
+  /* outline-offset: -0.5px; */
+  box-sizing: border-box;
 
   padding: 1px;
   padding-left: 5px;
 
   font-size: 13px;
   font-family: monospace;
+}
+
+.Parameter:not(:first-child) {
+  margin-top: -1px;
 }
 
 .Parameter:focus-within {

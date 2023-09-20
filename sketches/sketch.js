@@ -189,6 +189,7 @@ function Setup(createUI) {
 
    createUI(ui => {
       ui.createWindow(ui => {
+         if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES, step: 1 });
          if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
       });
 
