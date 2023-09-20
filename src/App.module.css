@@ -22,21 +22,26 @@
   flex-wrap: wrap;
 }
 
+
 .Window {
   padding: 2px;
   background-color: black;
+}
 
-  position: absolute;
-  top: 0;
-  right: 0;
-
-  flex: 1;
-  flex-direction: column;
+@media (orientation: landscape) {
+  .Window {
+    position: absolute;
+    top: 0;
+    right: 0;
+  
+    flex: 1;
+  }
 }
 
 .Timeline {
   padding: 5px;
   background-color: black;
+  --gap: 1px;
 }
 
 .rows {
@@ -51,7 +56,7 @@
   position: absolute;
   display: flex;
   inset: 0;
-  gap: 1px;
+  gap: var(--gap);
 }
 
 .cursor {
@@ -65,7 +70,7 @@
 .Row {
   height: 10px;
   display: flex;
-  gap: 1px;
+  gap: var(--gap);
 }
 
 .frame {

@@ -188,14 +188,14 @@ function Setup(createUI) {
    } = Sketch(tick_par);
 
    createUI(ui => {
+      ui.createWindow(ui => {
+         if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
+      });
+
       ui.createContainer(ui => {
          if (frame_par) ui.createView(frame_par);
          if (gen_frame_par) ui.createView(gen_frame_par);
          if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
-      });
-
-      ui.createWindow(ui => {
-         if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
       });
 
       ui.createTimeline(FRAMES, tick_par, running_par, [

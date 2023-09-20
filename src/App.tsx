@@ -206,6 +206,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   createEffect(() => {
     el.onpointerdown = (evt) => {
       evt.preventDefault();
+      document.activeElement?.blur();
       onStartScrub();
     }
 
@@ -239,8 +240,14 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
     }
   };
 
+  const gap = () => isMobile() ? 0 : 1;
+
   return (
-    <div class={styles.Timeline} ref={ref => el = ref}>
+    <div
+      ref={ref => el = ref}
+      class={styles.Timeline}
+      style={{ "--gap": gap() + "px" }}
+    >
       <div class={styles.rows}>
 
         <For each={caches}>{cache =>
@@ -383,6 +390,9 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
       ? clamp((value() - min) / range)
       : 0;
   }
+  const readonly = () => min !== undefined && max !== undefined
+    ? isMobile()
+    : false;
 
   let el: HTMLDivElement;
   let input_el: HTMLInputElement;
@@ -412,8 +422,6 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
   }
 
   createEffect(() => {
-    const containerWidth = el.getBoundingClientRect().width;
-
     function onKeyDown(evt: KeyboardEvent) {
       if (!hasFocus()) return;
 
@@ -447,7 +455,7 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
 
         const width = ({
           shift: window.innerWidth,
-          pointer: containerWidth
+          pointer: el.getBoundingClientRect().width,
         })[scrub_type];
 
         const f = evt.movementX / width;
@@ -489,9 +497,21 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
         step={step}
         min={min}
         max={max}
+        readonly={readonly()}
       />
     </div>
   )
+}
+
+function isMobile() {
+  const calculateIsMobile = () => window.innerWidth < window.innerHeight;
+  const [is_mobile, set_is_mobile] = createSignal(calculateIsMobile());
+  createEffect(() => {
+    const onResize = () => set_is_mobile(calculateIsMobile());
+    window.addEventListener("resize", onResize);
+    onCleanup(() => window.removeEventListener("resize", onResize));
+  });
+  return is_mobile();
 }
 
 function createRendrParameterSignal<T>(dependency: Parameter<T>) {
