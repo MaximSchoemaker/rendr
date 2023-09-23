@@ -16,29 +16,44 @@ const FRAMES = 200;
 function Sketch(tick_par) {
    const sketch = createSketch();
    const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
-   const state1_count_par = createParameter(1000, "state1_count_par");
+   const state1_count_par = createParameter(0, "state1_count_par");
+   const state2_count_par = createParameter(0, "state2_count_par");
 
-   const state1_par = sketch.update([], () => {
-      const t = 1; //(tick_par.get() % FRAMES) / FRAMES;
-      const count = state1_count_par.get();
-      return n_arr(count, () => ({
-         x: Math.random() * t,
-         y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
-      }));
-   });
-
-   const state2_par = sketch.construct([], 2000, (state) => {
-      const t = 1; //(tick_par.get() % FRAMES) / FRAMES;
-      const x = Math.random() * t;
-      const y = map(Math.random(), 0, 1, 1 / 4, 2 / 4)
-      state.push({ x, y })
-
+   const state1_par = sketch.update([], (state) => {
       // let arr = [];
       // for (let i = 0; i < 1000; i++) {
       //    arr.unshift(i);
       // }
+
+      const t = 1;
+      const count = state1_count_par.get();
+
+      if (state.length > count) return state.slice(0, count);
+      while (state.length < count) state.push({
+         x: Math.random() * t,
+         y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
+      });
+
+      // return n_arr(count, () => ({
+      //    x: Math.random() * t,
+      //    y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
+      // }));
    });
 
+   // const state2_par = null;
+   const state2_par = sketch.construct([], state2_count_par, (state, index, count) => {
+      // let arr = [];
+      // for (let i = 0; i < 1000; i++) {
+      //    arr.unshift(i);
+      // }
+
+      const t = 1;
+      const x = Math.random() * t;
+      const y = map(Math.random(), 0, 1, 1 / 4, 2 / 4)
+      state.push({ x, y })
+   });
+
+   // const state3_cache = null
    const state3_cache = sketch.simulate([], FRAMES, (state, frame, t) => {
       // let arr = [];
       // for (let i = 0; i < 50000; i++) {
@@ -70,13 +85,12 @@ function Sketch(tick_par) {
       const state3_map = state3.map(({ x, y }) => ({ x, y: map(Math.random(), 0, 1, 3 / 4, 4 / 4) }));
       return state3_map;
       state.push(...state3_map);
-
    });
 
    // const frame_par = null
    const frame_par = sketch.draw(() => {
-      const t = (tick_par.get() % FRAMES) / FRAMES;
       const tick = tick_par.get();
+      const t = (tick % FRAMES) / FRAMES;
       const state = [
          ...state1_par.get(),
          ...state2_par.get(),
@@ -103,7 +117,6 @@ function Sketch(tick_par) {
    });
 
    function drawScene(t, state) {
-      // console.log("drawScene", t);
       const ctx = new Draw2dContext(backbuffer);
       ctx.clear("blue");
 
@@ -140,7 +153,7 @@ function Sketch(tick_par) {
    return {
       frame_cache, frame_par, gen_frame_par,
       state3_cache, state4_cache,
-      state1_count_par
+      state1_count_par, state2_count_par
    }
 }
 
@@ -184,13 +197,14 @@ function Setup(createUI) {
    const {
       frame_cache, frame_par, gen_frame_par,
       state3_cache, state4_cache,
-      state1_count_par,
+      state1_count_par, state2_count_par,
    } = Sketch(tick_par);
 
    createUI(ui => {
       ui.createWindow(ui => {
          if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES, step: 1 });
          if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
+         if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
       });
 
       ui.createContainer(ui => {
@@ -203,7 +217,7 @@ function Setup(createUI) {
          frame_cache,
          state4_cache,
          state3_cache,
-      ]);
+      ].filter(c => !!c));
    })
 
    return () => {
@@ -223,7 +237,10 @@ function createSketch() {
          const state_par = createParameter(initial_state);
 
          const worker = createWorker(
-            () => callback(),
+            () => {
+               state_par.value = callback(state_par.value) ?? state_par.value;
+               return state_par.value;
+            },
             (state) => state_par.set(state),
          );
 
@@ -232,24 +249,32 @@ function createSketch() {
       construct(initial_state, count, callback) {
 
          const state_par = createParameter(initial_state);
+         const count_par = isParameter(count) ? count : createParameter(count);
+
          let timeout;
+         let state
+         let index = 0;
+
          const worker = createWorker(
             () => {
-               let state = structuredClone(initial_state);
-               let index = 0;
+               if (count_par.value <= index) index = 0;
+               if (index === 0) state = structuredClone(initial_state);
+
                const interval = 1000;
                function work() {
                   const time = Date.now();
 
                   global_effect_dependencies_stack.push(new Set());
+                  const count = count_par.get();
                   while (index < count && Date.now() - time < interval) {
-                     const new_state = callback(state);
+                     const new_state = callback(state, index, count);
                      state = new_state ?? state;
                      index++;
                   }
                   const dependencies = global_effect_dependencies_stack.pop();
                   const dependencies_ids_and_indexes = [...dependencies]
                      .map(({ dependency, index }) => ({ id: dependency.id, index }));
+
 
                   postMessage({ value: state, dependencies_ids_and_indexes });
 
@@ -259,17 +284,15 @@ function createSketch() {
                   }
                };
                work();
-
             },
             (state) => state_par.set(state),
          );
-
 
          return state_par;
       },
       simulate(initial_state, count, callback) {
 
-         const index_par = createParameter(0);
+         const index_par = createParameter({ index: 0, timestamp: undefined });
          const state_cache = createCache(count);
          state_cache.set(0, initial_state);
 
@@ -278,9 +301,8 @@ function createSketch() {
          const requestNextIndex = () => {
             for (let i = 0; i < count; i++) {
                const index = mod(start_index + i, count);
-               if (state_cache.status(index) !== 'valid') {
-                  state_cache.pending(index);
-                  index_par.set(index)
+               if (!state_cache.isValid(index)) {
+                  index_par.set({ index, timestamp: state_cache.invalidTimestamp(index) })
                   return
                }
             }
@@ -291,7 +313,8 @@ function createSketch() {
          const previous_states = [initial_state];
          const worker = createWorker(
             () => {
-               const i = mod(index_par.get(), count);
+               const { index, timestamp } = index_par.get();
+               const i = mod(index, count);
                let state = structuredClone(previous_states[i - 1]);
                const t = i / count;
 
@@ -299,17 +322,16 @@ function createSketch() {
                state = new_state ?? state;
                previous_states[i] = state;
 
-               return { i, state }
+               return { i, state, timestamp }
             },
-            ({ i, state }, dependencies_ids_and_indexes) => {
-               const wasInvalid = state_cache.status(i) === 'invalid'
+            ({ i, state, timestamp }, dependencies_ids_and_indexes) => {
+               if (state_cache.invalidTimestamp(i) !== timestamp) {
+                  state_cache.invalidSet(i, state);
+                  return
+               }
                state_cache.set(i, state);
-               if (wasInvalid) state_cache.invalidate(i);
-
                state_cache.invalidateFrom(i + 1)
-
                index_dependencies[i] = dependencies_ids_and_indexes;
-
                requestNextIndex();
             },
             (dependency_id, dependency_index) => {
@@ -339,7 +361,6 @@ function createSketch() {
                return bitmap;
             },
             (bitmap) => frame_par.set(bitmap),
-            // () => worker?.terminate(),
          );
 
          return frame_par;
@@ -370,7 +391,7 @@ function createSketch() {
                   postMessage({ value: bitmap, dependencies_ids_and_indexes });
 
                   const ctx = canvas.getContext('2d');
-                  ctx.drawImage(bitmap, 0, 0); // draw bitmap back onto canvas
+                  ctx.drawImage(bitmap, 0, 0);
 
                   if (index < count) {
                      clearTimeout(timeout);
@@ -380,14 +401,13 @@ function createSketch() {
                work();
             },
             (bitmap) => frame_par.set(bitmap),
-            // (id) => console.log({ id }),
          );
 
          return frame_par;
       },
       animate(frames, callback) {
 
-         const index_par = createParameter(null);
+         const index_par = createParameter({ index: 0 });
          const frame_cache = createCache(frames);
 
          let start_frame = 0;
@@ -399,9 +419,8 @@ function createSketch() {
          const requestNextFrame = () => {
             for (let i = 0; i < frames; i++) {
                const frame = mod(start_frame + i, frames);
-               if (frame_cache.status(frame) !== 'valid') {
-                  frame_cache.pending(frame);
-                  index_par.set(frame)
+               if (!frame_cache.isValid(frame)) {
+                  index_par.set({ index: frame, timestamp: frame_cache.invalidTimestamp(frame) })
                   return
                }
             }
@@ -411,7 +430,8 @@ function createSketch() {
          const frames_dependencies = []
          const worker = createWorker(
             () => {
-               const i = mod(index_par.get(), frames);
+               const { index, timestamp } = index_par.get();
+               const i = mod(index, frames);
 
                const t = i / frames;
                const canvas = callback(i, t);
@@ -419,15 +439,15 @@ function createSketch() {
                const bitmap = canvas.transferToImageBitmap();
                ctx.drawImage(bitmap, 0, 0);
 
-               return { i, bitmap }
+               return { i, bitmap, timestamp }
             },
-            ({ i, bitmap }, dependencies_ids_and_indexes) => {
-               const wasInvalid = frame_cache.status(i) === 'invalid'
+            ({ i, bitmap, timestamp }, dependencies_ids_and_indexes) => {
+               if (frame_cache.invalidTimestamp(i) !== timestamp) {
+                  frame_cache.invalidSet(i, bitmap);
+                  return;
+               }
                frame_cache.set(i, bitmap);
-               if (wasInvalid) frame_cache.invalidate(i);
-
                frames_dependencies[i] = dependencies_ids_and_indexes;
-
                requestNextFrame();
             },
             (dependency_id, dependency_index) => {
@@ -454,7 +474,6 @@ function createWorker(execute, receive, onDependencyChanged) {
       const retrig_par = createParameter(false);
       addEventListener("message", (evt) => {
          const { data } = evt;
-         // console.log(name, "MESSAGE", data);
          const { id, set_args } = data;
          const dependency = global_dependencies.get(id);
          dependency.set(...set_args);
@@ -465,14 +484,12 @@ function createWorker(execute, receive, onDependencyChanged) {
          const ret = execute();
          const dependencies_ids_and_indexes = [...global_effect_dependencies()]
             .map(({ dependency, index }) => ({ id: dependency.id, index }));
-         if (ret) postMessage({ value: ret, dependencies_ids_and_indexes })
+         if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
          retrig_par.get();
       }, { batch: true });
 
    } else if (WORKER_NAME === '') {
-      // const worker = new Worker(SKETCH_PATH, { type: "module", name });
       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
-      // const worker = SketchWorker({ name });
       global_workers.add(worker);
 
       worker.addEventListener("message", (evt) => {
@@ -483,11 +500,7 @@ function createWorker(execute, receive, onDependencyChanged) {
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep.listeners.has(onDepChange))
-               // if (index !== undefined)
-               //    onDepChange(id, index, dep.get(index));
-               // else
                onDepChange(id, dep.get());
-            // worker.postMessage({ id, set_args: [dep.get()] });
             dep.onChange(onDepChange);
          });
       });
@@ -500,6 +513,12 @@ function createWorker(execute, receive, onDependencyChanged) {
 
       return worker;
    }
+}
+
+function isParameter(v) {
+   return v.get !== undefined
+      && v.set !== undefined
+      && v.value !== undefined;
 }
 
 function createParameter(value, name) {
@@ -519,7 +538,7 @@ function createParameter(value, name) {
          this.listeners = new Set([...this.listeners].filter(c => c !== callback));
       },
       set(value) {
-         const prev = this.value;
+         if (this.value === value) return;
          this.value = value;
          this.listeners.forEach(callback => callback(this.id, value))
          if (typeof localStorage !== 'undefined' && this.name) localStorage[name] = JSON.stringify(value);
@@ -563,15 +582,20 @@ function createCache(count = 0) {
          this.listeners.forEach(callback => callback(this.id, value))
       },
       _setIndex(index, value) {
-         if (this.cache[index]?.value === value) return
-         this.cache[index] = { value, status: 'valid' };
+         this.validate(index);
+         this.invalidSet(index, value);
+      },
+      invalidSet(index, value) {
+         if (this.cache[index]?.value === value) return;
+
+         if (!this.cache[index]) this.cache[index] = {};
+         this.cache[index].value = value;
 
          if (index > this.count)
             this.count = index;
 
          this.listeners.forEach(callback => callback(this.id, index, value))
       },
-
       get() {
          if (arguments.length == 0) return this._getAll();
          if (arguments.length == 1) return this._getIndex(...arguments);
@@ -586,7 +610,6 @@ function createCache(count = 0) {
          global_effect_dependencies().add({ dependency: this, index });
          return this.cache[index]?.value;
       },
-
       getLatest(index = this.count - 1) {
          this.get_listeners.forEach(callback => callback(index))
 
@@ -606,7 +629,7 @@ function createCache(count = 0) {
       getLatestValid(index = this.count - 1) {
          this.get_listeners.forEach(callback => callback(index, true))
 
-         if (this.cache[index]?.status === 'valid') {
+         if (this.isValid(index)) {
             global_effect_dependencies().add({ dependency: this, index });
             return this.cache[index].value;
          }
@@ -614,44 +637,37 @@ function createCache(count = 0) {
          for (let i = 0; i < this.count; i++) {
             const item = this.cache[mod(index - i, this.count)];
             if (!item) continue;
-            const { value, status } = item;
-            if (status === 'valid')
-               return value;
+            const { value, valid } = item;
+            if (valid) return value;
          }
 
          // console.warn("no latest valid", this);
          return this.getLatest(index);
       },
-      status(index) {
-         return this.cache[index]?.status ?? 'invalid';
+      isValid(index) {
+         return this.cache[index]?.valid ?? false;
+      },
+      validate(index) {
+         if (!this.cache[index]) this.cache[index] = {};
+         this.cache[index].valid = true;
+      },
+      invalidate(index) {
+         if (!this.cache[index]) this.cache[index] = {};
+         this.cache[index].valid = false;
+         this.cache[index].invalid_timestamp = Date.now();
+      },
+      invalidTimestamp(index) {
+         return this.cache[index]?.invalid_timestamp;
+      },
+      invalidateFrom(index) {
+         for (let i = index; i < this.count; i++)
+            if (this.cache[i]) this.invalidate(i);
       },
       clear(index) {
          if (index == null)
             this.cache = [];
          else
             this.cache[index] = undefined
-      },
-      invalidate(index) {
-         if (index >= this.count) return;
-
-         if (index == null) {
-            this.cache.forEach(c => c.status = 'invalid');
-            // this.listeners.forEach(callback => callback(this.id, this.cache))
-         } else {
-            if (!this.cache[index]) this.cache[index] = {};
-            this.cache[index].status = 'invalid'
-            // this.listeners.forEach(callback => callback(this.id, index, this.cache[index].value))
-         }
-      },
-      invalidateFrom(index) {
-         this.cache.slice(index).forEach(c => c.status = 'invalid');
-      },
-      pending(index) {
-         this.cache.forEach(item => {
-            if (item.status !== 'valid') item.status = 'invalid'
-         })
-         if (!this.cache[index]) this.cache[index] = {};
-         this.cache[index].status = 'pending';
       },
       cleanup() {
          this.listeners.clear();
