@@ -202,7 +202,7 @@ function Setup(createUI) {
 
    createUI(ui => {
       ui.createWindow(ui => {
-         if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES, step: 1 });
+         if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
          if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
          if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
       });
@@ -234,14 +234,23 @@ function createSketch() {
       },
       update(initial_state, callback) {
 
-         const state_par = createParameter(initial_state);
+         const initial_state_par = isParameter(initial_state) ? initial_state : createParameter(initial_state);
+         const state_par = createParameter(initial_state_par.value);
+         const tick_par = createParameter(0);
 
+         let state;
          const worker = createWorker(
             () => {
-               state_par.value = callback(state_par.value) ?? state_par.value;
-               return state_par.value;
+               const tick = tick_par.get()
+               if (tick === 0) state = structuredClone(initial_state_par.get());
+               state = callback(state, tick) ?? state;
+               return state;
             },
             (state) => state_par.set(state),
+            (id) => {
+               if (id === initial_state_par.id) tick_par.set(0)
+               else if (id !== tick_par.id) tick_par.set(tick_par.value + 1);
+            }
          );
 
          return state_par;
