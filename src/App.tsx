@@ -16,7 +16,7 @@ type Parameter<T> = Dependency & {
 
 type Cache<T> = Dependency & {
   cache: ({
-    status: "valid" | "invalid" | "pending",
+    valid: boolean,
     value: T
   })[]
   getLatest: (index: number) => T,
@@ -273,7 +273,9 @@ function Row({ cache: _cache }: RowProps) {
   const [cache] = createRendrCacheSignal<Cache<any>["cache"]>(_cache);
 
   function getStatusClass(item?: Cache<any>["cache"][0]) {
-    return item ? styles[item.status] : '';
+    if (!item) return '';
+    const status = item.valid ? "valid" : "invalid";
+    return styles[status];
   }
 
   return (

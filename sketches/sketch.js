@@ -16,10 +16,15 @@ const FRAMES = 200;
 function Sketch(tick_par) {
    const sketch = createSketch();
    const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
-   const state1_count_par = createParameter(1000, "state1_count_par");
-   const state2_count_par = createParameter(10, "state2_count_par");
+   const state1_count_par = createParameter(0, "state1_count_par");
+   const state2_count_par = createParameter(0, "state2_count_par");
 
    const state1_par = sketch.update([], (state) => {
+      // let arr = [];
+      // for (let i = 0; i < 1000; i++) {
+      //    arr.unshift(i);
+      // }
+
       const t = 1;
       const count = state1_count_par.get();
 
@@ -28,7 +33,6 @@ function Sketch(tick_par) {
          x: Math.random() * t,
          y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
       });
-      // return state;
 
       // return n_arr(count, () => ({
       //    x: Math.random() * t,
@@ -38,15 +42,15 @@ function Sketch(tick_par) {
 
    // const state2_par = null;
    const state2_par = sketch.construct([], state2_count_par, (state, index, count) => {
-      const t = 1; //(tick_par.get() % FRAMES) / FRAMES;
-      const x = Math.random() * t;
-      const y = map(Math.random(), 0, 1, 1 / 4, 2 / 4)
-      state.push({ x, y })
-
       // let arr = [];
       // for (let i = 0; i < 1000; i++) {
       //    arr.unshift(i);
       // }
+
+      const t = 1;
+      const x = Math.random() * t;
+      const y = map(Math.random(), 0, 1, 1 / 4, 2 / 4)
+      state.push({ x, y })
    });
 
    // const state3_cache = null
@@ -81,7 +85,6 @@ function Sketch(tick_par) {
       const state3_map = state3.map(({ x, y }) => ({ x, y: map(Math.random(), 0, 1, 3 / 4, 4 / 4) }));
       return state3_map;
       state.push(...state3_map);
-
    });
 
    // const frame_par = null
@@ -94,7 +97,6 @@ function Sketch(tick_par) {
          ...state3_cache.getLatest(tick),
          ...state4_cache.getLatest(tick),
       ];
-      // console.log("draw", tick, state.length);
       return drawScene(t, state);
    });
 
@@ -111,12 +113,10 @@ function Sketch(tick_par) {
          ...state3_cache.getLatest(tick),
          ...state4_cache.getLatest(tick),
       ];
-      // console.log("ANIMATE", tick, state.length);
       return drawScene(t, state);
    });
 
    function drawScene(t, state) {
-      // console.log("drawScene", t);
       const ctx = new Draw2dContext(backbuffer);
       ctx.clear("blue");
 
@@ -284,11 +284,9 @@ function createSketch() {
                   }
                };
                work();
-               // return state;
             },
             (state) => state_par.set(state),
          );
-
 
          return state_par;
       },
@@ -328,7 +326,7 @@ function createSketch() {
             },
             ({ i, state, timestamp }, dependencies_ids_and_indexes) => {
                if (state_cache.invalidTimestamp(i) !== timestamp) {
-                  state_cache.setInvalid(i, state);
+                  state_cache.invalidSet(i, state);
                   return
                }
                state_cache.set(i, state);
@@ -363,7 +361,6 @@ function createSketch() {
                return bitmap;
             },
             (bitmap) => frame_par.set(bitmap),
-            // () => worker?.terminate(),
          );
 
          return frame_par;
@@ -394,7 +391,7 @@ function createSketch() {
                   postMessage({ value: bitmap, dependencies_ids_and_indexes });
 
                   const ctx = canvas.getContext('2d');
-                  ctx.drawImage(bitmap, 0, 0); // draw bitmap back onto canvas
+                  ctx.drawImage(bitmap, 0, 0);
 
                   if (index < count) {
                      clearTimeout(timeout);
@@ -404,7 +401,6 @@ function createSketch() {
                work();
             },
             (bitmap) => frame_par.set(bitmap),
-            // (id) => console.log({ id }),
          );
 
          return frame_par;
@@ -447,7 +443,7 @@ function createSketch() {
             },
             ({ i, bitmap, timestamp }, dependencies_ids_and_indexes) => {
                if (frame_cache.invalidTimestamp(i) !== timestamp) {
-                  frame_cache.setInvalid(i, bitmap);
+                  frame_cache.invalidSet(i, bitmap);
                   return;
                }
                frame_cache.set(i, bitmap);
@@ -478,7 +474,6 @@ function createWorker(execute, receive, onDependencyChanged) {
       const retrig_par = createParameter(false);
       addEventListener("message", (evt) => {
          const { data } = evt;
-         // console.log(name, "MESSAGE", data);
          const { id, set_args } = data;
          const dependency = global_dependencies.get(id);
          dependency.set(...set_args);
@@ -494,9 +489,7 @@ function createWorker(execute, receive, onDependencyChanged) {
       }, { batch: true });
 
    } else if (WORKER_NAME === '') {
-      // const worker = new Worker(SKETCH_PATH, { type: "module", name });
       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
-      // const worker = SketchWorker({ name });
       global_workers.add(worker);
 
       worker.addEventListener("message", (evt) => {
@@ -507,11 +500,7 @@ function createWorker(execute, receive, onDependencyChanged) {
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep.listeners.has(onDepChange))
-               // if (index !== undefined)
-               //    onDepChange(id, index, dep.get(index));
-               // else
                onDepChange(id, dep.get());
-            // worker.postMessage({ id, set_args: [dep.get()] });
             dep.onChange(onDepChange);
          });
       });
@@ -549,7 +538,7 @@ function createParameter(value, name) {
          this.listeners = new Set([...this.listeners].filter(c => c !== callback));
       },
       set(value) {
-         // if (value === this.value) return;
+         if (this.value === value) return;
          this.value = value;
          this.listeners.forEach(callback => callback(this.id, value))
          if (typeof localStorage !== 'undefined' && this.name) localStorage[name] = JSON.stringify(value);
@@ -593,10 +582,12 @@ function createCache(count = 0) {
          this.listeners.forEach(callback => callback(this.id, value))
       },
       _setIndex(index, value) {
-         this.setStatus(index, "valid");
-         this.setInvalid(index, value);
+         this.validate(index);
+         this.invalidSet(index, value);
       },
-      setInvalid(index, value) {
+      invalidSet(index, value) {
+         if (this.cache[index]?.value === value) return;
+
          if (!this.cache[index]) this.cache[index] = {};
          this.cache[index].value = value;
 
@@ -619,7 +610,6 @@ function createCache(count = 0) {
          global_effect_dependencies().add({ dependency: this, index });
          return this.cache[index]?.value;
       },
-
       getLatest(index = this.count - 1) {
          this.get_listeners.forEach(callback => callback(index))
 
@@ -639,7 +629,7 @@ function createCache(count = 0) {
       getLatestValid(index = this.count - 1) {
          this.get_listeners.forEach(callback => callback(index, true))
 
-         if (this.cache[index]?.status === 'valid') {
+         if (this.isValid(index)) {
             global_effect_dependencies().add({ dependency: this, index });
             return this.cache[index].value;
          }
@@ -647,50 +637,37 @@ function createCache(count = 0) {
          for (let i = 0; i < this.count; i++) {
             const item = this.cache[mod(index - i, this.count)];
             if (!item) continue;
-            const { value, status } = item;
-            if (status === 'valid')
-               return value;
+            const { value, valid } = item;
+            if (valid) return value;
          }
 
          // console.warn("no latest valid", this);
          return this.getLatest(index);
       },
-      // status(index) {
-      //    return this.cache[index]?.status ?? 'invalid';
-      // },
+      isValid(index) {
+         return this.cache[index]?.valid ?? false;
+      },
+      validate(index) {
+         if (!this.cache[index]) this.cache[index] = {};
+         this.cache[index].valid = true;
+      },
+      invalidate(index) {
+         if (!this.cache[index]) this.cache[index] = {};
+         this.cache[index].valid = false;
+         this.cache[index].invalid_timestamp = Date.now();
+      },
       invalidTimestamp(index) {
          return this.cache[index]?.invalid_timestamp;
       },
-      setStatus(index, status) {
-         if (index >= this.count) {
-            console.warn("setStatus: index higher than count", { index, status, count });
-            return;
-         }
-         if (!this.cache[index]) this.cache[index] = {};
-         this.cache[index].status = status;
-         if (status === 'invalid') {
-            this.cache[index].invalid_timestamp = Date.now();
-            // console.log(index, status, this.cache[index].invalid_timestamp);
-         } else {
-            // console.log(index, status);
-         }
-      },
-      isValid(index) {
-         return this.cache[index]?.status === 'valid';
+      invalidateFrom(index) {
+         for (let i = index; i < this.count; i++)
+            if (this.cache[i]) this.invalidate(i);
       },
       clear(index) {
          if (index == null)
             this.cache = [];
          else
             this.cache[index] = undefined
-      },
-      invalidate(index) {
-         this.setStatus(index, 'invalid');
-      },
-      invalidateFrom(index) {
-         // this.cache.slice(index).forEach(c => c.status = 'invalid');
-         for (let i = index; i < this.count; i++)
-            this.setStatus(i, "invalid");
       },
       cleanup() {
          this.listeners.clear();
