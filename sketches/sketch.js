@@ -133,7 +133,7 @@ function Sketch(tick_par) {
       }
 
       state.forEach(({ x, y }) => {
-         ctx.circle(x * WIDTH, y * HEIGHT, 1, { beginPath: true, fill: true, fillStyle: "gray" });
+         ctx.circle(x * WIDTH, y * HEIGHT, 2, { beginPath: true, fill: true, fillStyle: "gray" });
       });
 
       return backbuffer;
