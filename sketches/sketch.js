@@ -22,7 +22,7 @@ function Sketch(tick_par) {
 
    const state1_par = sketch.update([], (state) => {
       // let arr = [];
-      // for (let i = 0; i < 1000; i++) {
+      // for (let i = 0; i < 10000; i++) {
       //    arr.unshift(i);
       // }
 
@@ -102,9 +102,19 @@ function Sketch(tick_par) {
    });
 
    // const gen_frame_par = null
-   const gen_frame_par = sketch.generate(gen_count_par, 1000 / 60, (i) => {
-      const t = (tick_par.get() % FRAMES) / FRAMES;
-      return generateScene(i, t);
+   const gen1_frame_par = sketch.generate(gen_count_par, 1000 / 60, (tick) => {
+      const frame = tick_par.get();
+      const f = (frame % FRAMES) / FRAMES;
+      const x = Math.random() * f;
+      const y = Math.random() * 1;
+      return generateScene(tick, x, y);
+   });
+
+   // const gen2_state_par = state1_par;
+   const gen2_state_par = state2_par;
+   const gen2_frame_par = sketch.generate(gen2_state_par, 1000 / 60, (tick, state) => {
+      const { x, y } = state;
+      return generateScene(tick, x, y);
    });
 
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
@@ -140,19 +150,16 @@ function Sketch(tick_par) {
       return backbuffer;
    }
 
-   function generateScene(i, t) {
+   function generateScene(tick, x, y) {
       const ctx = new Draw2dContext(backbuffer);
-      if (i === 0) ctx.clear("orange");
-
-      const x = Math.random() * t;
-      const y = Math.random() * 1;
+      if (tick === 0) ctx.clear("orange");
       ctx.circle(x * WIDTH, y * HEIGHT, 5, { beginPath: true, fill: true, fillStyle: "black" });
 
       return backbuffer;
    }
 
    return {
-      frame_cache, frame_par, gen_frame_par,
+      frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
       state3_cache, state4_cache,
       state1_count_par, state2_count_par, gen_count_par,
    }
@@ -196,7 +203,7 @@ function Setup(createUI) {
    const tick_par = createParameter(0, "tick");
    const running_par = createParameter(true, "running");
    const {
-      frame_cache, frame_par, gen_frame_par,
+      frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
       state3_cache, state4_cache,
       state1_count_par, state2_count_par, gen_count_par,
    } = Sketch(tick_par);
@@ -211,7 +218,8 @@ function Setup(createUI) {
 
       ui.createContainer(ui => {
          if (frame_par) ui.createView(frame_par);
-         if (gen_frame_par) ui.createView(gen_frame_par);
+         if (gen1_frame_par) ui.createView(gen1_frame_par);
+         if (gen2_frame_par) ui.createView(gen2_frame_par);
          if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
       });
 
@@ -382,7 +390,7 @@ function createSketch() {
          const worker = createQueueWorker(
             count_or_queue,
             interval_ms,
-            (index) => callback(index),
+            (index, item) => callback(index, item),
             (canvas) => {
                const bitmap = canvas.transferToImageBitmap();
                const ctx = canvas.getContext('2d');
@@ -510,15 +518,15 @@ function executeQueueWorker(count_or_queue, interval_ms, execute, send) {
 
    if (isParameter(count_or_queue)) {
       const value = count_or_queue.get();
-      if (isNaN(value))
-         queue_par = count_or_queue
-      else
+      if (typeof value === 'number')
          count_par = count_or_queue
-   } else {
-      if (isNaN(count_or_queue))
-         queue_par = createParameter(count_or_queue);
       else
+         queue_par = count_or_queue
+   } else {
+      if (typeof count_or_queue === 'number')
          count_par = createParameter(count_or_queue);
+      else
+         queue_par = createParameter(count_or_queue);
    }
    console.log({ count_par, queue_par });
 
@@ -529,8 +537,8 @@ function executeQueueWorker(count_or_queue, interval_ms, execute, send) {
       const { data } = evt;
       const { id, set_args } = data;
 
-      if (!(id === count_par?.id && set_args > index))
-         index = 0;
+      if (count_par && !(id === count_par.id && set_args[0] > index)) index = 0;
+      if (queue_par && !(id === queue_par.id && set_args[0].length > index)) index = 0;
 
       const dependency = global_dependencies.get(id);
       dependency.set(...set_args);
@@ -556,8 +564,8 @@ function executeQueueWorker(count_or_queue, interval_ms, execute, send) {
       let ret;
       const time = Date.now();
       for (; index < count; index++) {
-         const item_or_index = queue ? queue[index] : index;
-         ret = execute(item_or_index);
+         const item = queue && queue[index];
+         ret = execute(index, item);
          if (Date.now() - time >= interval_ms) break;
       }
       const dependencies = global_effect_dependencies_stack.pop();
