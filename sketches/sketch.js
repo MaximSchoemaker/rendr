@@ -1,5 +1,5 @@
-import { Draw2dContext } from "/rendr/library/Draw2d.js";
-import { n_arr, mod, map, invCosn } from "/rendr/library/Utils.js"
+import { Draw2dContext } from "../rendr/library/Draw2d.js";
+import { n_arr, mod, map, invCosn } from "../rendr/library/Utils.js"
 // import SKETCH_PATH from "./sketch.js?url"
 
 const SKETCH_PATH = "/sketches/sketch.js";
@@ -101,7 +101,7 @@ function Sketch(tick_par) {
    });
 
    // const gen_frame_par = null
-   const gen_frame_par = sketch.generate(100000, (i) => {
+   const gen_frame_par = sketch.generate(100000, 1000 / 60, (i) => {
       const t = (tick_par.get() % FRAMES) / FRAMES;
       return generateScene(i, t);
    });
@@ -374,40 +374,19 @@ function createSketch() {
 
          return frame_par;
       },
-      generate(count, callback) {
+      generate(count, interval_ms, callback) {
 
          const frame_par = createParameter();
          let timeout;
-         const worker = createWorker(
-            () => {
-               let canvas;
-               let index = 0;
-               const interval = 1000 / 60;
-               function work() {
-                  const time = Date.now();
-
-                  global_effect_dependencies_stack.push(new Set());
-                  while (index < count && Date.now() - time < interval) {
-                     canvas = callback(index);
-                     index++;
-                  }
-
-                  const dependencies = global_effect_dependencies_stack.pop();
-                  const dependencies_ids_and_indexes = [...dependencies]
-                     .map(({ dependency, index }) => ({ id: dependency.id, index }));
-
-                  const bitmap = canvas.transferToImageBitmap();
-                  postMessage({ value: bitmap, dependencies_ids_and_indexes });
-
-                  const ctx = canvas.getContext('2d');
-                  ctx.drawImage(bitmap, 0, 0);
-
-                  if (index < count) {
-                     clearTimeout(timeout);
-                     timeout = setTimeout(work);
-                  }
-               };
-               work();
+         const worker = createQueueWorker(
+            n_arr(count, i => i),
+            interval_ms,
+            (index) => callback(index),
+            (canvas) => {
+               const bitmap = canvas.transferToImageBitmap();
+               const ctx = canvas.getContext('2d');
+               ctx.drawImage(bitmap, 0, 0);
+               return bitmap;
             },
             (bitmap) => frame_par.set(bitmap),
          );
@@ -478,49 +457,116 @@ function createSketch() {
 
 function createWorker(execute, receive, onDependencyChanged) {
    const name = `worker ${global_worker_id++}`;
-
    if (name === WORKER_NAME) {
-      const retrig_par = createParameter(false);
-      addEventListener("message", (evt) => {
-         const { data } = evt;
-         const { id, set_args } = data;
-         const dependency = global_dependencies.get(id);
-         dependency.set(...set_args);
-         retrig_par.set(!retrig_par.get())
-      });
-
-      createEffect(() => {
-         const ret = execute();
-         const dependencies_ids_and_indexes = [...global_effect_dependencies()]
-            .map(({ dependency, index }) => ({ id: dependency.id, index }));
-         if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
-         retrig_par.get();
-      }, { batch: true });
-
+      executeWorker(execute);
    } else if (WORKER_NAME === '') {
-      const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
-      global_workers.add(worker);
-
-      worker.addEventListener("message", (evt) => {
-         const { data } = evt;
-         const { value, dependencies_ids_and_indexes } = data;
-         receive(value, dependencies_ids_and_indexes)
-
-         dependencies_ids_and_indexes.forEach(({ id, index }) => {
-            const dep = global_dependencies.get(id);
-            if (!dep.listeners.has(onDepChange))
-               onDepChange(id, dep.get());
-            dep.onChange(onDepChange);
-         });
-      });
-
-      function onDepChange(id, ...set_args) {
-         worker.postMessage({ id, set_args });
-         const index = set_args.length > 1 ? set_args[0] : undefined;
-         onDependencyChanged && onDependencyChanged(id, index);
-      }
-
+      const worker = constructWorker(name);
+      receiveWorker(worker, receive, onDependencyChanged);
       return worker;
+   }
+}
+
+
+function createQueueWorker(queue, interval_ms, execute, send, receive, onDependencyChanged) {
+   const name = `worker ${global_worker_id++}`;
+   if (name === WORKER_NAME) {
+      executeQueueWorker(queue, interval_ms, execute, send);
+   } else if (WORKER_NAME === '') {
+      const worker = constructWorker(name);
+      receiveWorker(worker, receive, onDependencyChanged);
+      return worker;
+   }
+}
+
+function constructWorker(name) {
+   const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
+   global_workers.add(worker);
+   return worker;
+}
+
+function executeWorker(execute) {
+   const retrig_par = createParameter(false);
+   addEventListener("message", (evt) => {
+      const { data } = evt;
+      const { id, set_args } = data;
+      const dependency = global_dependencies.get(id);
+      dependency.set(...set_args);
+      retrig_par.set(!retrig_par.get())
+   });
+
+   createEffect(() => {
+      const ret = execute();
+      const dependencies_ids_and_indexes = [...global_effect_dependencies()]
+         .map(({ dependency, index }) => ({ id: dependency.id, index }));
+      if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
+      retrig_par.get();
+   }, { batch: true });
+}
+
+
+function executeQueueWorker(queue, interval_ms, execute, send) {
+   const queue_par = isParameter(queue) ? queue : createParameter(queue);
+   const retrig_par = createParameter(false);
+
+   addEventListener("message", (evt) => {
+      const { data } = evt;
+      const { id, set_args } = data;
+      const dependency = global_dependencies.get(id);
+      dependency.set(...set_args);
+      retrig_par.set(!retrig_par.value)
+   });
+
+   let timeout;
+   createEffect(() => {
+      retrig_par.get();
+      const index = 0;
+      const queue = queue_par.get();
+      const count = queue.length;
+      clearTimeout(timeout);
+      work(index, count, queue);
+   }, { batch: true });
+
+   function work(index, count, queue) {
+      const time = Date.now();
+      let ret;
+      global_effect_dependencies_stack.push(new Set());
+      for (; index < count; index++) {
+         const item = queue[index];
+         ret = execute(item);
+         if (Date.now() - time >= interval_ms) break;
+      }
+      const dependencies = global_effect_dependencies_stack.pop();
+      const dependencies_ids_and_indexes = [...dependencies]
+         .map(({ dependency, index }) => ({ id: dependency.id, index }));
+
+      const value = send(ret);
+      if (ret !== undefined) postMessage({ value, dependencies_ids_and_indexes })
+
+      if (index < count) {
+         clearTimeout(timeout);
+         timeout = setTimeout(() => work(index, count, queue));
+      }
+   }
+}
+
+function receiveWorker(worker, receive, onDependencyChanged) {
+   worker.addEventListener("message", (evt) => {
+      const { data } = evt;
+      const { value, dependencies_ids_and_indexes } = data;
+      receive(value, dependencies_ids_and_indexes)
+
+      dependencies_ids_and_indexes.forEach(({ id, index }) => {
+         const dep = global_dependencies.get(id);
+         if (!dep.listeners.has(onDepChange))
+            onDepChange(id, dep.get());
+         dep.onChange(onDepChange);
+      });
+   });
+
+   function onDepChange(id, ...set_args) {
+      worker.postMessage({ id, set_args });
+      const index = set_args.length > 1 ? set_args[0] : undefined;
+      onDependencyChanged && onDependencyChanged(id, index);
    }
 }
 
