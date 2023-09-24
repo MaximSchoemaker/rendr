@@ -297,13 +297,17 @@ function View({ frame_par }: ViewProps) {
 
   let el: HTMLCanvasElement;
   createEffect(() => {
+    const ctx = el.getContext('2d');
     const bitmap = frame();
-    if (!bitmap) return;
+
+    if (!bitmap) {
+      ctx?.clearRect(0, 0, el.width, el.height);
+      return;
+    }
 
     el.width = bitmap.width;
     el.height = bitmap.height;
 
-    const ctx = el.getContext('2d');
     if (!ctx) return;
 
     ctx.drawImage(bitmap, 0, 0);
