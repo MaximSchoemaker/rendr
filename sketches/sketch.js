@@ -219,7 +219,7 @@ function Setup(createUI) {
       ui.createWindow(ui => {
          if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
          if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
-         if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
+         if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 1, max: 10000, step: 1 });
          if (gen_count_par) ui.createParameterNumber("Gen 1 Count", gen_count_par, { min: 1, max: 100000, step: 1 });
       });
 
@@ -393,30 +393,37 @@ function createSketch() {
       },
       animate(frames, callback) {
 
-         const index_par = createParameter({ index: 0 });
+         const queue_par = createParameter([{ index: 0 }]);
          const frame_cache = createCache(frames);
 
          let start_frame = 0;
-         frame_cache.onGet((index, getLatestValid) => getLatestValid
-            ? start_frame = 0
-            : start_frame = index
-         );
+         frame_cache.onGet((index, getLatestValid) => {
+            if (getLatestValid) start_frame = 0
+            else start_frame = index
+            requestNextFrame();
+         });
 
          const requestNextFrame = () => {
+            const queue = [];
             for (let i = 0; i < frames; i++) {
                const frame = mod(start_frame + i, frames);
                if (!frame_cache.isValid(frame)) {
-                  index_par.set({ index: frame, timestamp: frame_cache.invalidTimestamp(frame) })
-                  return
+                  queue.push({
+                     index: frame,
+                     timestamp: frame_cache.invalidTimestamp(frame)
+                  })
                }
             }
+            queue_par.set(queue);
          }
          requestNextFrame();
 
          const frames_dependencies = []
-         const worker = createWorker(
-            () => {
-               const { index, timestamp } = index_par.get();
+         const worker = createCacheWorker(
+            queue_par,
+            1000 / 60,
+            (_, __, item) => {
+               const { index, timestamp } = item;
                const i = mod(index, frames);
 
                const t = i / frames;
@@ -434,10 +441,10 @@ function createSketch() {
                }
                frame_cache.set(i, bitmap);
                frames_dependencies[i] = dependencies_ids_and_indexes;
-               requestNextFrame();
+               // requestNextFrame();
             },
             (dependency_id, dependency_index) => {
-               if (dependency_id === index_par.id) return;
+               if (dependency_id === queue_par.id) return;
                frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
                   if (dependencies_ids_and_indexes.find(({ id, index }) =>
                      dependency_id === id && (index === undefined || index === dependency_index)
@@ -445,12 +452,19 @@ function createSketch() {
                      frame_cache.invalidate(frame)
                });
                requestNextFrame();
-            }
+            },
+            { reset_on_queue_change: true }
          );
 
          return frame_cache;
       }
    }
+}
+
+function constructWorker(name) {
+   const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
+   global_workers.add(worker);
+   return worker;
 }
 
 function createWorker(execute, receive, onDependencyChanged) {
@@ -465,28 +479,6 @@ function createWorker(execute, receive, onDependencyChanged) {
       receiveWorker(worker, receive, onDependencyChanged);
       return worker;
    }
-}
-
-
-function createQueueWorker(count_or_queue, interval_ms, execute, send, receive, onDependencyChanged, options) {
-   const name = `worker ${global_worker_id++}`;
-
-   const count_or_queue_par = isParameter(count_or_queue) ? count_or_queue : createParameter(count_or_queue);
-   const retrig_par = createParameter(false);
-
-   if (name === WORKER_NAME) {
-      executeQueueWorker(count_or_queue_par, retrig_par, interval_ms, execute, send, options);
-   } else if (WORKER_NAME === '') {
-      const worker = constructWorker(name);
-      receiveWorker(worker, receive, onDependencyChanged);
-      return worker;
-   }
-}
-
-function constructWorker(name) {
-   const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
-   global_workers.add(worker);
-   return worker;
 }
 
 function executeWorker(retrig_par, execute) {
@@ -508,6 +500,41 @@ function executeWorker(retrig_par, execute) {
    }, { batch: true });
 }
 
+function receiveWorker(worker, receive, onDependencyChanged) {
+   worker.addEventListener("message", (evt) => {
+      const { data } = evt;
+      const { value, dependencies_ids_and_indexes } = data;
+      receive(value, dependencies_ids_and_indexes)
+
+      dependencies_ids_and_indexes.forEach(({ id, index }) => {
+         const dep = global_dependencies.get(id);
+         if (!dep.listeners.has(onDepChange))
+            onDepChange(id, dep.get());
+         dep.onChange(onDepChange);
+      });
+   });
+
+   function onDepChange(id, ...set_args) {
+      worker.postMessage({ id, set_args });
+      const index = set_args.length > 1 ? set_args[0] : undefined;
+      onDependencyChanged && onDependencyChanged(id, index);
+   }
+}
+
+function createQueueWorker(count_or_queue, interval_ms, execute, send, receive, onDependencyChanged, options) {
+   const name = `worker ${global_worker_id++}`;
+
+   const count_or_queue_par = isParameter(count_or_queue) ? count_or_queue : createParameter(count_or_queue);
+   const retrig_par = createParameter(false);
+
+   if (name === WORKER_NAME) {
+      executeQueueWorker(count_or_queue_par, retrig_par, interval_ms, execute, send, options);
+   } else if (WORKER_NAME === '') {
+      const worker = constructWorker(name);
+      receiveWorker(worker, receive, onDependencyChanged);
+      return worker;
+   }
+}
 
 function executeQueueWorker(count_or_queue, retrig_par, interval_ms, execute, send, options = {}) {
    const { reset_on_count_change, reset_on_queue_change } = options;
@@ -578,24 +605,66 @@ function executeQueueWorker(count_or_queue, retrig_par, interval_ms, execute, se
    }
 }
 
-function receiveWorker(worker, receive, onDependencyChanged) {
-   worker.addEventListener("message", (evt) => {
-      const { data } = evt;
-      const { value, dependencies_ids_and_indexes } = data;
-      receive(value, dependencies_ids_and_indexes)
 
-      dependencies_ids_and_indexes.forEach(({ id, index }) => {
-         const dep = global_dependencies.get(id);
-         if (!dep.listeners.has(onDepChange))
-            onDepChange(id, dep.get());
-         dep.onChange(onDepChange);
-      });
+function createCacheWorker(queue, interval_ms, execute, receive, onDependencyChanged, options) {
+   const name = `worker ${global_worker_id++}`;
+
+   const queue_par = isParameter(queue) ? queue : createParameter(queue);
+   const retrig_par = createParameter(false);
+
+   if (name === WORKER_NAME) {
+      executeCacheWorker(queue_par, retrig_par, interval_ms, execute, options);
+   } else if (WORKER_NAME === '') {
+      const worker = constructWorker(name);
+      receiveWorker(worker, receive, onDependencyChanged);
+      return worker;
+   }
+}
+
+function executeCacheWorker(queue_par, retrig_par, interval_ms, execute, options = {}) {
+   let index = 0;
+
+   addEventListener("message", (evt) => {
+      const { data } = evt;
+      const { id, set_args } = data;
+
+      const dependency = global_dependencies.get(id);
+      dependency.set(...set_args);
+
+      retrig_par.set(!retrig_par.value)
    });
 
-   function onDepChange(id, ...set_args) {
-      worker.postMessage({ id, set_args });
-      const index = set_args.length > 1 ? set_args[0] : undefined;
-      onDependencyChanged && onDependencyChanged(id, index);
+   let timeout;
+   createEffect(() => {
+      retrig_par.get();
+      clearTimeout(timeout);
+      index = 0;
+      work();
+   }, { batch: true });
+
+   function work() {
+      const count = queue_par.value.length;
+      if (count == 0) return;
+
+      let ret;
+      const time = Date.now();
+      for (; index < count; index++) {
+         global_effect_dependencies_stack.push(new Set());
+
+         const item = queue_par.get()[index];
+         ret = execute(index, count, item);
+
+         const dependencies = global_effect_dependencies_stack.pop();
+         const dependencies_ids_and_indexes = [...dependencies]
+            .map(({ dependency, index }) => ({ id: dependency.id, index }));
+
+         postMessage({ value: ret, dependencies_ids_and_indexes })
+
+         if (Date.now() - time >= interval_ms) break;
+      }
+
+      clearTimeout(timeout);
+      timeout = setTimeout(work);
    }
 }
 
