@@ -455,8 +455,11 @@ function createSketch() {
 
 function createWorker(execute, receive, onDependencyChanged) {
    const name = `worker ${global_worker_id++}`;
+
+   const retrig_par = createParameter(false);
+
    if (name === WORKER_NAME) {
-      executeWorker(execute);
+      executeWorker(retrig_par, execute);
    } else if (WORKER_NAME === '') {
       const worker = constructWorker(name);
       receiveWorker(worker, receive, onDependencyChanged);
@@ -467,8 +470,12 @@ function createWorker(execute, receive, onDependencyChanged) {
 
 function createQueueWorker(count_or_queue, interval_ms, execute, send, receive, onDependencyChanged, options) {
    const name = `worker ${global_worker_id++}`;
+
+   const count_or_queue_par = isParameter(count_or_queue) ? count_or_queue : createParameter(count_or_queue);
+   const retrig_par = createParameter(false);
+
    if (name === WORKER_NAME) {
-      executeQueueWorker(count_or_queue, interval_ms, execute, send, options);
+      executeQueueWorker(count_or_queue_par, retrig_par, interval_ms, execute, send, options);
    } else if (WORKER_NAME === '') {
       const worker = constructWorker(name);
       receiveWorker(worker, receive, onDependencyChanged);
@@ -482,8 +489,8 @@ function constructWorker(name) {
    return worker;
 }
 
-function executeWorker(execute) {
-   const retrig_par = createParameter(false);
+function executeWorker(retrig_par, execute) {
+
    addEventListener("message", (evt) => {
       const { data } = evt;
       const { id, set_args } = data;
@@ -502,26 +509,18 @@ function executeWorker(execute) {
 }
 
 
-function executeQueueWorker(count_or_queue, interval_ms, execute, send, options = {}) {
+function executeQueueWorker(count_or_queue, retrig_par, interval_ms, execute, send, options = {}) {
    const { reset_on_count_change, reset_on_queue_change } = options;
 
    let queue_par, count_par;
-   if (isParameter(count_or_queue)) {
-      const value = count_or_queue.get();
-      if (typeof value === 'number')
-         count_par = count_or_queue
-      else
-         queue_par = count_or_queue
-   } else {
-      if (typeof count_or_queue === 'number')
-         count_par = createParameter(count_or_queue);
-      else
-         queue_par = createParameter(count_or_queue);
-   }
+   const value = count_or_queue.get();
+   if (typeof value === 'number')
+      count_par = count_or_queue
+   else
+      queue_par = count_or_queue
    console.log({ count_par, queue_par });
 
    let index = 0;
-   const retrig_par = createParameter(false);
 
    addEventListener("message", (evt) => {
       const { data } = evt;
