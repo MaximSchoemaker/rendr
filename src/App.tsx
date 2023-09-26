@@ -19,6 +19,8 @@ type Cache<T> = Dependency & {
     valid: boolean,
     value: T
   })[]
+  onChange: (callback: (value: any) => void) => void;
+  onChangeValid: (callback: (value: any) => void) => void;
   getLatest: (index: number) => T,
   getLatestValid: (index: number) => T,
 }
@@ -100,10 +102,17 @@ const Container = ({ callback }: ContainerProps) => {
     return component;
   }
 
+  function getSelectedComponent() {
+    const index = Math.min(components().length - 1, selected()!);
+    return components()[index];
+  }
+
   return (
     <div class={styles.Container}>
-      <Show when={selected() === null} fallback={clickComponent(components()[selected()!], selected)}>
-        <For each={components()}>{clickComponent}</For>
+      <Show when={components().length > 0}>
+        <Show when={selected() === null} fallback={clickComponent(getSelectedComponent(), selected)}>
+          <For each={components()}>{clickComponent}</For>
+        </Show>
       </Show>
     </div>
   );
@@ -280,10 +289,10 @@ function Row({ cache: _cache }: RowProps) {
 
   return (
     <div class={styles.Row}>
-      <Index each={cache()}>{(item, index) => {
-        return <div class={`${styles.frame} ${getStatusClass(item())}`} />
+      <For each={cache()}>{(item, index) => {
+        return <div class={`${styles.frame} ${getStatusClass(item)}`} />
       }
-      }</Index>
+      }</For>
     </div>
   )
 }
@@ -520,57 +529,71 @@ function isMobile() {
   return is_mobile();
 }
 
-function createRendrParameterSignal<T>(dependency: Parameter<T>) {
-  const _value = dependency.value;
+function createRendrParameterSignal<T>(parameter: Parameter<T>) {
+  const _value = parameter.value;
   const [value, set_value] = createSignal<T>(_value);
 
   createEffect(() => {
 
     function onChange() {
-      set_value(() => dependency.value);
+      set_value(() => parameter.value);
     }
 
-    dependency.onChange(onChange);
+    parameter.onChange(onChange);
 
-    onCleanup(() => dependency.unsubscribe(onChange));
+    onCleanup(() => parameter.unsubscribe(onChange));
   });
 
   function setValue(new_value: any) {
-    dependency.set(new_value);
+    parameter.set(new_value);
   }
 
   return [value, setValue] as [typeof value, typeof setValue];
 }
 
-function createRendrCacheSignal<T>(dependency: Cache<T>) {
-  const _value = dependency.cache;
+function createRendrCacheSignal<T>(cache: Cache<T>) {
+  const _value = cache.cache;
   const [value, set_value] = createSignal<Cache<T>["cache"]>(_value);
 
   createEffect(() => {
 
     function onChange() {
-      const _value = dependency.cache;
-      const new_value = _value.map(v => ({ ...v }));
-      set_value(new_value);
+      // const _value = cache.cache;
+      // const new_value = _value.map(v => ({ ...v }));
+      // set_value(new_value);
+      // set_value([...cache.cache])
+      // return;
 
-      // console.log(...arguments);
-      // if (arguments.length == 2) set_value(arguments[1]);
-      // if (arguments.length == 3) set_value((cache) => {
-      //   cache = [...cache]
-      //   const [_, index, value] = arguments;
-      //   cache[index] = { ...cache[index], value };
-      //   // console.log(cache);
-      //   return cache;
-      // });
+      if (arguments.length == 2) set_value([...cache.cache]);
+      if (arguments.length == 3) set_value((cache) => {
+        cache = [...cache]
+        const [_, index, value] = arguments;
+        cache[index] = { ...cache[index], value };
+        return cache;
+      });
     }
 
-    dependency.onChange(onChange);
+    function onChangeValid() {
+      if (arguments.length == 2) set_value([...cache.cache]);
+      if (arguments.length == 3) set_value((cache) => {
+        cache = [...cache]
+        const [_, index, valid] = arguments;
+        cache[index] = { ...cache[index], valid };
+        return cache;
+      });
+    }
 
-    onCleanup(() => dependency.unsubscribe(onChange));
+    cache.onChange(onChange);
+    cache.onChangeValid(onChangeValid);
+
+    onCleanup(() => {
+      cache.unsubscribe(onChange)
+      cache.unsubscribe(onChangeValid)
+    });
   });
 
   function setValue(new_value: any) {
-    dependency.set(new_value);
+    cache.set(new_value);
   }
 
   return [value, setValue] as [typeof value, typeof setValue];

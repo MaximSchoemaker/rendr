@@ -93,6 +93,26 @@
 
 .frame {
   flex: 1;
+  position: relative;
+}
+
+.frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: white;
+
+  animation: fade-out 0.5s;
+  animation-fill-mode: forwards;
+}
+
+@keyframes fade-out {
+  from {
+      opacity: 0.75;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .valid {
