@@ -1,4 +1,5 @@
 import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
+import { createStore } from "solid-js/store";
 
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
@@ -259,15 +260,15 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
     >
       <div class={styles.rows}>
 
-        <For each={caches}>{cache =>
-          <Row cache={cache} />
-        }</For>
-
         <div class={styles.cursorRow} >
           <Index each={Array(frames).fill(null)}>{(_, index) =>
             <div class={`${styles.cursor} ${getActiveClass(tick(), index)}`} />
           }</Index>
         </div>
+
+        <For each={caches}>{cache =>
+          <Row cache={cache} />
+        }</For>
 
       </div>
     </div>
@@ -279,22 +280,46 @@ type RowProps = {
 }
 
 function Row({ cache: _cache }: RowProps) {
-  const [cache] = createRendrCacheSignal<Cache<any>["cache"]>(_cache);
+  const [cache] = createRendrCacheStore<Cache<any>["cache"]>(_cache);
 
-  function getStatusClass(item?: Cache<any>["cache"][0]) {
-    if (!item) return '';
-    const status = item.valid ? "valid" : "invalid";
+  return (
+    <div class={styles.Row}>
+      <For each={cache}>{(item) =>
+        <Frame item={item} />
+      }</For>
+    </div>
+  )
+}
+
+type FrameProps = {
+  item: Cache<any>["cache"][0]
+}
+
+function Frame(props: FrameProps) {
+
+  let el: HTMLDivElement;
+  createEffect(() => {
+    if (!el) return;
+    props.item?.valid;
+    el.style.setProperty("animation-name", "none");
+    setTimeout(() => el.style.setProperty("animation-name", styles["fade-out"]));
+  });
+
+
+  function getStatusClass() {
+    if (!props.item) return '';
+    const status = props.item.valid ? "valid" : "invalid";
     return styles[status];
   }
 
   return (
-    <div class={styles.Row}>
-      <For each={cache()}>{(item, index) => {
-        return <div class={`${styles.frame} ${getStatusClass(item)}`} />
-      }
-      }</For>
+    <div
+      class={`${styles.frame} ${getStatusClass()}`}
+    >
+      <div class={styles.flash} ref={ref => el = ref} />
+      <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
     </div>
-  )
+  );
 }
 
 type ViewProps = {
@@ -558,12 +583,6 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
   createEffect(() => {
 
     function onChange() {
-      // const _value = cache.cache;
-      // const new_value = _value.map(v => ({ ...v }));
-      // set_value(new_value);
-      // set_value([...cache.cache])
-      // return;
-
       if (arguments.length == 2) set_value([...cache.cache]);
       if (arguments.length == 3) set_value((cache) => {
         cache = [...cache]
@@ -575,12 +594,16 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
 
     function onChangeValid() {
       if (arguments.length == 2) set_value([...cache.cache]);
-      if (arguments.length == 3) set_value((cache) => {
-        cache = [...cache]
+      if (arguments.length == 3) {
         const [_, index, valid] = arguments;
-        cache[index] = { ...cache[index], valid };
-        return cache;
-      });
+        if (value()[index]?.valid === valid) return;
+
+        set_value((cache) => {
+          cache = [...cache]
+          cache[index] = { ...cache[index], valid };
+          return cache;
+        });
+      }
     }
 
     cache.onChange(onChange);
@@ -597,6 +620,52 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
   }
 
   return [value, setValue] as [typeof value, typeof setValue];
+}
+
+function createRendrCacheStore<T>(cache: Cache<T>) {
+
+  const [store, set_store] = createStore<Cache<T>["cache"]>([...cache.cache]);
+
+  function onChange() {
+    if (arguments.length == 2) set_store([...cache.cache]);
+    if (arguments.length == 3) {
+      const [_, index, value] = arguments;
+      if (store[index] === undefined) {
+        set_store(index, { ...cache.cache[index] })
+      } else {
+        set_store(index, "value", value);
+      }
+    }
+  }
+
+  function onChangeValid() {
+    if (arguments.length == 2) set_store([...cache.cache]);
+    if (arguments.length == 3) {
+      const [_, index, valid] = arguments;
+      // if (value[index]?.valid === valid) return;
+      if (store[index] === undefined) {
+        set_store(index, { ...cache.cache[index] })
+      } else {
+        set_store(index, "valid", valid);
+      }
+    }
+  }
+
+  cache.onChange(onChange);
+  cache.onChangeValid(onChangeValid);
+
+  onCleanup(() => {
+    cache.unsubscribe(onChange)
+    cache.unsubscribe(onChangeValid)
+  });
+
+
+  function setStore(new_value: any) {
+    cache.set(new_value);
+  }
+
+
+  return [store, setStore] as [typeof store, typeof setStore];
 }
 
 function createAnimationLoop(callback: () => void, running = false) {
