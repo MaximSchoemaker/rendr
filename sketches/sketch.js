@@ -76,9 +76,11 @@ const test_sketch = createSketch(sketch => (tick_par) => {
          state.push({ x, y })
       }
    }, {
-      // max_queue_length: 1,
-      interval_ms: 0,
-      timeout_ms: 30,
+      // max_queue_length: 2,
+      // interval_ms: 0,
+
+      // batch_timeout_ms: 20,
+      // timeout_ms: 20,
    });
 
    // const state4_cache = null
@@ -98,8 +100,8 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       // if (!state3) return
       const state3_map = state3.map(({ x, y }) => ({
          x,
-         // y: map(Math.random(), 0, 1, 3 / 4, 4 / 4)
-         y: map(y, 2 / 4, 3 / 4, 3 / 4, 4 / 4)
+         y: map(Math.random(), 0, 1, 3 / 4, 4 / 4)
+         // y: map(y, 2 / 4, 3 / 4, 3 / 4, 4 / 4)
       }));
       return state3_map;
       state.push(...state3_map);
@@ -127,6 +129,9 @@ const test_sketch = createSketch(sketch => (tick_par) => {
          ...state4_cache.getLatest(tick),
       ];
       return drawScene(t, state);
+   }, {
+      // interval_ms: 1000
+      // max_queue_length: 10
    });
 
    function drawScene(t, state) {
@@ -421,7 +426,7 @@ function createSketch(fn) {
                   }
                }
 
-               if (index_dependencies[index] === undefined) {
+               if (index_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
                   index_dependencies[index] = [];
                   invalidate(index);
                   return
@@ -497,10 +502,15 @@ function createSketch(fn) {
          );
 
          const requestNextFrame = () => {
+            // console.log("request next frame");
             for (let i = 0; i < frames; i++) {
                const frame = mod(start_frame + i, frames);
                if (!frame_cache.isValid(frame)) {
-                  index_par.set({ index: frame, timestamp: frame_cache.invalidTimestamp(frame) })
+                  const new_index = { index: frame, timestamp: frame_cache.invalidTimestamp(frame) };
+                  if (index_par.value?.index === new_index.index && index_par.value?.timestamp === new_index.timestamp)
+                     return;
+                  index_par.set(new_index)
+                  // console.log(new_index);
                   return
                }
             }
@@ -525,6 +535,7 @@ function createSketch(fn) {
                if (frame_cache.isValid(i)) return;
                if (frame_cache.invalidTimestamp(i) !== timestamp) {
                   frame_cache.invalidSet(i, bitmap);
+                  requestNextFrame();
                   return;
                }
 
@@ -539,7 +550,7 @@ function createSketch(fn) {
                      dependency_id === id && (index === undefined || index === dependency_index)
                   )) {
                      frame_cache.invalidate(frame)
-                     // frames_dependencies[frame] = [];
+                     frames_dependencies[frame] = [];
                   }
                });
                requestNextFrame();
@@ -548,84 +559,80 @@ function createSketch(fn) {
 
          return frame_cache;
       },
-      // animate(frames, callback) {
+      animateQueue(frames, callback, options) {
 
-      //    const queue_par = createParameter([{ index: 0 }]);
-      //    const frame_cache = createCache(frames);
+         const frame_cache = createCache(frames);
 
-      //    let start_frame = 0;
-      //    frame_cache.onGet((index, getLatestValid) => {
-      //       if (getLatestValid) start_frame = 0
-      //       else start_frame = index
-      //       // requestNextFrame();
-      //    });
+         let start_frame = 0;
+         frame_cache.onGet((index, getLatestValid) => {
+            if (getLatestValid) start_frame = 0
+            else start_frame = index
+            // requestNextFrame();
+         });
 
-      //    const requestNextFrame = () => {
-      //       const queue = [];
-      //       for (let i = 0; i < frames; i++) {
-      //          const frame = mod(start_frame + i, frames);
-      //          if (!frame_cache.isValid(frame)) {
-      //             queue.push({
-      //                index: frame,
-      //                timestamp: frame_cache.invalidTimestamp(frame)
-      //             })
-      //          }
-      //       }
-      //       queue_par.set(queue);
-      //    }
-      //    requestNextFrame();
+         function invalidate(index) {
+            frame_cache.invalidate(index)
+            const timestamp = frame_cache.invalidTimestamp(index);
+            worker.postMessage({ kind: "invalidate", index, timestamp });
+         }
 
-      //    const frames_dependencies = []
-      //    const worker = createCacheWorker(
-      //       queue_par,
-      //       1000 / 60,
-      //       (_, __, item) => {
-      //          const { index, timestamp } = item;
-      //          const i = mod(index, frames);
+         const frames_dependencies = []
+         const worker = createReactiveCacheWorker(
+            frame_cache,
+            (index) => {
+               const i = mod(index, frames);
 
-      //          const t = i / frames;
-      //          const canvas = callback(i, t);
-      //          const ctx = canvas.getContext('2d');
-      //          const bitmap = canvas.transferToImageBitmap();
-      //          ctx.drawImage(bitmap, 0, 0);
+               const t = i / frames;
+               const canvas = callback(i, t);
+               const ctx = canvas.getContext('2d');
+               const bitmap = canvas.transferToImageBitmap();
+               ctx.drawImage(bitmap, 0, 0);
 
-      //          return { i, bitmap, timestamp }
-      //       },
-      //       ({ i, bitmap, timestamp }, dependencies_ids_and_indexes) => {
-      //          // if (frame_cache.isValid(i)) return;
+               return bitmap
+            },
+            (bitmap, index, timestamp, dependencies_ids_and_indexes) => {
+               // if (frame_cache.isValid(i)) return;
 
-      //          if (frame_cache.invalidTimestamp(i) !== timestamp) {
-      //             frame_cache.invalidSet(i, bitmap);
-      //             return;
-      //          }
+               if (frame_cache.invalidTimestamp(index) !== timestamp) {
+                  frame_cache.invalidSet(index, bitmap);
+                  return;
+               }
 
-      //          if (frames_dependencies[i] === undefined) {
-      //             // state_cache.invalidSet(i, state);
-      //             frame_cache.invalidate(i);
-      //             requestNextFrame();
-      //          } else
-      //             frame_cache.set(i, bitmap);
+               for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
+                  const dependency = global_dependencies.get(id);
+                  const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
+                  if (timestamp < last_set_timestamp) {
+                     // frames_dependencies[index] = [];
+                     invalidate(index);
+                     return;
+                  }
+               }
 
-      //          frames_dependencies[i] = dependencies_ids_and_indexes;
-      //          // requestNextFrame();
-      //       },
-      //       (dependency_id, dependency_index) => {
-      //          if (dependency_id === queue_par.id) return;
-      //          frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
-      //             if (dependencies_ids_and_indexes.find(({ id, index }) =>
-      //                dependency_id === id && (index === undefined || dependency_index === undefined || index === dependency_index)
-      //             )) {
-      //                frame_cache.invalidate(dependency_index)
-      //                // dependencies_ids_and_indexes = [];
-      //             }
-      //          });
-      //          requestNextFrame();
-      //       },
-      //       { reset_on_queue_change: true }
-      //    );
+               if (frames_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
+                  frames_dependencies[index] = [];
+                  invalidate(index);
+                  return;
+               }
 
-      //    return frame_cache;
-      // }
+               frame_cache.set(index, bitmap);
+
+               frames_dependencies[index] = dependencies_ids_and_indexes;
+            },
+            (dependency_id, dependency_index) => {
+               frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
+                  if (dependencies_ids_and_indexes.find(({ id, index }) =>
+                     dependency_id === id && (index === undefined || index === dependency_index)
+                  )) {
+                     invalidate(frame);
+                     frames_dependencies[frame] = [];
+                  }
+               });
+            },
+            options
+         );
+
+         return frame_cache;
+      }
    }
 
    return {
@@ -755,8 +762,11 @@ function createReactiveQueueWorker(count_or_queue, interval_ms, execute, send, r
             const value = send(ret);
             postMessage({ value, dependencies_ids_and_indexes })
 
-            clearTimeout(timeout);
-            timeout = setTimeout(work);
+
+            if (index != count) {
+               clearTimeout(timeout);
+               timeout = setTimeout(work);
+            }
          }
       },
       (data) => {
@@ -801,7 +811,7 @@ function createReactiveQueueWorker(count_or_queue, interval_ms, execute, send, r
 }
 
 function createReactiveCacheWorker(cache, execute, receive, onDependencyChanged, options = {}) {
-   const { interval_ms, timeout_ms, max_queue_length } = options;
+   const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
 
    const retrig_par = createParameter(false);
 
@@ -814,7 +824,7 @@ function createReactiveCacheWorker(cache, execute, receive, onDependencyChanged,
             work();
          }, {
             batch: true,
-            // batch_timeout: interval_ms
+            batch_timeout_ms
          });
 
          function work() {
@@ -863,7 +873,7 @@ function createReactiveCacheWorker(cache, execute, receive, onDependencyChanged,
             case "invalidate":
                const { index, timestamp } = data;
                cache.invalidate(index, timestamp);
-               cache.validate(0);
+               // cache.validate(0);
 
                retrig_par.set(!retrig_par.value)
                break;
@@ -1081,13 +1091,14 @@ function createCache(count = 0) {
       cleanup() {
          this.listeners.clear();
          this.get_listeners.clear();
+         this.valid_listeners.clear();
       }
    }
    global_dependencies.set(ret.id, ret);
    return ret;
 }
 
-function createEffect(callback, options = { batch: false, batch_timeout: 0 }) {
+function createEffect(callback, options = { batch: false, batch_timeout_ms: 0 }) {
    let cleanup;
    let timeout;
    let dependencies;
@@ -1110,7 +1121,7 @@ function createEffect(callback, options = { batch: false, batch_timeout: 0 }) {
    function _callback() {
       if (options.batch) {
          clearTimeout(timeout);
-         timeout = setTimeout(() => call(), options.batch_timeout);
+         timeout = setTimeout(() => call(), options.batch_timeout_ms);
       } else
          call();
    }

@@ -4,11 +4,16 @@ import { createStore } from "solid-js/store";
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
+import { trackSelf } from 'solid-js/store/types/store';
+
+type onChangeCallback =
+  ((id: number, value: any) => void) |
+  ((id: number, index: number, value: any) => void)
 
 type Dependency = {
   set: (value: any) => void;
-  onChange: (callback: (value: any) => void) => void;
-  unsubscribe: (callback: (value: any) => void) => void;
+  onChange: (callback: onChangeCallback) => void;
+  unsubscribe: (callback: onChangeCallback) => void;
 }
 
 type Parameter<T> = Dependency & {
@@ -20,8 +25,8 @@ type Cache<T> = Dependency & {
     valid: boolean,
     value: T
   })[]
-  onChange: (callback: (value: any) => void) => void;
-  onChangeValid: (callback: (value: any) => void) => void;
+  onChange: (callback: onChangeCallback) => void;
+  onChangeValid: (callback: onChangeCallback) => void;
   getLatest: (index: number) => T,
   getLatestValid: (index: number) => T,
 }
@@ -279,32 +284,45 @@ type RowProps = {
   cache: Cache<any>
 }
 
-function Row({ cache: _cache }: RowProps) {
-  const [cache] = createRendrCacheStore<Cache<any>["cache"]>(_cache);
+function Row({ cache: rendr_cache }: RowProps) {
+  const [cache] = createRendrCacheStore<Cache<any>["cache"]>(rendr_cache);
 
   return (
     <div class={styles.Row}>
-      <For each={cache}>{(item) =>
-        <Frame item={item} />
+      <For each={cache}>{(item, i) =>
+        <Frame item={item} index={i()} rendr_cache={rendr_cache} />
       }</For>
     </div>
   )
 }
 
 type FrameProps = {
-  item: Cache<any>["cache"][0]
+  item: Cache<any>["cache"][0];
+  index: number;
+  rendr_cache: Cache<any>;
 }
 
 function Frame(props: FrameProps) {
 
   let el: HTMLDivElement;
-  createEffect(() => {
+  function resetAnimation() {
     if (!el) return;
-    props.item?.valid;
     el.style.setProperty("animation-name", "none");
     setTimeout(() => el.style.setProperty("animation-name", styles["fade-out"]));
-  });
+  }
 
+  // createEffect(() => {
+  //   props.item?.valid;
+  //   resetAnimation();
+  // });
+
+  function onChange(_: number, index: number) {
+    if (props.index === index)
+      resetAnimation();
+  }
+  props.rendr_cache.onChange(onChange);
+  props.rendr_cache.onChangeValid(onChange);
+  onCleanup(() => props.rendr_cache.unsubscribe(onChange));
 
   function getStatusClass() {
     if (!props.item) return '';
@@ -642,7 +660,6 @@ function createRendrCacheStore<T>(cache: Cache<T>) {
     if (arguments.length == 2) set_store([...cache.cache]);
     if (arguments.length == 3) {
       const [_, index, valid] = arguments;
-      // if (value[index]?.valid === valid) return;
       if (store[index] === undefined) {
         set_store(index, { ...cache.cache[index] })
       } else {
