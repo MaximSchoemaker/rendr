@@ -316,7 +316,7 @@ function Frame(props: FrameProps) {
     <div
       class={`${styles.frame} ${getStatusClass()}`}
     >
-      {/* <div class={styles.flash} ref={ref => el = ref} /> */}
+      <div class={styles.flash} ref={ref => el = ref} />
       <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
     </div>
   );

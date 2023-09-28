@@ -76,8 +76,9 @@ const test_sketch = createSketch(sketch => (tick_par) => {
          state.push({ x, y })
       }
    }, {
-      // interval_ms: 1000,
       // max_queue_length: 1,
+      interval_ms: 0,
+      timeout_ms: 30,
    });
 
    // const state4_cache = null
@@ -372,39 +373,21 @@ function createSketch(fn) {
          return state_cache;
       },
       simulateQueue(initial_state, count, callback, options = {}) {
-         const { interval_ms, max_queue_length } = options;
 
-         const queue_par = createParameter([{ index: 0 }]);
          const state_cache = createCache(count);
          state_cache.set(0, initial_state);
 
-         let start_index = 0;
-         let timeout;
-         const requestNextIndex = () => {
-            // console.log("requestNextIndex");
-            const queue = [];
-            let changed = false;
-            for (let i = 0; i < count; i++) {
-               const index = mod(start_index + i, count);
-               if (!state_cache.isValid(index)) {
-                  queue.push({
-                     index: index,
-                     timestamp: state_cache.invalidTimestamp(index)
-                  })
-               }
-               if (max_queue_length !== undefined && queue.length >= max_queue_length) break;
-            }
-            queue_par.set(queue);
+         function invalidate(index) {
+            state_cache.invalidate(index)
+            const timestamp = state_cache.invalidTimestamp(index);
+            worker.postMessage({ kind: "invalidate", index, timestamp });
          }
-         requestNextIndex();
 
          const index_dependencies = [];
          const previous_states = [initial_state];
          const worker = createReactiveCacheWorker(
-            queue_par,
-            interval_ms,
-            (queue_index, queue_length, item) => {
-               const { index, timestamp } = item;
+            state_cache,
+            (index, timestamp) => {
                const i = mod(index, count);
 
                if (i === 0) {
@@ -420,59 +403,46 @@ function createSketch(fn) {
                state = new_state ?? state;
                previous_states[i] = state;
 
-               const last = queue_index === queue_length - 1;
-               return { i, state, timestamp, last }
+               return state
             },
-            ({ i, state, timestamp, last }, dependencies_ids_and_indexes) => {
+            (state, index, timestamp, dependencies_ids_and_indexes) => {
                // console.log(state_cache.isValid(i));
                // if (state_cache.isValid(i)) return;
 
-               if (state_cache.invalidTimestamp(i) !== timestamp) return
+               if (state_cache.invalidTimestamp(index) !== timestamp) return
 
-               for (let { id, index } of dependencies_ids_and_indexes) {
+               for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
                   const dependency = global_dependencies.get(id);
-                  const last_set_timestamp = dependency.lastSetTimestamp(index);
+                  const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
                   if (timestamp < last_set_timestamp) {
-                     index_dependencies[i] = [];
-                     state_cache.invalidate(i);
-                     requestNextIndex();
+                     index_dependencies[index] = [];
+                     invalidate(index);
                      return;
                   }
                }
 
-               if (index_dependencies[i] === undefined) {
-                  index_dependencies[i] = [];
-                  state_cache.invalidate(i);
-                  requestNextIndex();
+               if (index_dependencies[index] === undefined) {
+                  index_dependencies[index] = [];
+                  invalidate(index);
                   return
                }
 
-               state_cache.set(i, state);
+               state_cache.set(index, state);
 
-               index_dependencies[i] = dependencies_ids_and_indexes;
-
-               if (last) requestNextIndex();
+               index_dependencies[index] = dependencies_ids_and_indexes;
             },
             (dependency_id, dependency_index) => {
-               if (dependency_id === queue_par.id) return;
                for (let [index, dependencies_ids_and_indexes] of index_dependencies.entries()) {
                   if (!dependencies_ids_and_indexes) continue;
 
                   if (dependencies_ids_and_indexes.find(({ id, index }) =>
                      dependency_id === id && (index === undefined || index === dependency_index)
                   )) {
-                     state_cache.invalidate(index)
-                     index_dependencies[index] = []
-
-                     // state_cache.invalidateFrom(dependency_index)
-                     // for (let i = index; i < index_dependencies.length; i++)
-                     //    index_dependencies[i] = []
-                     // break;
+                     invalidate(index);
                   }
                }
-
-               requestNextIndex();
             },
+            options,
          );
 
          return state_cache;
@@ -830,9 +800,9 @@ function createReactiveQueueWorker(count_or_queue, interval_ms, execute, send, r
    return worker;
 }
 
-function createReactiveCacheWorker(queue, interval_ms, execute, receive, onDependencyChanged, options) {
+function createReactiveCacheWorker(cache, execute, receive, onDependencyChanged, options = {}) {
+   const { interval_ms, timeout_ms, max_queue_length } = options;
 
-   const queue_par = isParameter(queue) ? queue : createParameter(queue);
    const retrig_par = createParameter(false);
 
    const worker = createMessageWorker(
@@ -841,46 +811,67 @@ function createReactiveCacheWorker(queue, interval_ms, execute, receive, onDepen
          createEffect(() => {
             retrig_par.get();
             clearTimeout(timeout);
-            work(0);
+            work();
          }, {
             batch: true,
             // batch_timeout: interval_ms
          });
 
-         function work(index) {
-            const count = queue_par.value.length;
-            if (count == 0) return;
+         function work() {
+            if (cache.count == 0) return;
 
             const time = Date.now();
             const polling = () => interval_ms === undefined || Date.now() - time <= interval_ms
-            for (; index < count && polling(); index++) {
+            const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length
+            let queue_count = 0;
+            let index;
+            for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
+               if (cache.isValid(index)) continue;
+               const timestamp = cache.invalidTimestamp(index);
+
                global_effect_dependencies_stack.push(new Set());
-               const item = queue_par.get()[index];
-               const ret = execute(index, count, item);
+               const ret = execute(index);
 
                const dependencies = global_effect_dependencies_stack.pop();
                const dependencies_ids_and_indexes = [...dependencies]
                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-               postMessage({ value: ret, dependencies_ids_and_indexes })
+               postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes })
+
+               cache.set(index, ret);
+
+               queue_count++;
             }
 
-            clearTimeout(timeout);
-            timeout = setTimeout(() => work(index));
+            if (index != cache.count) {
+               clearTimeout(timeout);
+               timeout = setTimeout(work, timeout_ms);
+            }
          }
       },
       (data) => {
-         const { id, set_args } = data;
+         const { kind } = data;
+         switch (kind) {
+            case "dependency":
+               const { id, set_args } = data;
 
+               const dependency = global_dependencies.get(id);
+               dependency.set(...set_args);
 
-         const dependency = global_dependencies.get(id);
-         dependency.set(...set_args);
+               retrig_par.set(!retrig_par.value)
+               break;
+            case "invalidate":
+               const { index, timestamp } = data;
+               cache.invalidate(index, timestamp);
+               cache.validate(0);
 
-         retrig_par.set(!retrig_par.value)
+               retrig_par.set(!retrig_par.value)
+               break;
+         }
       },
       (data) => {
-         const { value, dependencies_ids_and_indexes } = data;
-         receive(value, dependencies_ids_and_indexes)
+         const { value, index, timestamp, dependencies_ids_and_indexes } = data;
+         receive(value, index, timestamp, dependencies_ids_and_indexes)
 
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
@@ -892,7 +883,7 @@ function createReactiveCacheWorker(queue, interval_ms, execute, receive, onDepen
    );
 
    function onDepChange(id, ...set_args) {
-      worker.postMessage({ id, set_args });
+      worker.postMessage({ kind: "dependency", id, set_args });
       const index = set_args.length > 1 ? set_args[0] : undefined;
       onDependencyChanged && onDependencyChanged(id, index);
    }
@@ -1050,23 +1041,23 @@ function createCache(count = 0) {
          this.cache[index].valid = true;
          this.valid_listeners.forEach(callback => callback(this.id, index, true))
       },
-      invalidate(index) {
+      invalidate(index, timestamp) {
          if (index === undefined) {
-            this._invalidateAll();
+            this._invalidateAll(timestamp);
             this.valid_listeners.forEach(callback => callback(this.id, false))
          } else {
-            this._invalidateIndex(index);
+            this._invalidateIndex(index, timestamp);
             this.valid_listeners.forEach(callback => callback(this.id, index, false))
          }
       },
-      _invalidateAll() {
+      _invalidateAll(timestamp) {
          // for (let i = 0; i < this.count; i++) this._invalidateIndex(i);
-         this.cache.forEach((_, index) => this._invalidateIndex(index));
+         this.cache.forEach((_, index) => this._invalidateIndex(index, timestamp));
       },
-      _invalidateIndex(index) {
+      _invalidateIndex(index, timestamp) {
          if (!this.cache[index]) this.cache[index] = {};
          this.cache[index].valid = false;
-         this.cache[index].invalid_timestamp = Date.now();
+         this.cache[index].invalid_timestamp = timestamp ?? Date.now();
       },
       invalidateFrom(index) {
          if (index === undefined) {
