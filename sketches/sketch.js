@@ -445,11 +445,11 @@ function createSketch(fn) {
                      }
                   }
 
-                  if (index_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-                     index_dependencies[index] = [];
-                     invalidate(index);
-                     return
-                  }
+                  // if (index_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
+                  //    index_dependencies[index] = [];
+                  //    invalidate(index);
+                  //    return
+                  // }
 
                   state_cache.set(index, state);
 
@@ -570,12 +570,12 @@ function createSketch(fn) {
                      return;
                   }
 
-                  if (frames_dependencies[i] === undefined && dependencies_ids_and_indexes.length) {
-                     frames_dependencies[i] = dependencies_ids_and_indexes;
-                     frame_cache.invalidate(i);
-                     requestNextFrame();
-                     return;
-                  }
+                  // if (frames_dependencies[i] === undefined && dependencies_ids_and_indexes.length) {
+                  //    frames_dependencies[i] = dependencies_ids_and_indexes;
+                  //    frame_cache.invalidate(i);
+                  //    requestNextFrame();
+                  //    return;
+                  // }
 
                   frame_cache.set(i, bitmap);
                   frames_dependencies[i] = dependencies_ids_and_indexes;
@@ -648,11 +648,11 @@ function createSketch(fn) {
                      }
                   }
 
-                  if (frames_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-                     frames_dependencies[index] = dependencies_ids_and_indexes;
-                     invalidate(index);
-                     return;
-                  }
+                  // if (frames_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
+                  //    frames_dependencies[index] = dependencies_ids_and_indexes;
+                  //    invalidate(index);
+                  //    return;
+                  // }
 
                   frame_cache.set(index, bitmap);
 
@@ -723,17 +723,50 @@ function createSketch(fn) {
 function createWorker(name, parent_name, executeWorker, receiveWorker, execute, receive) {
 
    if (WORKER_NAME === name) {
-      const res = executeWorker();
-      if (res !== undefined) postMessage(res);
+      addEventListener("message", (evt) => {
+         const { data } = evt;
+         // console.log(data);
 
-      addEventListener("message", (evt) => receiveWorker(evt.data));
+         const { kind, parameters } = data;
+         if (kind === "localStorage") {
+            parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
+
+            const res = executeWorker();
+            if (res !== undefined) postMessage(res);
+
+            return;
+         }
+
+         receiveWorker(data)
+      });
    }
    else if (WORKER_NAME === parent_name) {
       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
       global_workers.add(worker);
 
-      const res = execute(worker);
-      if (res !== undefined) worker.postMessage(res);
+      function start() {
+         worker.postMessage({
+            kind: "localStorage",
+            parameters: [...global_dependencies.entries()]
+               .filter(([id, p]) => p.name)
+               .map(([id, p]) => ({ id, value: p.value }))
+         })
+
+         const res = execute(worker);
+         if (res !== undefined) worker.postMessage(res);
+      }
+
+      if (WORKER_NAME === ROOT_WORKER_NAME) start()
+
+      addEventListener("message", (evt) => {
+         const { data } = evt;
+         const { kind, parameters } = data;
+
+         if (kind === "localStorage") {
+            parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
+            start();
+         }
+      });
 
       worker.addEventListener("message", (evt) => receive(evt.data));
 
@@ -996,6 +1029,14 @@ function matchActionTest(match, action) {
 
 function createParameter(value, name) {
 
+   if (name && typeof localStorage !== 'undefined') {
+      const stored_value = localStorage[name];
+      if (stored_value) {
+         const parsed_value = JSON.parse(localStorage[name])
+         value = parsed_value;
+      }
+   }
+
    const ret = {
       id: global_dependency_id++,
       value,
@@ -1046,14 +1087,6 @@ function createParameter(value, name) {
    }
    global_dependencies.set(ret.id, ret);
 
-   if (name && typeof localStorage !== 'undefined') {
-      const stored_value = localStorage[name];
-      if (stored_value) {
-         const value = JSON.parse(localStorage[name])
-         setTimeout(() => ret.set(value));
-      }
-   }
-
    return ret;
 }
 
@@ -1092,7 +1125,6 @@ function createCache(count = 0) {
          action.source ??= WORKER_NAME;
          const { key, value, index, validate } = action;
          if (index !== undefined) {
-            if (validate) this.validate(index);
 
             if (this.cache[index]?.[key] === value) return;
             if (!this.cache[index]) this.cache[index] = {};
@@ -1105,6 +1137,7 @@ function createCache(count = 0) {
             if (index > this.count)
                this.count = index;
 
+            if (validate) this.validate(index);
             this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
          } else {
             const _key = key === "value" ? "cache" : key;
