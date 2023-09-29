@@ -6,14 +6,13 @@ import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
 import { trackSelf } from 'solid-js/store/types/store';
 
-type onChangeCallback =
-  ((id: number, value: any) => void) |
-  ((id: number, index: number, value: any) => void)
+type onMutateCallback = (dependency: Dependency, action: Action) => void
 
 type Dependency = {
+  mutate: (action: Action) => void;
   set: (value: any) => void;
-  onChange: (callback: onChangeCallback) => void;
-  unsubscribe: (callback: onChangeCallback) => void;
+  onMutate: (match: Match, callback: onMutateCallback) => void;
+  unsubscribe: (callback: onMutateCallback) => void;
 }
 
 type Parameter<T> = Dependency & {
@@ -25,11 +24,25 @@ type Cache<T> = Dependency & {
     valid: boolean,
     value: T
   })[]
-  onChange: (callback: onChangeCallback) => void;
-  onChangeValid: (callback: onChangeCallback) => void;
   getLatest: (index: number) => T,
   getLatestValid: (index: number) => T,
 }
+
+type Action = {
+  key: string;
+  value: any;
+  index?: number;
+  validate?: boolean;
+  source?: string;
+}
+
+type Match = {
+  key?: string;
+  value?: any;
+  index?: number;
+  validate?: boolean;
+  source?: string;
+} | ((action: Action) => boolean);
 
 class UI {
   AddComponent;
@@ -311,18 +324,10 @@ function Frame(props: FrameProps) {
     setTimeout(() => el.style.setProperty("animation-name", styles["fade-out"]));
   }
 
-  // createEffect(() => {
-  //   props.item?.valid;
-  //   resetAnimation();
-  // });
-
-  function onChange(_: number, index: number) {
-    if (props.index === index)
-      resetAnimation();
-  }
-  props.rendr_cache.onChange(onChange);
-  props.rendr_cache.onChangeValid(onChange);
-  onCleanup(() => props.rendr_cache.unsubscribe(onChange));
+  props.rendr_cache.onMutate({ index: props.index, key: "valid" }, resetAnimation);
+  props.rendr_cache.onMutate({ index: props.index, key: "value" }, resetAnimation);
+  // props.rendr_cache.onChangeValid(onChange);
+  onCleanup(() => props.rendr_cache.unsubscribe(resetAnimation));
 
   function getStatusClass() {
     if (!props.item) return '';
@@ -582,7 +587,7 @@ function createRendrParameterSignal<T>(parameter: Parameter<T>) {
       set_value(() => parameter.value);
     }
 
-    parameter.onChange(onChange);
+    parameter.onMutate({ key: "value" }, onChange);
 
     onCleanup(() => parameter.unsubscribe(onChange));
   });
@@ -600,41 +605,45 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
 
   createEffect(() => {
 
-    function onChange() {
-      if (arguments.length == 2) set_value([...cache.cache]);
-      if (arguments.length == 3) set_value((cache) => {
-        cache = [...cache]
-        const [_, index, value] = arguments;
-        cache[index] = { ...cache[index], value };
-        return cache;
-      });
-    }
-
-    function onChangeValid() {
-      if (arguments.length == 2) set_value([...cache.cache]);
-      if (arguments.length == 3) {
-        const [_, index, valid] = arguments;
-        if (value()[index]?.valid === valid) return;
-
+    function onChange(dependency: Dependency, action: Action) {
+      const { key, index, value } = action;
+      // console.log(key);
+      if (index === undefined) {
+        set_value([...cache.cache]);
+      } else {
         set_value((cache) => {
           cache = [...cache]
-          cache[index] = { ...cache[index], valid };
+          cache[index] = { ...cache[index], [key]: value };
           return cache;
         });
       }
     }
 
-    cache.onChange(onChange);
-    cache.onChangeValid(onChangeValid);
+    // function onChangeValid() {
+    //   if (arguments.length == 2) set_value([...cache.cache]);
+    //   if (arguments.length == 3) {
+    //     const [_, index, valid] = arguments;
+    //     if (value()[index]?.valid === valid) return;
+
+    //     set_value((cache) => {
+    //       cache = [...cache]
+    //       cache[index] = { ...cache[index], valid };
+    //       return cache;
+    //     });
+    //   }
+    // }
+
+    cache.onMutate((action) => ["value", "valid"].includes(action.key), onChange);
+    // cache.onChangeValid(onChangeValid);
 
     onCleanup(() => {
       cache.unsubscribe(onChange)
-      cache.unsubscribe(onChangeValid)
+      // cache.unsubscribe(onChangeValid)
     });
   });
 
   function setValue(new_value: any) {
-    cache.set(new_value);
+    cache.mutate({ key: "value", value: new_value });
   }
 
   return [value, setValue] as [typeof value, typeof setValue];
@@ -644,41 +653,43 @@ function createRendrCacheStore<T>(cache: Cache<T>) {
 
   const [store, set_store] = createStore<Cache<T>["cache"]>([...cache.cache]);
 
-  function onChange() {
-    if (arguments.length == 2) set_store([...cache.cache]);
-    if (arguments.length == 3) {
-      const [_, index, value] = arguments;
-      if (store[index] === undefined) {
+  function onChange(dependency: Dependency, action: Action) {
+    const { key, index, value } = action;
+    if (index === undefined) {
+      set_store([...cache.cache]);
+    } else {
+      if (store[index] === undefined)
         set_store(index, { ...cache.cache[index] })
-      } else {
-        set_store(index, "value", value);
-      }
+      else
+        set_store(index, key, value);
     }
   }
 
-  function onChangeValid() {
-    if (arguments.length == 2) set_store([...cache.cache]);
-    if (arguments.length == 3) {
-      const [_, index, valid] = arguments;
-      if (store[index] === undefined) {
-        set_store(index, { ...cache.cache[index] })
-      } else {
-        set_store(index, "valid", valid);
-      }
-    }
-  }
+  // function onChangeValid() {
+  //   if (arguments.length == 2) set_store([...cache.cache]);
+  //   if (arguments.length == 3) {
+  //     const [_, index, valid] = arguments;
+  //     if (store[index] === undefined) {
+  //       set_store(index, { ...cache.cache[index] })
+  //     } else {
+  //       set_store(index, "valid", valid);
+  //     }
+  //   }
+  // }
 
-  cache.onChange(onChange);
-  cache.onChangeValid(onChangeValid);
+  cache.onMutate({ key: "value" }, onChange);
+  cache.onMutate({ key: "valid" }, onChange);
+
+  // cache.onChangeValid(onChangeValid);
 
   onCleanup(() => {
     cache.unsubscribe(onChange)
-    cache.unsubscribe(onChangeValid)
+    // cache.unsubscribe(onChangeValid)
   });
 
 
   function setStore(new_value: any) {
-    cache.set(new_value);
+    cache.mutate({ key: "value", value: new_value });
   }
 
 
