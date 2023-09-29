@@ -121,7 +121,7 @@ const test_sketch = createSketch(sketch => (tick_par) => {
    });
 
    // const frame_cache = null;
-   const frame_cache = sketch.animate(FRAMES, (tick, t) => {
+   const frame_cache = sketch.animateQueue(FRAMES, (tick, t) => {
       const state = [
          ...state1_par.get(),
          ...state2_par.get(),
@@ -131,7 +131,7 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       return drawScene(t, state);
    }, {
       // interval_ms: 1000
-      // max_queue_length: 10
+      max_queue_length: 1
    });
 
    function drawScene(t, state) {
@@ -329,7 +329,7 @@ function createSketch(fn) {
             for (let i = 0; i < count; i++) {
                const index = mod(start_index + i, count);
                if (!state_cache.isValid(index)) {
-                  index_par.set({ index, timestamp: state_cache.invalidTimestamp(index) })
+                  index_par.set({ index, invalidate_count: state_cache.invalidateCount(index) })
                   return
                }
             }
@@ -340,7 +340,7 @@ function createSketch(fn) {
          const previous_states = [initial_state];
          const worker = createReactiveWorker(
             () => {
-               const { index, timestamp } = index_par.get();
+               const { index, invalidate_count } = index_par.get();
                const i = mod(index, count);
                let state = structuredClone(previous_states[i - 1]);
                const t = i / count;
@@ -349,13 +349,13 @@ function createSketch(fn) {
                state = new_state ?? state;
                previous_states[i] = state;
 
-               return { i, state, timestamp }
+               return { i, state, invalidate_count }
             },
-            ({ i, state, timestamp }, dependencies_ids_and_indexes) => {
+            ({ i, state, invalidate_count }, dependencies_ids_and_indexes) => {
                // console.log(state_cache.isValid(i));
 
                if (state_cache.isValid(i)) return;
-               if (state_cache.invalidTimestamp(i) !== timestamp) return
+               if (state_cache.invalidateCount(i) !== invalidate_count) return
 
                state_cache.set(i, state);
                // state_cache.invalidateFrom(i + 1)
@@ -502,15 +502,20 @@ function createSketch(fn) {
          );
 
          const requestNextFrame = () => {
-            // console.log("request next frame");
             for (let i = 0; i < frames; i++) {
                const frame = mod(start_frame + i, frames);
                if (!frame_cache.isValid(frame)) {
-                  const new_index = { index: frame, timestamp: frame_cache.invalidTimestamp(frame) };
-                  if (index_par.value?.index === new_index.index && index_par.value?.timestamp === new_index.timestamp)
+                  const new_index = {
+                     index: frame,
+                     timestamp: frame_cache.invalidTimestamp(frame),
+                     invalidate_count: frame_cache.invalidateCount(frame),
+                  };
+                  if (index_par.value?.index === new_index.index &&
+                     index_par.value?.timestamp === new_index.timestamp &&
+                     index_par.value?.invalidate_count === new_index.invalidate_count) {
                      return;
+                  }
                   index_par.set(new_index)
-                  // console.log(new_index);
                   return
                }
             }
@@ -520,7 +525,7 @@ function createSketch(fn) {
          const frames_dependencies = []
          const worker = createReactiveWorker(
             () => {
-               const { index, timestamp } = index_par.get();
+               const { index, timestamp, invalidate_count } = index_par.get();
                const i = mod(index, frames);
 
                const t = i / frames;
@@ -529,12 +534,20 @@ function createSketch(fn) {
                const bitmap = canvas.transferToImageBitmap();
                ctx.drawImage(bitmap, 0, 0);
 
-               return { i, bitmap, timestamp }
+               return { i, bitmap, timestamp, invalidate_count }
             },
-            ({ i, bitmap, timestamp }, dependencies_ids_and_indexes) => {
+            ({ i, bitmap, timestamp, invalidate_count }, dependencies_ids_and_indexes) => {
                if (frame_cache.isValid(i)) return;
+
                if (frame_cache.invalidTimestamp(i) !== timestamp) {
                   frame_cache.invalidSet(i, bitmap);
+                  requestNextFrame();
+                  return;
+               }
+
+               if (frames_dependencies[i] === undefined && dependencies_ids_and_indexes.length) {
+                  frames_dependencies[i] = dependencies_ids_and_indexes;
+                  frame_cache.invalidate(i);
                   requestNextFrame();
                   return;
                }
@@ -545,14 +558,15 @@ function createSketch(fn) {
             },
             (dependency_id, dependency_index) => {
                if (dependency_id === index_par.id) return;
+
                frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
                   if (dependencies_ids_and_indexes.find(({ id, index }) =>
                      dependency_id === id && (index === undefined || index === dependency_index)
                   )) {
                      frame_cache.invalidate(frame)
-                     frames_dependencies[frame] = [];
                   }
                });
+
                requestNextFrame();
             }
          );
@@ -602,14 +616,13 @@ function createSketch(fn) {
                   const dependency = global_dependencies.get(id);
                   const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
                   if (timestamp < last_set_timestamp) {
-                     // frames_dependencies[index] = [];
                      invalidate(index);
                      return;
                   }
                }
 
                if (frames_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-                  frames_dependencies[index] = [];
+                  frames_dependencies[index] = dependencies_ids_and_indexes;
                   invalidate(index);
                   return;
                }
@@ -624,7 +637,6 @@ function createSketch(fn) {
                      dependency_id === id && (index === undefined || index === dependency_index)
                   )) {
                      invalidate(frame);
-                     frames_dependencies[frame] = [];
                   }
                });
             },
@@ -673,8 +685,6 @@ function createMessageWorker(execute, onMessage, receive) {
 
 function createReactiveWorker(execute, receive, onDependencyChanged) {
 
-   const retrig_par = createParameter(false);
-
    const worker = createMessageWorker(
       () => {
          createEffect(() => {
@@ -682,14 +692,12 @@ function createReactiveWorker(execute, receive, onDependencyChanged) {
             const dependencies_ids_and_indexes = [...global_effect_dependencies()]
                .map(({ dependency, index }) => ({ id: dependency.id, index }));
             if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
-            retrig_par.get();
          }, { batch: true });
       },
       (data) => {
          const { id, set_args } = data;
          const dependency = global_dependencies.get(id);
          dependency.set(...set_args);
-         retrig_par.set(!retrig_par.get())
       },
       (data) => {
          const { value, dependencies_ids_and_indexes } = data;
@@ -873,7 +881,6 @@ function createReactiveCacheWorker(cache, execute, receive, onDependencyChanged,
             case "invalidate":
                const { index, timestamp } = data;
                cache.invalidate(index, timestamp);
-               // cache.validate(0);
 
                retrig_par.set(!retrig_par.value)
                break;
@@ -1068,6 +1075,7 @@ function createCache(count = 0) {
          if (!this.cache[index]) this.cache[index] = {};
          this.cache[index].valid = false;
          this.cache[index].invalid_timestamp = timestamp ?? Date.now();
+         this.cache[index].invalidate_count = (this.cache[index].invalidate_count ?? 0) + 1;
       },
       invalidateFrom(index) {
          if (index === undefined) {
@@ -1077,6 +1085,9 @@ function createCache(count = 0) {
       },
       invalidTimestamp(index) {
          return this.cache[index]?.invalid_timestamp;
+      },
+      invalidateCount(index) {
+         return this.cache[index]?.invalidate_count;
       },
       lastSetTimestamp(index) {
          if (index === undefined) return this.last_set_timestamp;
