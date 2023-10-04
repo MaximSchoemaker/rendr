@@ -95,9 +95,8 @@ const test_sketch = createSketch(sketch => (tick_par) => {
 
       const state3 = state3_cache.getLatest(index);
       // const state3 = state3_cache.get(index);
+      if (!state3) return
 
-      // return state3;
-      // if (!state3) return
       const state3_map = state3.map(({ x, y }) => ({
          x,
          y: map(Math.random(), 0, 1, 3 / 4, 4 / 4)
@@ -114,8 +113,8 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       const state = [
          ...state1_par.get(),
          ...state2_par.get(),
-         ...state3_cache.getLatest(tick),
-         ...state4_cache.getLatest(tick),
+         ...(state3_cache.get(tick) ?? []),
+         ...(state4_cache.get(tick) ?? []),
       ];
       return drawScene(t, state);
    });
@@ -125,8 +124,8 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       const state = [
          ...state1_par.get(),
          ...state2_par.get(),
-         ...state3_cache.getLatest(tick),
-         ...state4_cache.getLatest(tick),
+         ...(state3_cache.get(tick) ?? []),
+         ...(state4_cache.get(tick) ?? []),
       ];
       return drawScene(t, state);
    }, {
@@ -157,26 +156,26 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       return backbuffer;
    }
 
-   // const gen1_frame_par = null
-   const gen1_frame_par = sketch.generate(gen1_count_par, 1000 / 60, (index) => {
-      const tick = tick_par.get();
-      const f = (tick % FRAMES) / FRAMES;
-      const x = Math.random() * f;
-      const y = Math.random() * 1;
-      return generateScene(index, x, y);
-   });
+   const gen1_frame_par = null
+   // const gen1_frame_par = sketch.generate(gen1_count_par, 1000 / 60, (index) => {
+   //    const tick = tick_par.get();
+   //    const f = (tick % FRAMES) / FRAMES;
+   //    const x = Math.random() * f;
+   //    const y = Math.random() * 1;
+   //    return generateScene(index, x, y);
+   // });
 
    // const gen2_state_par = state1_par;
    const gen2_state_par = state2_par;
 
-   // const gen2_frame_par = null;
-   const gen2_frame_par = sketch.generate(gen2_state_par, 1000 / 60, (index, count, item) => {
-      const frame = tick_par.get();
-      const f = (frame % FRAMES) / FRAMES;
-      const x = item.x * f;
-      const y = item.y;
-      return generateScene(index, x, y);
-   });
+   const gen2_frame_par = null;
+   // const gen2_frame_par = sketch.generate(gen2_state_par, 1000 / 60, (index, count, item) => {
+   //    const frame = tick_par.get();
+   //    const f = (frame % FRAMES) / FRAMES;
+   //    const x = item.x * f;
+   //    const y = item.y;
+   //    return generateScene(index, x, y);
+   // });
 
    function generateScene(index, x, y) {
       const ctx = new Draw2dContext(backbuffer);
@@ -185,9 +184,22 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       return backbuffer;
    }
 
+   const state3_cache_view = createCache(state3_cache.count);
+   state3_cache.onMutate({ key: "valid" }, (dep, action) => {
+      // if (action.key === "value") action = { ...action, key: "length", value: action.value.length };
+      // console.log(action);
+      state3_cache_view.mutate(action)
+   });
+
+   const state4_cache_view = createCache(state4_cache.count);
+   state4_cache.onMutate({ key: "valid" }, (dep, action) => {
+      // console.log(action);
+      state4_cache_view.mutate(action)
+   });
+
    return {
       frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
-      state3_cache, state4_cache,
+      state3_cache_view, state4_cache_view,
       state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
    }
 });
@@ -236,7 +248,7 @@ function Setup(createUI) {
    const running_par = createParameter(true, "running");
    const {
       frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
-      state3_cache, state4_cache,
+      state3_cache_view, state4_cache_view,
       state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
    } = test_sketch.init(tick_par);
 
@@ -258,8 +270,8 @@ function Setup(createUI) {
 
       ui.createTimeline(FRAMES, tick_par, running_par, [
          frame_cache,
-         state4_cache,
-         state3_cache,
+         state4_cache_view,
+         state3_cache_view,
       ].filter(c => !!c));
    })
 
@@ -565,6 +577,7 @@ function createSketch(fn) {
                   if (frame_cache.isValid(i)) return;
 
                   if (frame_cache.invalidTimestamp(i) !== timestamp) {
+                     frames_dependencies[i] = dependencies_ids_and_indexes;
                      frame_cache.invalidSet(i, bitmap);
                      requestNextFrame();
                      return;
@@ -589,6 +602,7 @@ function createSketch(fn) {
                         dependency_id === id && (index === undefined || index === dependency_index)
                      )) {
                         frame_cache.invalidate(frame)
+                        // frames_dependencies[frame] = [];
                      }
                   });
 
@@ -1066,7 +1080,7 @@ function createParameter(value, name) {
          if (key === "value") {
             this.last_set_timestamp = Date.now();
             // this.mutate({ key: "last_set_timestamp", value: Date.now() });
-            if (typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
+            if (name && typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
          }
 
          this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))

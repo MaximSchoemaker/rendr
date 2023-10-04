@@ -100,7 +100,7 @@
   min-width: 0;
 }
 
-.frame:hover.flash {
+.frame:hover .flash {
   opacity: 0.5;
   animation-fill-mode: backwards;
 }
@@ -111,7 +111,7 @@
   background-color: white;
 
   animation-name: fade-out;
-  animation-duration: 0.25s;
+  animation-duration: 0.5s;
   animation-fill-mode: forwards;
 
   /* animation-duration: 0.05s;

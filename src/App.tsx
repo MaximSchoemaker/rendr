@@ -184,7 +184,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
       move = 0;
       move_start_tick = mod(tick(), frames);
     }
-  });
+  }, false);
   onCleanup(loop.stop);
 
   createEffect(() => loop.set(running()));
@@ -302,9 +302,12 @@ function Row({ cache: rendr_cache }: RowProps) {
 
   return (
     <div class={styles.Row}>
-      <For each={cache}>{(item, i) =>
-        <Frame item={item} index={i()} rendr_cache={rendr_cache} />
-      }</For>
+      <Index each={cache}>{(item, i) =>
+        <Frame item={item()} index={i} rendr_cache={rendr_cache} />
+      }</Index>
+      {/* <For each={cache}>{(item, i) =>
+        <Frame item={item} index={i} rendr_cache={rendr_cache} />
+      }</For> */}
     </div>
   )
 }
@@ -318,10 +321,15 @@ type FrameProps = {
 function Frame(props: FrameProps) {
 
   let el: HTMLDivElement;
+  let resetting = false;
   function resetAnimation() {
-    if (!el) return;
+    if (!el || resetting) return;
+    resetting = true;
     el.style.setProperty("animation-name", "none");
-    setTimeout(() => el.style.setProperty("animation-name", styles["fade-out"]));
+    setTimeout(() => {
+      el.style.setProperty("animation-name", styles["fade-out"])
+      resetting = false
+    });
   }
 
   props.rendr_cache.onMutate({ index: props.index, key: "valid" }, resetAnimation);
@@ -330,6 +338,7 @@ function Frame(props: FrameProps) {
   onCleanup(() => props.rendr_cache.unsubscribe(resetAnimation));
 
   function getStatusClass() {
+    // console.log(props.item);
     if (!props.item) return '';
     const status = props.item.valid ? "valid" : "invalid";
     return styles[status];
@@ -339,8 +348,8 @@ function Frame(props: FrameProps) {
     <div
       class={`${styles.frame} ${getStatusClass()}`}
     >
-      <div class={styles.flash} ref={ref => el = ref} />
-      <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
+      {/* <div class={styles.flash} ref={ref => el = ref} /> */}
+      <div class={styles.frameTooltip}>{props.item?.length}</div>
     </div>
   );
 }
@@ -392,8 +401,8 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
 
   let el: HTMLCanvasElement;
-  createEffect(() => {
-    cache();
+  const loop = createAnimationLoop(() => {
+    // cache();
 
     const bitmap = running()
       ? frame_cache.getLatestValid(tick())
@@ -409,6 +418,7 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
 
     ctx.drawImage(bitmap, 0, 0);
   });
+  onCleanup(loop.stop);
 
   return (
     <canvas
@@ -696,7 +706,7 @@ function createRendrCacheStore<T>(cache: Cache<T>) {
   return [store, setStore] as [typeof store, typeof setStore];
 }
 
-function createAnimationLoop(callback: () => void, running = false) {
+function createAnimationLoop(callback: () => void, running = true) {
   let animationFrame: number;
   const loop = () => {
     if (!ret.running) return
