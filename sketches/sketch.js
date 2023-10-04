@@ -36,6 +36,7 @@ const test_sketch = createSketch(sketch => (tick_par) => {
 
       const t = 1;
       const count = state1_count_par.get();
+      // console.log({ count });
 
       if (state.length > count) return state.slice(0, count);
       while (state.length < count) state.push({
@@ -51,6 +52,7 @@ const test_sketch = createSketch(sketch => (tick_par) => {
 
    // const state2_par = null;
    const state2_par = sketch.construct([], state2_count_par, 1000, (state, index, count, item) => {
+      // console.log({ count, index });
       // wait(1000);
 
       // const frame = tick_par.get();
@@ -106,24 +108,28 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       state.push(...state3_map);
    });
 
-   // const frame_par = null
-   const frame_par = sketch.draw(() => {
-      const tick = tick_par.get();
-      const t = (tick % FRAMES) / FRAMES;
-      const state = [
-         ...state1_par.get(),
-         ...state2_par.get(),
-         ...(state3_cache.get(tick) ?? []),
-         ...(state4_cache.get(tick) ?? []),
-      ];
-      return drawScene(t, state);
-   });
+   const frame_par = null
+   // const frame_par = sketch.draw(() => {
+   //    const tick = tick_par.get();
+   //    const t = (tick % FRAMES) / FRAMES;
+   //    const state = [
+   //       ...state1_par.get(),
+   //       ...state2_par.get(),
+   //       // ...state3_cache.getLatest(tick),
+   //       // ...state4_cache.getLatest(tick),
+   //       ...(state3_cache.get(tick) ?? []),
+   //       ...(state4_cache.get(tick) ?? []),
+   //    ];
+   //    return drawScene(t, state);
+   // });
 
    // const frame_cache = null;
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
       const state = [
          ...state1_par.get(),
          ...state2_par.get(),
+         // ...state3_cache.getLatest(tick),
+         // ...state4_cache.getLatest(tick),
          ...(state3_cache.get(tick) ?? []),
          ...(state4_cache.get(tick) ?? []),
       ];
@@ -184,18 +190,18 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       return backbuffer;
    }
 
-   const state3_cache_view = createCache(state3_cache.count);
-   state3_cache.onMutate({ key: "valid" }, (dep, action) => {
-      // if (action.key === "value") action = { ...action, key: "length", value: action.value.length };
-      // console.log(action);
-      state3_cache_view.mutate(action)
-   });
-
-   const state4_cache_view = createCache(state4_cache.count);
-   state4_cache.onMutate({ key: "valid" }, (dep, action) => {
-      // console.log(action);
-      state4_cache_view.mutate(action)
-   });
+   // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
+   let state3_cache_view, state4_cache_view;
+   if (state3_cache) {
+      state3_cache_view = createCache(state3_cache.count);
+      state3_cache_view.set(0, state3_cache.get(0));
+      state3_cache.onMutate({ key: "valid" }, (dep, action) => state3_cache_view.mutate(action));
+   }
+   if (state4_cache) {
+      state4_cache_view = createCache(state4_cache.count);
+      state4_cache_view.set(0, state4_cache.get(0));
+      state4_cache.onMutate({ key: "valid" }, (dep, action) => state4_cache_view.mutate(action));
+   }
 
    return {
       frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
@@ -283,13 +289,7 @@ function Setup(createUI) {
 
 function createSketch(fn) {
 
-   function constructSketch() {
-      const name = `sketch ${global_sketch_id++}`;
-      const main_worker_name = `${name} main worker`;
-
-      let worker_id = 0;
-      const gen_worker_name = () => `${name} worker ${worker_id++}`
-
+   function constructSketch(name, main_worker_name, gen_worker_name) {
       return {
          name,
          main_worker_name,
@@ -387,6 +387,13 @@ function createSketch(fn) {
 
                   if (state_cache.isValid(i)) return;
                   if (state_cache.invalidateCount(i) !== invalidate_count) return
+
+                  // if (state_cache[i] === undefined && dependencies_ids_and_indexes.length) {
+                  //    state_cache[i] = dependencies_ids_and_indexes;
+                  //    state_cache.invalidate(i);
+                  //    requestNextIndex();
+                  //    return;
+                  // }
 
                   state_cache.set(i, state);
                   // state_cache.invalidateFrom(i + 1)
@@ -577,7 +584,7 @@ function createSketch(fn) {
                   if (frame_cache.isValid(i)) return;
 
                   if (frame_cache.invalidTimestamp(i) !== timestamp) {
-                     frames_dependencies[i] = dependencies_ids_and_indexes;
+                     // frames_dependencies[i] = dependencies_ids_and_indexes;
                      frame_cache.invalidSet(i, bitmap);
                      requestNextFrame();
                      return;
@@ -691,41 +698,58 @@ function createSketch(fn) {
 
    return {
       init(...args) {
-         const sketch = constructSketch();
+         const name = `sketch ${global_sketch_id++}`;
+
+         // const main_worker_name = ROOT_WORKER_NAME;
+         const main_worker_name = `${name} main worker`;
+
+         let worker_id = 0;
+         const gen_worker_name = () => `${name} worker ${worker_id++}`
+
+         const sketch = constructSketch(name, main_worker_name, gen_worker_name);
 
          let sketch_output = fn(sketch);
          if (typeof sketch_output === 'function')
             sketch_output = sketch_output(...args);
+
+         // return sketch_output;
 
          createWorker(
             sketch.main_worker_name,
             ROOT_WORKER_NAME,
             () => {
                for (const [key, dependency] of Object.entries(sketch_output)) {
-                  dependency?.onMutate({}, (dep, action) => action.source === WORKER_NAME && postMessage({ target: "output", key, action }));
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
                }
                args.forEach((dependency, index) => {
-                  dependency?.onMutate({}, (dep, action) => action.source === WORKER_NAME && postMessage({ target: "input", index, action }));
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+               });
+               [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
                });
             },
             (data) => {
-               const { target, key, index, action } = data;
-               // console.log("receive worker", data);
-               if (target === 'output') sketch_output[key].mutate(action);
-               if (target === 'input') args[index].mutate(action);
+               const { id, action } = data;
+               const dependency = global_dependencies.get(id);
+               dependency.mutate(action);
             },
             (worker) => {
                for (const [key, dependency] of Object.entries(sketch_output)) {
-                  dependency?.onMutate({}, (dep, action) => action.source === WORKER_NAME && worker.postMessage({ target: "output", key, action }));
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
                }
                args.forEach((dependency, index) => {
-                  dependency?.onMutate({}, (dep, action) => action.source === WORKER_NAME && worker.postMessage({ target: "input", index, action }));
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+               });
+               [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+                  // console.log(dependency);
+                  dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+                  worker.postMessage({ id: dependency.id, action: { key: "value", value: dependency.get() } });
                });
             },
             (data) => {
-               const { target, key, index, action } = data;
-               if (target === 'output') sketch_output[key].mutate(action);
-               if (target === 'input') args[index].mutate(action);
+               const { id, action } = data;
+               const dependency = global_dependencies.get(id);
+               dependency.mutate(action);
             },
          );
 
@@ -737,56 +761,77 @@ function createSketch(fn) {
 function createWorker(name, parent_name, executeWorker, receiveWorker, execute, receive) {
 
    if (WORKER_NAME === name) {
-      addEventListener("message", (evt) => {
-         const { data } = evt;
-         // console.log(data);
+      addEventListener("message", (evt) => receiveWorker(evt.data));
 
-         const { kind, parameters } = data;
-         if (kind === "localStorage") {
-            parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
-
-            const res = executeWorker();
-            if (res !== undefined) postMessage(res);
-
-            return;
-         }
-
-         receiveWorker(data)
-      });
+      const res = executeWorker();
+      if (res !== undefined) postMessage(res);
    }
    else if (WORKER_NAME === parent_name) {
       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
       global_workers.add(worker);
 
-      function start() {
-         worker.postMessage({
-            kind: "localStorage",
-            parameters: [...global_dependencies.entries()]
-               .filter(([id, p]) => p.name)
-               .map(([id, p]) => ({ id, value: p.value }))
-         })
-
-         const res = execute(worker);
-         if (res !== undefined) worker.postMessage(res);
-      }
-
-      if (WORKER_NAME === ROOT_WORKER_NAME) start()
-
-      addEventListener("message", (evt) => {
-         const { data } = evt;
-         const { kind, parameters } = data;
-
-         if (kind === "localStorage") {
-            parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
-            start();
-         }
-      });
-
       worker.addEventListener("message", (evt) => receive(evt.data));
+
+      const res = execute(worker);
+      if (res !== undefined) worker.postMessage(res);
 
       return worker;
    }
 }
+
+// function createLocalStorageWorker(name, parent_name, executeWorker, receiveWorker, execute, receive) {
+
+//    if (WORKER_NAME === name) {
+//       addEventListener("message", (evt) => {
+//          const { data } = evt;
+//          // console.log(data);
+
+//          const { kind, parameters } = data;
+//          if (kind === "localStorage") {
+//             parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
+
+//             const res = executeWorker();
+//             if (res !== undefined) postMessage(res);
+
+//             return;
+//          }
+
+//          receiveWorker(data)
+//       });
+//    }
+//    else if (WORKER_NAME === parent_name) {
+//       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
+//       global_workers.add(worker);
+
+//       function start() {
+//          worker.postMessage({
+//             kind: "localStorage",
+//             parameters: [...global_dependencies.entries()]
+//                .filter(([id, p]) => p.name)
+//                .map(([id, p]) => ({ id, value: p.value }))
+//          })
+
+//          const res = execute(worker);
+//          if (res !== undefined) worker.postMessage(res);
+//       }
+
+//       if (WORKER_NAME === ROOT_WORKER_NAME) start()
+
+//       addEventListener("message", (evt) => {
+//          const { data } = evt;
+//          const { kind, parameters } = data;
+
+//          if (kind === "localStorage") {
+//             parameters.forEach(({ id, value }) => global_dependencies.get(id).set(value));
+//             start();
+//          }
+//       });
+
+//       worker.addEventListener("message", (evt) => receive(evt.data));
+
+//       return worker;
+//    }
+// }
 
 function createReactiveWorker(name, parent_name, execute, receive, onDependencyChanged) {
 
@@ -806,7 +851,11 @@ function createReactiveWorker(name, parent_name, execute, receive, onDependencyC
          const dependency = global_dependencies.get(id);
          dependency.mutate(action);
       },
-      (worker) => { },
+      (worker) => {
+         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+         // });
+      },
       (data) => {
          const { value, dependencies_ids_and_indexes } = data;
          receive(value, dependencies_ids_and_indexes)
@@ -814,7 +863,7 @@ function createReactiveWorker(name, parent_name, execute, receive, onDependencyC
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { value: dep.get() });
+               onDepChange(dep, { key: "value", value: dep.get() });
             else
                dep.unsubscribe(onDepChange);
             dep.onChange(onDepChange);
@@ -907,7 +956,11 @@ function createReactiveQueueWorker(name, parent_name, count_or_queue, interval_m
          dependency.mutate(action);
          retrig_par.set(!retrig_par.value)
       },
-      (worker) => { },
+      (worker) => {
+         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+         // });
+      },
       (data) => {
          const { value, dependencies_ids_and_indexes } = data;
          receive(value, dependencies_ids_and_indexes)
@@ -915,7 +968,7 @@ function createReactiveQueueWorker(name, parent_name, count_or_queue, interval_m
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { value: dep.get() });
+               onDepChange(dep, { key: "value", value: dep.get() });
             else
                dep.unsubscribe(onDepChange);
             dep.onChange(onDepChange);
@@ -1002,7 +1055,11 @@ function createReactiveCacheWorker(name, parent_name, cache, execute, receive, o
                break;
          }
       },
-      (worker) => { },
+      (worker) => {
+         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+         // });
+      },
       (data) => {
          const { value, index, timestamp, dependencies_ids_and_indexes } = data;
          receive(value, index, timestamp, dependencies_ids_and_indexes)
@@ -1010,7 +1067,7 @@ function createReactiveCacheWorker(name, parent_name, cache, execute, receive, o
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { value: dep.get() });
+               onDepChange(dep, { key: "value", value: dep.get() });
             else
                dep.unsubscribe(onDepChange);
             dep.onChange(onDepChange);
@@ -1073,7 +1130,7 @@ function createParameter(value, name) {
       },
       mutate(action) {
          action.source ??= WORKER_NAME;
-         const { key, value, validate } = action;
+         const { key, value } = action;
          if (this[key] === value) return;
          this[key] = value;
 
@@ -1086,7 +1143,7 @@ function createParameter(value, name) {
          this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
       },
       set(value) {
-         this.mutate({ key: "value", value, validate: true });
+         this.mutate({ key: "value", value });
       },
       get() {
          global_effect_dependencies().add({ dependency: this });
@@ -1152,7 +1209,6 @@ function createCache(count = 0) {
                this.count = index;
 
             if (validate) this.validate(index);
-            this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
          } else {
             const _key = key === "value" ? "cache" : key;
             if (this[key] === value) return
@@ -1161,16 +1217,17 @@ function createCache(count = 0) {
             if (key === "value") this.last_set_timestamp = Date.now()
             // if (key === "value") this.mutate({ key: "last_set_timestamp", value: Date.now() });
 
-            // this.listeners.forEach(callback => callback(this, action))
-            this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
          }
+         this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
       },
       set(index, value) {
-         if (index === undefined || value === undefined) console.warn("wrong set");
-         this.mutate({ key: "value", index, value, validate: true });
+         if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
+         this.mutate({ key: "value", index, value });
+         this.validate(index);
       },
       invalidSet(index, value) {
-         this.mutate({ key: "value", index, value, validate: false });
+         if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
+         this.mutate({ key: "value", index, value });
       },
       get() {
          if (arguments.length == 0) return this._getAll();

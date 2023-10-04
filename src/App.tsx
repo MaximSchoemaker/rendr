@@ -349,7 +349,7 @@ function Frame(props: FrameProps) {
       class={`${styles.frame} ${getStatusClass()}`}
     >
       {/* <div class={styles.flash} ref={ref => el = ref} /> */}
-      <div class={styles.frameTooltip}>{props.item?.length}</div>
+      <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
     </div>
   );
 }
@@ -398,17 +398,19 @@ type CacheViewProps = {
 function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   const [tick] = createRendrParameterSignal<number>(tick_par);
   const [running] = createRendrParameterSignal<boolean>(running_par);
-  const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
+  // const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
 
   let el: HTMLCanvasElement;
+  let prev_bitmap: ImageBitmap;
   const loop = createAnimationLoop(() => {
     // cache();
 
-    const bitmap = running()
-      ? frame_cache.getLatestValid(tick())
-      : frame_cache.getLatest(tick());
+    // const bitmap = running()
+    //   ? frame_cache.getLatestValid(tick())
+    //   : frame_cache.getLatest(tick());
+    const bitmap = frame_cache.getLatestValid(tick());
 
-    if (!bitmap) return;
+    if (!bitmap || bitmap === prev_bitmap) return;
 
     el.width = bitmap.width;
     el.height = bitmap.height;
@@ -417,6 +419,7 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
     if (!ctx) return;
 
     ctx.drawImage(bitmap, 0, 0);
+    prev_bitmap = bitmap;
   });
   onCleanup(loop.stop);
 
