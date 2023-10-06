@@ -435,7 +435,6 @@ export function createCache<T>(count = 0): Cache<T> {
    return ret;
 }
 
-type SketchReturn = { [key: string]: Dependency };
 type SketchInitArgs = Dependency[]
 type SketchFn<T> = (sketch: Sketch) => (T | ((...args: SketchInitArgs) => T));
 
@@ -467,13 +466,13 @@ export function createSketch<T>(fn: SketchFn<T>) {
          ROOT_WORKER_NAME,
          () => {
             for (const dependency of Object.values(sketch_output as SketchInitArgs)) {
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== ROOT_WORKER_NAME && postMessage({ id, action }));
             }
             args.forEach(dependency => {
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== ROOT_WORKER_NAME && postMessage({ id, action }));
             });
             [...global_dependencies.values()].filter(dep => dep.name).forEach(dependency => {
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== ROOT_WORKER_NAME && postMessage({ id, action }));
             });
          },
          (data) => {
@@ -483,14 +482,14 @@ export function createSketch<T>(fn: SketchFn<T>) {
          },
          (worker) => {
             for (const dependency of Object.values(sketch_output as SketchInitArgs)) {
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== main_worker_name && worker.postMessage({ id, action: { ...action, source: WORKER_NAME } }));
             }
             args.forEach(dependency => {
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== main_worker_name && worker.postMessage({ id, action: { ...action, source: WORKER_NAME } }));
             });
             [...global_dependencies.values()].filter(dep => dep.name).forEach(dependency => {
                // console.log(dependency);
-               dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+               dependency?.onMutate({}, ({ id }, action) => action.source !== main_worker_name && worker.postMessage({ id, action: { ...action, source: WORKER_NAME } }));
                worker.postMessage({ id: dependency.id, action: { key: "value", value: (dependency as Parameter<any>).get() } });
             });
          },

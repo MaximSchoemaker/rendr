@@ -11,6 +11,36 @@ const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
 const FRAMES = 200;
 
+function drawScene(view, t, state) {
+   const ctx = new Draw2dContext(view);
+   ctx.clear("blue");
+
+   const sig = t;
+
+   const max_count = 5000;
+   const count = sig * max_count;
+   // const count = frame;
+   for (let i = 0; i < count; i++) {
+      const f = i / (max_count);
+      // const f = i / count;
+      ctx.line(WIDTH * f, 0, WIDTH * f, HEIGHT, { beginPath: true, stroke: true, lineWidth: 2 });
+   }
+
+   state.forEach(({ x, y }) => {
+      ctx.circle(x * WIDTH, y * HEIGHT, 2, { beginPath: true, fill: true, fillStyle: "gray" });
+   });
+
+   return view;
+}
+
+function generateScene(view, index, x, y) {
+   const ctx = new Draw2dContext(view);
+   if (index === 0) ctx.clear("orange");
+   ctx.circle(x * WIDTH, y * HEIGHT, 5, { beginPath: true, fill: true, fillStyle: "black" });
+   return view;
+}
+
+
 function wait(count) {
    let arr = [];
    for (let i = 0; i < count; i++) {
@@ -18,14 +48,11 @@ function wait(count) {
    }
 }
 
-const test_sketch = createSketch(sketch => (tick_par) => {
-
-   const backbuffer = createCanvas(WIDTH, HEIGHT);
+const data_sketch = createSketch(sketch => (tick_par) => {
 
    const state1_count_par = createParameter(0, "state1_count_par");
    const state2_count_par = createParameter(0, "state2_count_par");
    const state3_count_par = createParameter(0, "state3_count_par");
-   const gen1_count_par = createParameter(1, "gen1_count_par");
 
    // const state1_par = null;
    const state1_par = sketch.update([], (state) => {
@@ -95,6 +122,17 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       state.push(...state3_map);
    });
 
+   return {
+      state1_par, state2_par,
+      state3_cache, state4_cache,
+      state1_count_par, state2_count_par, state3_count_par,
+   }
+});
+
+const draw_sketch = createSketch(sketch => (tick_par, state1_par, state2_par, state3_cache, state4_cache) => {
+
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
+
    // const frame_par = null
    const frame_par = sketch.draw(() => {
       const view = backbuffer;
@@ -110,6 +148,15 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       ];
       return drawScene(view, t, state);
    });
+
+   return {
+      frame_par,
+   }
+});
+
+const animate_sketch = createSketch(sketch => (tick_par, state1_par, state2_par, state3_cache, state4_cache) => {
+
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const frame_cache = null;
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
@@ -128,27 +175,15 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       max_queue_length: 1
    });
 
-   function drawScene(view, t, state) {
-      const ctx = new Draw2dContext(view);
-      ctx.clear("blue");
-
-      const sig = t;
-
-      const max_count = 5000;
-      const count = sig * max_count;
-      // const count = frame;
-      for (let i = 0; i < count; i++) {
-         const f = i / (max_count);
-         // const f = i / count;
-         ctx.line(WIDTH * f, 0, WIDTH * f, HEIGHT, { beginPath: true, stroke: true, lineWidth: 2 });
-      }
-
-      state.forEach(({ x, y }) => {
-         ctx.circle(x * WIDTH, y * HEIGHT, 2, { beginPath: true, fill: true, fillStyle: "gray" });
-      });
-
-      return backbuffer;
+   return {
+      frame_cache,
    }
+});
+
+const generate_sketch1 = createSketch(sketch => (tick_par) => {
+
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
+   const gen1_count_par = createParameter(0, "gen1_count_par");
 
    // const gen1_frame_par = null
    const gen1_frame_par = sketch.generate(gen1_count_par, 1000 / 60, (index) => {
@@ -159,6 +194,16 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       const y = Math.random() * 1;
       return generateScene(view, index, x, y);
    });
+
+   return {
+      gen1_frame_par,
+      gen1_count_par,
+   }
+});
+
+const generate_sketch2 = createSketch(sketch => (tick_par, state1_par, state2_par) => {
+
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const gen2_state_par = state1_par;
    const gen2_state_par = state2_par;
@@ -173,12 +218,24 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       return generateScene(view, index, x, y);
    });
 
-   function generateScene(view, index, x, y) {
-      const ctx = new Draw2dContext(view);
-      if (index === 0) ctx.clear("orange");
-      ctx.circle(x * WIDTH, y * HEIGHT, 5, { beginPath: true, fill: true, fillStyle: "black" });
-      return backbuffer;
+   return {
+      gen2_frame_par,
    }
+});
+
+const master_sketch = createSketch(sketch => (tick_par) => {
+   const {
+      state1_par, state2_par,
+      state3_cache, state4_cache,
+      state1_count_par, state2_count_par, state3_count_par,
+   } = data_sketch.init(tick_par);
+
+   const { frame_par } = draw_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
+   const { frame_cache } = animate_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
+   const gen1_frame_par = null, gen1_count_par = null;
+   // const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
+   const gen2_frame_par = null;
+   // const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
 
    // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
    let state3_cache_view, state4_cache_view;
@@ -194,9 +251,9 @@ const test_sketch = createSketch(sketch => (tick_par) => {
    }
 
    return {
-      frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
       state3_cache_view, state4_cache_view,
       state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
+      frame_par, frame_cache, gen1_frame_par, gen2_frame_par
    }
 });
 
@@ -206,34 +263,39 @@ function Setup(createUI) {
 
    const tick_par = createParameter(0, "tick");
    const running_par = createParameter(true, "running");
-   const {
-      frame_cache, frame_par, gen1_frame_par, gen2_frame_par,
-      state3_cache_view, state4_cache_view,
-      state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
-   } = test_sketch.init(tick_par);
 
-   createUI(ui => {
-      ui.createWindow(ui => {
-         if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
-         if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
-         if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
-         if (state3_count_par) ui.createParameterNumber("State 3 Count", state3_count_par, { min: 1, max: 50, step: 1 });
-         if (gen1_count_par) ui.createParameterNumber("Gen 1 Count", gen1_count_par, { min: 1, max: 100000, step: 1 });
-      });
+   for (let i = 0; i < 1; i++) {
+      const {
+         state3_cache_view, state4_cache_view,
+         state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
+         frame_par, frame_cache, gen1_frame_par, gen2_frame_par
+      } = master_sketch.init(tick_par);
 
-      ui.createContainer(ui => {
-         if (frame_par) ui.createView(frame_par);
-         if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
-         if (gen1_frame_par) ui.createView(gen1_frame_par);
-         if (gen2_frame_par) ui.createView(gen2_frame_par);
-      });
+      createUI(ui => {
+         ui.createContainer(ui => {
+            ui.createWindow(ui => {
+               if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
+               if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
+               if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
+               if (state3_count_par) ui.createParameterNumber("State 3 Count", state3_count_par, { min: 1, max: 50, step: 1 });
+               if (gen1_count_par) ui.createParameterNumber("Gen 1 Count", gen1_count_par, { min: 1, max: 100000, step: 1 });
+            });
 
-      ui.createTimeline(FRAMES, tick_par, running_par, [
-         frame_cache,
-         state4_cache_view,
-         state3_cache_view,
-      ].filter(c => !!c));
-   })
+            ui.createViewContainer(ui => {
+               if (frame_par) ui.createView(frame_par);
+               if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
+               if (gen1_frame_par) ui.createView(gen1_frame_par);
+               if (gen2_frame_par) ui.createView(gen2_frame_par);
+            });
+
+            ui.createTimeline(FRAMES, tick_par, running_par, [
+               frame_cache,
+               state3_cache_view,
+               state4_cache_view,
+            ].filter(c => !!c));
+         });
+      })
+   }
 
    return () => {
       cleanupGlobals();

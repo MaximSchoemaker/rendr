@@ -52,6 +52,9 @@ class UI {
   createContainer(callback: (ui: UI) => void) {
     this.AddComponent(Container({ callback }));
   }
+  createViewContainer(callback: (ui: UI) => void) {
+    this.AddComponent(ViewContainer({ callback }));
+  }
   createWindow(callback: (ui: UI) => void) {
     this.AddComponent(Window({ callback }));
   }
@@ -109,6 +112,29 @@ const Container = ({ callback }: ContainerProps) => {
   const ui = new UI(AddComponent);
   callback(ui);
 
+  return (
+    <div class={styles.Container}>
+      <For each={components()}>{component => component}</For>
+    </div>
+  );
+};
+
+
+type ViewContainerProps = {
+  callback: (ui: UI) => void;
+}
+
+const ViewContainer = ({ callback }: ViewContainerProps) => {
+
+  const [components, set_components] = createSignal<JSXElement[]>([]);
+
+  function AddComponent(component: JSXElement) {
+    set_components(components => [...components, component]);
+  }
+
+  const ui = new UI(AddComponent);
+  callback(ui);
+
   const stored_selected = JSON.parse(localStorage.getItem("selected") ?? "null");
   const [selected, set_selected] = createSignal<number | null>(stored_selected);
   createEffect(() => {
@@ -127,7 +153,7 @@ const Container = ({ callback }: ContainerProps) => {
   }
 
   return (
-    <div class={styles.Container}>
+    <div class={styles.ViewContainer}>
       <Show when={components().length > 0}>
         <Show when={selected() === null} fallback={clickComponent(getSelectedComponent(), selected)}>
           <For each={components()}>{clickComponent}</For>
