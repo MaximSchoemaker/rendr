@@ -4,7 +4,6 @@ import { createStore } from "solid-js/store";
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
-import { trackSelf } from 'solid-js/store/types/store';
 
 type onMutateCallback = (dependency: Dependency, action: Action) => void
 

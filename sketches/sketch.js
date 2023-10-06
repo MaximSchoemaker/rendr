@@ -1,7 +1,6 @@
-import { resetGlobals, cleanupGlobals, createSketch, createSketchWorker, createCanvas, createParameter, createCache } from "../rendr/rendr.js";
-
-import { Draw2dContext } from "../rendr/library/Draw2d.js";
-import { n_arr, mod, map, invCosn } from "../rendr/library/Utils.js"
+import { resetGlobals, cleanupGlobals, createSketch, createSketchWorker, createCanvas, createParameter, createCache } from "/rendr/rendr.js";
+import { Draw2dContext } from "/rendr/library/Draw2d.js";
+import { n_arr, mod, map, invCosn } from "/rendr/library/Utils.js"
 
 const ROOT_WORKER_NAME = "root"
 const WORKER_NAME = self.name || ROOT_WORKER_NAME;

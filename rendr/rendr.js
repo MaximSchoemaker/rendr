@@ -1,4 +1,4 @@
-import { mod } from "./library/Utils";
+import { mod } from "./library/Utils.js";
 // import SKETCH_PATH from "./sketch.js?url"
 const SKETCH_PATH = "/sketches/sketch.js";
 const ROOT_WORKER_NAME = "root";
