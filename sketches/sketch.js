@@ -33,27 +33,15 @@ const test_sketch = createSketch(sketch => (tick_par) => {
 
       const t = 1;
       const count = state1_count_par.get();
-      // console.log({ count });
-
       if (state.length > count) return state.slice(0, count);
       while (state.length < count) state.push({
          x: Math.random() * t,
          y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
       });
-
-      // return n_arr(count, () => ({
-      //    x: Math.random() * t,
-      //    y: map(Math.random(), 0, 1, 0 / 4, 1 / 4)
-      // }));
    });
 
    // const state2_par = null;
    const state2_par = sketch.construct([], state2_count_par, 1000, (state, index, count, item) => {
-      // console.log({ count, index });
-      // wait(1000);
-
-      // const frame = tick_par.get();
-      // const f = (frame % FRAMES) / FRAMES;
       const f = 1;
 
       // const x = item.x * f;
@@ -144,7 +132,6 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       const ctx = new Draw2dContext(view);
       ctx.clear("blue");
 
-      // const sig = Math.sin(t * Math.PI * 2) * 0.5 + 0.5
       const sig = t;
 
       const max_count = 5000;
@@ -212,20 +199,6 @@ const test_sketch = createSketch(sketch => (tick_par) => {
       state1_count_par, state2_count_par, state3_count_par, gen1_count_par,
    }
 });
-
-
-
-// let effectStack = [[]];
-// const pushEffectStack = () => {
-//    effectStack.push([]);
-// }
-// const popEffectStack = () => {
-//    const popped = effectStack.pop();
-//    popped.forEach(cleanup => cleanup());
-// }
-// const addEffectStack = (cleanup) => {
-//    effectStack.at(-1).push(cleanup);
-// }
 
 function Setup(createUI) {
 

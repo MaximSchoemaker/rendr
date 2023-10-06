@@ -9,9 +9,20 @@ let global_dependencies = new Map();
 let global_workers = new Set();
 let global_sketch_id = 0;
 let global_effect_dependencies_stack = [new Set()];
-export function global_effect_dependencies() {
+function global_effect_dependencies() {
     return global_effect_dependencies_stack.at(-1);
 }
+// let effectStack = [[]];
+// const pushEffectStack = () => {
+//    effectStack.push([]);
+// }
+// const popEffectStack = () => {
+//    const popped = effectStack.pop();
+//    popped.forEach(cleanup => cleanup());
+// }
+// const addEffectStack = (cleanup) => {
+//    effectStack.at(-1).push(cleanup);
+// }
 export function resetGlobals() {
     global_dependencies = new Map();
     global_dependency_id = 0;
@@ -328,52 +339,53 @@ export function createCache(count = 0) {
     return ret;
 }
 export function createSketch(fn) {
-    return {
-        init(...args) {
-            const name = `sketch ${global_sketch_id++}`;
-            // const main_worker_name = ROOT_WORKER_NAME;
-            const main_worker_name = `${name} main worker`;
-            let worker_id = 0;
-            const gen_worker_name = () => `${name} worker ${worker_id++}`;
-            const sketch = constructSketch(name, main_worker_name, gen_worker_name);
-            let _sketch_output = fn(sketch);
-            let sketch_output = typeof _sketch_output === 'function'
-                ? _sketch_output(...args)
-                : _sketch_output;
-            // return sketch_output;
-            createWorker(sketch.main_worker_name, ROOT_WORKER_NAME, () => {
-                for (const [key, dependency] of Object.entries(sketch_output)) {
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
-                }
-                args.forEach((dependency, index) => {
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
-                });
-                [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
-                });
-            }, (data) => {
-                const { id, action } = data;
-                const dependency = global_dependencies.get(id);
-                dependency?.mutate(action);
-            }, (worker) => {
-                for (const [key, dependency] of Object.entries(sketch_output)) {
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-                }
-                args.forEach((dependency, index) => {
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-                });
-                [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-                    // console.log(dependency);
-                    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-                    worker.postMessage({ id: dependency.id, action: { key: "value", value: dependency.get() } });
-                });
-            }, (data) => {
-                const { id, action } = data;
-                const dependency = global_dependencies.get(id);
-                dependency?.mutate(action);
+    function init(...args) {
+        const name = `sketch ${global_sketch_id++}`;
+        // const main_worker_name = ROOT_WORKER_NAME;
+        const main_worker_name = `${name} main worker`;
+        let worker_id = 0;
+        const gen_worker_name = () => `${name} worker ${worker_id++}`;
+        const sketch = constructSketch(name, main_worker_name, gen_worker_name);
+        let _sketch_output = fn(sketch);
+        let sketch_output = typeof _sketch_output === 'function'
+            ? _sketch_output(...args)
+            : _sketch_output;
+        // return sketch_output;
+        createWorker(sketch.main_worker_name, ROOT_WORKER_NAME, () => {
+            for (const dependency of Object.values(sketch_output)) {
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+            }
+            args.forEach(dependency => {
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
             });
-            return sketch_output;
-        }
+            [...global_dependencies.values()].filter(dep => dep.name).forEach(dependency => {
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && postMessage({ id, action }));
+            });
+        }, (data) => {
+            const { id, action } = data;
+            const dependency = global_dependencies.get(id);
+            dependency?.mutate(action);
+        }, (worker) => {
+            for (const dependency of Object.values(sketch_output)) {
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+            }
+            args.forEach(dependency => {
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+            });
+            [...global_dependencies.values()].filter(dep => dep.name).forEach(dependency => {
+                // console.log(dependency);
+                dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+                worker.postMessage({ id: dependency.id, action: { key: "value", value: dependency.get() } });
+            });
+        }, (data) => {
+            const { id, action } = data;
+            const dependency = global_dependencies.get(id);
+            dependency?.mutate(action);
+        });
+        return sketch_output;
+    }
+    return {
+        init,
     };
 }
 function constructSketch(name, main_worker_name, gen_worker_name) {
