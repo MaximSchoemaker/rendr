@@ -230,15 +230,14 @@ const master_sketch = createSketch(sketch => (tick_par) => {
    } = data_sketch.init(tick_par);
 
    // const frame_par = null;
+   // const frame_cache = null;
+   // const gen1_frame_par = null, gen1_count_par = null;
+   // const gen2_frame_par = null;
+
    const { frame_par } = draw_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
-
    const { frame_cache } = animate_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
-
-   const gen1_frame_par = null, gen1_count_par = null;
-   // const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
-
-   const gen2_frame_par = null;
-   // const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
+   const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
+   const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
 
    // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
    let state3_cache_view, state4_cache_view;
