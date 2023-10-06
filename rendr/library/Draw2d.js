@@ -1,15 +1,17 @@
 export function mergeConfigs(config1, config2) {
     if (config1 === undefined)
-        return config2 !== null && config2 !== void 0 ? config2 : {};
+        return config2 ?? {};
     return Array.isArray(config2)
         ? Array.isArray(config1)
             ? config2
-            : config2.map(c => (Object.assign(Object.assign({}, config1), c)))
+            : config2.map(c => ({ ...config1, ...c }))
         : Array.isArray(config1)
-            ? config1.map(c => (Object.assign(Object.assign({}, c), config2)))
-            : Object.assign(Object.assign({}, config1), config2);
+            ? config1.map(c => ({ ...c, ...config2 }))
+            : { ...config1, ...config2 };
 }
 class Draw2dContextBase {
+    canvas;
+    _config;
     constructor(canvas) {
         this.canvas = canvas;
     }
@@ -131,7 +133,7 @@ export default class Draw2d {
         ctx.save();
         ctx.resetTransform();
         ctx.globalCompositeOperation = "copy";
-        ctx.fillStyle = color !== null && color !== void 0 ? color : "transparent";
+        ctx.fillStyle = color ?? "transparent";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
     }
