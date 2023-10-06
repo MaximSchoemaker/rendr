@@ -1,12 +1,30 @@
 .App {
   display: flex;
-  flex-direction: column;
+  /* flex-direction: column; */
+  width: 100vw;
   height: 100dvh;
-  /* overflow: hidden; */
-  /* background-color: black; */
+  overflow: hidden;
+  /* background-color: black;  */
 }
 
 .Container {
+  flex: 1;
+  
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  position: relative;
+  border: 1px solid black;
+
+  container-type: size;
+}
+
+.ViewContainer {
   flex: 1;
   
   width: 100%;
@@ -22,8 +40,8 @@
   flex-wrap: wrap;
 }
 
-@media (orientation: portrait) {
-  .Container {
+@container (orientation: portrait) {
+  .ViewContainer {
     flex-direction: column;
   }
 }
@@ -49,6 +67,19 @@
   --gap: 1px;
 }
 
+@media (orientation: portrait) {
+  .Timeline {
+    --gap: 0px;
+  }
+}
+
+/* @container (max-width: 860px) { */
+@container (orientation: portrait) {
+    .Timeline {
+    --gap: 0px;
+  }
+}
+
 .rows {
   display: flex;
   flex-direction: column;
@@ -72,9 +103,12 @@
   outline: 4px solid #84F;
   position: relative;
   isolation: isolate;
+  
+  z-index: 1;
+  pointer-events: none;
 }
 
-@media (orientation: landscape) {
+@container (min-width: 500px) {
   .active::before {
     z-index: -1;
     content: '';
@@ -82,7 +116,7 @@
     inset: 0;
     outline: 6px solid black;
     outline-offset: -1px;
-  }   
+  }
 }
 
 .Row {
@@ -93,6 +127,55 @@
 
 .frame {
   flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.frame:hover .flash {
+  opacity: 0.5;
+  animation-fill-mode: backwards;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background-color: white;
+
+  animation-name: fade-out;
+  animation-duration: 0.5s;
+  animation-fill-mode: forwards;
+
+  /* animation-duration: 0.05s;
+  animation-timing-function: steps(1); */
+}
+
+.frame:hover .frameTooltip {
+  display: block;
+}
+
+.frameTooltip {
+  display: none;
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 1;
+
+  color: white;
+  background-color: black;
+  border: 1px solid white;
+  user-select: none;
+  padding: 5px;
+}
+
+
+@keyframes fade-out {
+  from {
+      opacity: 0.75;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .valid {
@@ -121,7 +204,8 @@
   object-fit: contain;
 }
 
-@media (orientation: portrait) {
+
+@container (orientation: portrait) {
   .View {    
     max-width: 100%;
     max-height: min-content;
@@ -150,7 +234,6 @@
   padding-left: 5px;
 
   font-size: 13px;
-  font-family: monospace;
 }
 
 .Parameter:not(:first-child) {

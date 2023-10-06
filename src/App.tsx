@@ -1,13 +1,18 @@
 import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
+import { createStore } from "solid-js/store";
 
 import styles from './App.module.css';
 import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
+import { trackSelf } from 'solid-js/store/types/store';
+
+type onMutateCallback = (dependency: Dependency, action: Action) => void
 
 type Dependency = {
+  mutate: (action: Action) => void;
   set: (value: any) => void;
-  onChange: (callback: (value: any) => void) => void;
-  unsubscribe: (callback: (value: any) => void) => void;
+  onMutate: (match: Match, callback: onMutateCallback) => void;
+  unsubscribe: (callback: onMutateCallback) => void;
 }
 
 type Parameter<T> = Dependency & {
@@ -23,6 +28,22 @@ type Cache<T> = Dependency & {
   getLatestValid: (index: number) => T,
 }
 
+type Action = {
+  key: string;
+  value: any;
+  index?: number;
+  validate?: boolean;
+  source?: string;
+}
+
+type Match = {
+  key?: string;
+  value?: any;
+  index?: number;
+  validate?: boolean;
+  source?: string;
+} | ((action: Action) => boolean);
+
 class UI {
   AddComponent;
   constructor(AddComponent: (component: JSXElement) => void) {
@@ -30,6 +51,9 @@ class UI {
   }
   createContainer(callback: (ui: UI) => void) {
     this.AddComponent(Container({ callback }));
+  }
+  createViewContainer(callback: (ui: UI) => void) {
+    this.AddComponent(ViewContainer({ callback }));
   }
   createWindow(callback: (ui: UI) => void) {
     this.AddComponent(Window({ callback }));
@@ -88,6 +112,29 @@ const Container = ({ callback }: ContainerProps) => {
   const ui = new UI(AddComponent);
   callback(ui);
 
+  return (
+    <div class={styles.Container}>
+      <For each={components()}>{component => component}</For>
+    </div>
+  );
+};
+
+
+type ViewContainerProps = {
+  callback: (ui: UI) => void;
+}
+
+const ViewContainer = ({ callback }: ViewContainerProps) => {
+
+  const [components, set_components] = createSignal<JSXElement[]>([]);
+
+  function AddComponent(component: JSXElement) {
+    set_components(components => [...components, component]);
+  }
+
+  const ui = new UI(AddComponent);
+  callback(ui);
+
   const stored_selected = JSON.parse(localStorage.getItem("selected") ?? "null");
   const [selected, set_selected] = createSignal<number | null>(stored_selected);
   createEffect(() => {
@@ -100,10 +147,17 @@ const Container = ({ callback }: ContainerProps) => {
     return component;
   }
 
+  function getSelectedComponent() {
+    const index = Math.min(components().length - 1, selected()!);
+    return components()[index];
+  }
+
   return (
-    <div class={styles.Container}>
-      <Show when={selected() === null} fallback={clickComponent(components()[selected()!], selected)}>
-        <For each={components()}>{clickComponent}</For>
+    <div class={styles.ViewContainer}>
+      <Show when={components().length > 0}>
+        <Show when={selected() === null} fallback={clickComponent(getSelectedComponent(), selected)}>
+          <For each={components()}>{clickComponent}</For>
+        </Show>
       </Show>
     </div>
   );
@@ -156,7 +210,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
       move = 0;
       move_start_tick = mod(tick(), frames);
     }
-  });
+  }, false);
   onCleanup(loop.stop);
 
   createEffect(() => loop.set(running()));
@@ -240,25 +294,22 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
     }
   };
 
-  const gap = () => isMobile() ? 0 : 1;
-
   return (
     <div
       ref={ref => el = ref}
       class={styles.Timeline}
-      style={{ "--gap": gap() + "px" }}
     >
       <div class={styles.rows}>
-
-        <For each={caches}>{cache =>
-          <Row cache={cache} />
-        }</For>
 
         <div class={styles.cursorRow} >
           <Index each={Array(frames).fill(null)}>{(_, index) =>
             <div class={`${styles.cursor} ${getActiveClass(tick(), index)}`} />
           }</Index>
         </div>
+
+        <For each={caches}>{cache =>
+          <Row cache={cache} />
+        }</For>
 
       </div>
     </div>
@@ -269,23 +320,61 @@ type RowProps = {
   cache: Cache<any>
 }
 
-function Row({ cache: _cache }: RowProps) {
-  const [cache] = createRendrCacheSignal<Cache<any>["cache"]>(_cache);
+function Row({ cache: rendr_cache }: RowProps) {
+  const [cache] = createRendrCacheStore<Cache<any>["cache"]>(rendr_cache);
 
-  function getStatusClass(item?: Cache<any>["cache"][0]) {
-    if (!item) return '';
-    const status = item.valid ? "valid" : "invalid";
+  return (
+    <div class={styles.Row}>
+      <Index each={cache}>{(item, i) =>
+        <Frame item={item()} index={i} rendr_cache={rendr_cache} />
+      }</Index>
+      {/* <For each={cache}>{(item, i) =>
+        <Frame item={item} index={i} rendr_cache={rendr_cache} />
+      }</For> */}
+    </div>
+  )
+}
+
+type FrameProps = {
+  item: Cache<any>["cache"][0];
+  index: number;
+  rendr_cache: Cache<any>;
+}
+
+function Frame(props: FrameProps) {
+
+  let el: HTMLDivElement;
+  let resetting = false;
+  function resetAnimation() {
+    if (!el || resetting) return;
+    resetting = true;
+    el.style.setProperty("animation-name", "none");
+    setTimeout(() => {
+      el.style.setProperty("animation-name", styles["fade-out"])
+      resetting = false
+    });
+  }
+
+  props.rendr_cache.onMutate({ index: props.index, key: "valid" }, resetAnimation);
+  props.rendr_cache.onMutate({ index: props.index, key: "value" }, resetAnimation);
+  // props.rendr_cache.onChangeValid(onChange);
+  onCleanup(() => props.rendr_cache.unsubscribe(resetAnimation));
+
+  function getStatusClass() {
+    // console.log(props.item);
+    if (!props.item) return '';
+    const status = props.item.valid ? "valid" : "invalid";
     return styles[status];
   }
 
   return (
-    <div class={styles.Row}>
-      <Index each={cache()}>{(item, index) => {
-        return <div class={`${styles.frame} ${getStatusClass(item())}`} />
-      }
-      }</Index>
+    <div
+      class={`${styles.frame} ${getStatusClass()}`}
+    >
+      {/* <div class={styles.flash} ref={ref => el = ref} /> */}
+      <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
     </div>
-  )
+  );
 }
 
 type ViewProps = {
@@ -332,17 +421,19 @@ type CacheViewProps = {
 function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   const [tick] = createRendrParameterSignal<number>(tick_par);
   const [running] = createRendrParameterSignal<boolean>(running_par);
-  const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
+  // const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
 
   let el: HTMLCanvasElement;
-  createEffect(() => {
-    cache();
+  let prev_bitmap: ImageBitmap;
+  const loop = createAnimationLoop(() => {
+    // cache();
 
-    const bitmap = running()
-      ? frame_cache.getLatestValid(tick())
-      : frame_cache.getLatest(tick());
+    // const bitmap = running()
+    //   ? frame_cache.getLatestValid(tick())
+    //   : frame_cache.getLatest(tick());
+    const bitmap = frame_cache.getLatestValid(tick());
 
-    if (!bitmap) return;
+    if (!bitmap || bitmap === prev_bitmap) return;
 
     el.width = bitmap.width;
     el.height = bitmap.height;
@@ -351,7 +442,9 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
     if (!ctx) return;
 
     ctx.drawImage(bitmap, 0, 0);
+    prev_bitmap = bitmap;
   });
+  onCleanup(loop.stop);
 
   return (
     <canvas
@@ -520,63 +613,126 @@ function isMobile() {
   return is_mobile();
 }
 
-function createRendrParameterSignal<T>(dependency: Parameter<T>) {
-  const _value = dependency.value;
+function createRendrParameterSignal<T>(parameter: Parameter<T>) {
+  const _value = parameter.value;
   const [value, set_value] = createSignal<T>(_value);
 
   createEffect(() => {
 
     function onChange() {
-      set_value(() => dependency.value);
+      set_value(() => parameter.value);
     }
 
-    dependency.onChange(onChange);
+    parameter.onMutate({ key: "value" }, onChange);
 
-    onCleanup(() => dependency.unsubscribe(onChange));
+    onCleanup(() => parameter.unsubscribe(onChange));
   });
 
   function setValue(new_value: any) {
-    dependency.set(new_value);
+    parameter.set(new_value);
   }
 
   return [value, setValue] as [typeof value, typeof setValue];
 }
 
-function createRendrCacheSignal<T>(dependency: Cache<T>) {
-  const _value = dependency.cache;
+function createRendrCacheSignal<T>(cache: Cache<T>) {
+  const _value = cache.cache;
   const [value, set_value] = createSignal<Cache<T>["cache"]>(_value);
 
   createEffect(() => {
 
-    function onChange() {
-      const _value = dependency.cache;
-      const new_value = _value.map(v => ({ ...v }));
-      set_value(new_value);
-
-      // console.log(...arguments);
-      // if (arguments.length == 2) set_value(arguments[1]);
-      // if (arguments.length == 3) set_value((cache) => {
-      //   cache = [...cache]
-      //   const [_, index, value] = arguments;
-      //   cache[index] = { ...cache[index], value };
-      //   // console.log(cache);
-      //   return cache;
-      // });
+    function onChange(dependency: Dependency, action: Action) {
+      const { key, index, value } = action;
+      // console.log(key);
+      if (index === undefined) {
+        set_value([...cache.cache]);
+      } else {
+        set_value((cache) => {
+          cache = [...cache]
+          cache[index] = { ...cache[index], [key]: value };
+          return cache;
+        });
+      }
     }
 
-    dependency.onChange(onChange);
+    // function onChangeValid() {
+    //   if (arguments.length == 2) set_value([...cache.cache]);
+    //   if (arguments.length == 3) {
+    //     const [_, index, valid] = arguments;
+    //     if (value()[index]?.valid === valid) return;
 
-    onCleanup(() => dependency.unsubscribe(onChange));
+    //     set_value((cache) => {
+    //       cache = [...cache]
+    //       cache[index] = { ...cache[index], valid };
+    //       return cache;
+    //     });
+    //   }
+    // }
+
+    cache.onMutate((action) => ["value", "valid"].includes(action.key), onChange);
+    // cache.onChangeValid(onChangeValid);
+
+    onCleanup(() => {
+      cache.unsubscribe(onChange)
+      // cache.unsubscribe(onChangeValid)
+    });
   });
 
   function setValue(new_value: any) {
-    dependency.set(new_value);
+    cache.mutate({ key: "value", value: new_value });
   }
 
   return [value, setValue] as [typeof value, typeof setValue];
 }
 
-function createAnimationLoop(callback: () => void, running = false) {
+function createRendrCacheStore<T>(cache: Cache<T>) {
+
+  const [store, set_store] = createStore<Cache<T>["cache"]>([...cache.cache]);
+
+  function onChange(dependency: Dependency, action: Action) {
+    const { key, index, value } = action;
+    if (index === undefined) {
+      set_store([...cache.cache]);
+    } else {
+      if (store[index] === undefined)
+        set_store(index, { ...cache.cache[index] })
+      else
+        set_store(index, key, value);
+    }
+  }
+
+  // function onChangeValid() {
+  //   if (arguments.length == 2) set_store([...cache.cache]);
+  //   if (arguments.length == 3) {
+  //     const [_, index, valid] = arguments;
+  //     if (store[index] === undefined) {
+  //       set_store(index, { ...cache.cache[index] })
+  //     } else {
+  //       set_store(index, "valid", valid);
+  //     }
+  //   }
+  // }
+
+  cache.onMutate({ key: "value" }, onChange);
+  cache.onMutate({ key: "valid" }, onChange);
+
+  // cache.onChangeValid(onChangeValid);
+
+  onCleanup(() => {
+    cache.unsubscribe(onChange)
+    // cache.unsubscribe(onChangeValid)
+  });
+
+
+  function setStore(new_value: any) {
+    cache.mutate({ key: "value", value: new_value });
+  }
+
+
+  return [store, setStore] as [typeof store, typeof setStore];
+}
+
+function createAnimationLoop(callback: () => void, running = true) {
   let animationFrame: number;
   const loop = () => {
     if (!ret.running) return
