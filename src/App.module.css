@@ -19,6 +19,9 @@
   flex-direction: column;
 
   position: relative;
+  border: 1px solid black;
+
+  container-type: size;
 }
 
 .ViewContainer {
@@ -37,7 +40,7 @@
   flex-wrap: wrap;
 }
 
-@media (orientation: portrait) {
+@container (orientation: portrait) {
   .ViewContainer {
     flex-direction: column;
   }
@@ -62,6 +65,19 @@
   padding: 5px;
   background-color: black;
   --gap: 1px;
+}
+
+@media (orientation: portrait) {
+  .Timeline {
+    --gap: 0px;
+  }
+}
+
+/* @container (max-width: 860px) { */
+@container (orientation: portrait) {
+    .Timeline {
+    --gap: 0px;
+  }
 }
 
 .rows {
@@ -92,7 +108,7 @@
   pointer-events: none;
 }
 
-@media (orientation: landscape) {
+@container (min-width: 500px) {
   .active::before {
     z-index: -1;
     content: '';
@@ -100,7 +116,7 @@
     inset: 0;
     outline: 6px solid black;
     outline-offset: -1px;
-  }   
+  }
 }
 
 .Row {
@@ -188,7 +204,8 @@
   object-fit: contain;
 }
 
-@media (orientation: portrait) {
+
+@container (orientation: portrait) {
   .View {    
     max-width: 100%;
     max-height: min-content;

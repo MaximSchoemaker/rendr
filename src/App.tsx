@@ -294,13 +294,10 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
     }
   };
 
-  const gap = () => isMobile() ? 0 : 1;
-
   return (
     <div
       ref={ref => el = ref}
       class={styles.Timeline}
-      style={{ "--gap": gap() + "px" }}
     >
       <div class={styles.rows}>
 
