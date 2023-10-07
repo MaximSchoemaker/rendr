@@ -5,9 +5,9 @@ const SKETCH_PATH = "/sketches/sketch.js";
 // console.log("SKETCH_PATH", SKETCH_PATH);
 
 
-type onMutateCallback = (dependency: Dependency, action: Action) => void
+export type onMutateCallback = (dependency: Dependency, action: Action) => void
 
-type Dependency = {
+export type Dependency = {
    id: number;
    name?: string;
    mutate: (action: Action) => void;
@@ -20,7 +20,7 @@ type Dependency = {
    lastSetTimestamp: (index?: number) => number | undefined;
 }
 
-type Parameter<T> = Dependency & {
+export type Parameter<T> = Dependency & {
    value: T;
    set: (value: T) => void;
    get: () => T;
@@ -28,8 +28,8 @@ type Parameter<T> = Dependency & {
 
 // type Parameter<T> = ReturnType<typeof createParameter<T>>;
 
-type Cache<T> = Dependency & {
-   cache: CacheItem<T>[]
+export type Cache<T> = Dependency & {
+   value: CacheItem<T>[]
    count: number,
    get: (() => CacheItem<T>[]) | ((index: number) => T),
    getLatest: (index: number) => T | undefined,
@@ -45,7 +45,7 @@ type Cache<T> = Dependency & {
 
 // type Cache<T> = ReturnType<typeof createCache<T>>;
 
-type Action = {
+export type Action = {
    key: string;
    value: any;
    index?: number;
@@ -54,7 +54,7 @@ type Action = {
    timestamp?: number;
 }
 
-type Match = {
+export type Match = {
    key?: string;
    value?: any;
    index?: number;
@@ -62,7 +62,7 @@ type Match = {
    source?: string;
 } | ((action: Action) => boolean);
 
-type StackDependency = {
+export type StackDependency = {
    dependency: Dependency;
    index?: number;
 }
@@ -198,8 +198,8 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
       const { key, value, timestamp } = action; // @ts-ignore
-      if (ret[key] === value) return; // @ts-ignore
-      ret[key] = value;
+      if (parameter[key] === value) return; // @ts-ignore
+      parameter[key] = value;
 
       if (key === "value") {
          last_set_timestamp = timestamp ?? Date.now();
@@ -207,7 +207,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
          // mutate({ key: "last_set_timestamp", value: Date.now() });
          if (name && typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
       }
-      listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(ret, action))
+      listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(parameter, action))
    }
 
    function set(value: T) {
@@ -215,8 +215,8 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
    }
 
    function get() {
-      global_effect_dependencies()?.add({ dependency: ret });
-      return ret.value;
+      global_effect_dependencies()?.add({ dependency: parameter });
+      return parameter.value;
    }
 
    function lastSetTimestamp() {
@@ -227,7 +227,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       listeners.clear();
    }
 
-   const ret = {
+   const parameter = {
       id,
       value: initial_value,
       listeners,
@@ -244,9 +244,9 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       cleanup,
    }
 
-   global_dependencies.set(ret.id, ret);
+   global_dependencies.set(parameter.id, parameter);
 
-   return ret;
+   return parameter;
 }
 
 type onGetCallback = (index?: number, valid?: boolean) => void
@@ -292,15 +292,15 @@ export function createCache<T>(count = 0): Cache<T> {
       const { key, value, index, timestamp } = action;
       if (index !== undefined) {
          // @ts-ignore
-         if (ret.cache[index]?.[key] === value) return;
-         if (!ret.cache[index]) ret.cache[index] = {};
+         if (cache.value[index]?.[key] === value) return;
+         if (!cache.value[index]) cache.value[index] = {};
          // @ts-ignore
-         ret.cache[index][key] = value;
+         cache.value[index][key] = value;
 
          if (key === "value") {
-            ret.cache[index].last_set_timestamp = timestamp ?? Date.now()
+            cache.value[index].last_set_timestamp = timestamp ?? Date.now()
             // mutate({ key: "last_set_timestamp", index, value: Date.now() });
-            action.timestamp = ret.cache[index].last_set_timestamp;
+            action.timestamp = cache.value[index].last_set_timestamp;
          }
 
          if (index > count)
@@ -308,12 +308,12 @@ export function createCache<T>(count = 0): Cache<T> {
 
          if (action.validate) validate(index);
       } else {
-         const _key = key === "value" ? "cache" : key;// @ts-ignore
-         if (ret[_key] === value) return
+         // @ts-ignore
+         if (cache[key] === value) return
 
          if (value == null) {
             clear(); // @ts-ignore
-         } else ret[_key] = value;
+         } else cache[key] = value;
 
          if (key === "value") {
             last_set_timestamp = timestamp ?? Date.now()
@@ -322,7 +322,7 @@ export function createCache<T>(count = 0): Cache<T> {
          }
 
       }
-      listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(ret, action))
+      listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(cache, action))
    }
    function set(index: number, value: T) {
       if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
@@ -342,24 +342,24 @@ export function createCache<T>(count = 0): Cache<T> {
    }
    function _getAll() {
       get_listeners.forEach(callback => callback())
-      global_effect_dependencies()?.add({ dependency: ret });
-      return ret.cache;
+      global_effect_dependencies()?.add({ dependency: cache });
+      return cache.value;
    }
    function _getIndex(index: number) {
       get_listeners.forEach(callback => callback(index))
-      global_effect_dependencies()?.add({ dependency: ret, index });
-      return ret.cache[index]?.value;
+      global_effect_dependencies()?.add({ dependency: cache, index });
+      return cache.value[index]?.value;
    }
    function getLatest(index = count - 1) {
       get_listeners.forEach(callback => callback(index))
 
-      if (ret.cache[index]?.value !== undefined) {
-         global_effect_dependencies()?.add({ dependency: ret, index });
-         return ret.cache[index].value;
+      if (cache.value[index]?.value !== undefined) {
+         global_effect_dependencies()?.add({ dependency: cache, index });
+         return cache.value[index].value;
       }
-      global_effect_dependencies()?.add({ dependency: ret });
+      global_effect_dependencies()?.add({ dependency: cache });
       for (let i = 0; i < count; i++) {
-         const value = ret.cache[mod(index - i, count)]?.value;
+         const value = cache.value[mod(index - i, count)]?.value;
          if (value !== undefined)
             return value;
       }
@@ -368,12 +368,12 @@ export function createCache<T>(count = 0): Cache<T> {
       get_listeners.forEach(callback => callback(index, true))
 
       if (isValid(index)) {
-         global_effect_dependencies()?.add({ dependency: ret, index });
-         return ret.cache[index].value;
+         global_effect_dependencies()?.add({ dependency: cache, index });
+         return cache.value[index].value;
       }
-      global_effect_dependencies()?.add({ dependency: ret });
+      global_effect_dependencies()?.add({ dependency: cache });
       for (let i = 0; i < count; i++) {
-         const item = ret.cache[mod(index - i, count)];
+         const item = cache.value[mod(index - i, count)];
          if (!item) continue;
          const { value, valid } = item;
          if (valid) return value;
@@ -382,11 +382,10 @@ export function createCache<T>(count = 0): Cache<T> {
       return getLatest(index);
    }
    function isValid(index: number) {
-      return ret.cache[index]?.valid ?? false;
+      return cache.value[index]?.valid ?? false;
    }
    function validate(index: number) {
-      if (!ret.cache[index]) ret.cache[index] = {};
-      // ret.cache[index].valid = true;
+      if (!cache.value[index]) cache.value[index] = {};
       mutate({ key: "valid", value: true, index });
    }
    function invalidate(index: number, timestamp?: number) {
@@ -398,52 +397,51 @@ export function createCache<T>(count = 0): Cache<T> {
    }
    function _invalidateAll(timestamp?: number) {
       // for (let i = 0; i < count; i++) _invalidateIndex(i);
-      ret.cache.forEach((_, index) => _invalidateIndex(index, timestamp));
+      cache.value.forEach((_, index) => _invalidateIndex(index, timestamp));
    }
    function _invalidateIndex(index: number, timestamp?: number) {
-      if (!ret.cache[index]) ret.cache[index] = {};
+      if (!cache.value[index]) cache.value[index] = {};
 
       mutate({ key: "valid", value: false, index });
       // mutate({ key: "invalid_timestamp", value: timestamp ?? Date.now(), index });
-      // mutate({ key: "invalidate_count", value: (ret.cache[index].invalidate_count ?? 0) + 1, index });
+      // mutate({ key: "invalidate_count", value: (cache.value[index].invalidate_count ?? 0) + 1, index });
 
-      // ret.cache[index].valid = false;
-      ret.cache[index].invalid_timestamp = timestamp ?? Date.now();
-      ret.cache[index].invalidate_count = (ret.cache[index].invalidate_count ?? 0) + 1;
+      cache.value[index].invalid_timestamp = timestamp ?? Date.now();
+      cache.value[index].invalidate_count = (cache.value[index].invalidate_count ?? 0) + 1;
    }
    function invalidateFrom(index: number) {
       if (index === undefined) {
          invalidate(index);
       } else for (let i = index; i < count; i++)
-         if (ret.cache[i]) invalidate(i);
+         if (cache.value[i]) invalidate(i);
    }
    function invalidTimestamp(index: number) {
       if (index === undefined) return invalid_timestamp;
-      return ret.cache[index]?.invalid_timestamp;
+      return cache.value[index]?.invalid_timestamp;
    }
    function invalidateCount(index: number) {
       if (index === undefined) return invalidate_count;
-      return ret.cache[index]?.invalidate_count;
+      return cache.value[index]?.invalidate_count;
    }
    function lastSetTimestamp(index?: number) {
       if (index === undefined) return last_set_timestamp;
-      return ret.cache[index]?.last_set_timestamp;
+      return cache.value[index]?.last_set_timestamp;
    }
    function clear(index?: number) {
       if (index == null)
-         ret.cache = new Array<CacheItem<T>>(count)
+         cache.value = new Array<CacheItem<T>>(count)
       else
-         ret.cache[index] = {}
+         cache.value[index] = {}
    }
    function cleanup() {
       listeners.clear();
       get_listeners.clear();
    }
 
-   const ret = {
+   const cache = {
       id,
       count,
-      cache: new Array<CacheItem<T>>(count),
+      value: new Array<CacheItem<T>>(count),
       get,
       set,
       invalidSet,
@@ -464,8 +462,8 @@ export function createCache<T>(count = 0): Cache<T> {
       cleanup,
    }
 
-   global_dependencies.set(ret.id, ret);
-   return ret;
+   global_dependencies.set(id, cache);
+   return cache;
 }
 
 type SketchInitArgs = Dependency[]
@@ -1109,7 +1107,7 @@ export function createReactiveWorker<T>(
             }
 
             if (!dep.hasListener(onDepChange)) {
-               onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get(), timestamp: dep.lastSetTimestamp() });
+               onDepChange(dep, { key: "value", value: dep.get(), timestamp: dep.lastSetTimestamp() });
             } else {
                dep.unsubscribe(onDepChange);
             }

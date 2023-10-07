@@ -1,47 +1,10 @@
 import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
 import { createStore } from "solid-js/store";
 
-import styles from './App.module.css';
+import styles from './App.module.css'; // @ts-ignore
 import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
-
-type onMutateCallback = (dependency: Dependency, action: Action) => void
-
-type Dependency = {
-  mutate: (action: Action) => void;
-  set: (value: any) => void;
-  onMutate: (match: Match, callback: onMutateCallback) => void;
-  unsubscribe: (callback: onMutateCallback) => void;
-}
-
-type Parameter<T> = Dependency & {
-  value: T;
-}
-
-type Cache<T> = Dependency & {
-  cache: ({
-    valid: boolean,
-    value: T
-  })[]
-  getLatest: (index: number) => T,
-  getLatestValid: (index: number) => T,
-}
-
-type Action = {
-  key: string;
-  value: any;
-  index?: number;
-  validate?: boolean;
-  source?: string;
-}
-
-type Match = {
-  key?: string;
-  value?: any;
-  index?: number;
-  validate?: boolean;
-  source?: string;
-} | ((action: Action) => boolean);
+import { Action, Cache, Dependency, Parameter } from '../rendr/rendr';
 
 class UI {
   AddComponent;
@@ -258,7 +221,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
   let el: HTMLDivElement;
   createEffect(() => {
     el.onpointerdown = (evt) => {
-      evt.preventDefault();
+      evt.preventDefault(); // @ts-ignore
       document.activeElement?.blur();
       onStartScrub();
     }
@@ -320,7 +283,7 @@ type RowProps = {
 }
 
 function Row({ cache: rendr_cache }: RowProps) {
-  const [cache] = createRendrCacheStore<Cache<any>["cache"]>(rendr_cache);
+  const [cache] = createRendrCacheStore<Cache<any>["value"]>(rendr_cache);
 
   return (
     <div class={styles.Row}>
@@ -335,7 +298,7 @@ function Row({ cache: rendr_cache }: RowProps) {
 }
 
 type FrameProps = {
-  item: Cache<any>["cache"][0];
+  item: Cache<any>["value"][0];
   index: number;
   rendr_cache: Cache<any>;
 }
@@ -635,16 +598,15 @@ function createRendrParameterSignal<T>(parameter: Parameter<T>) {
 }
 
 function createRendrCacheSignal<T>(cache: Cache<T>) {
-  const _value = cache.cache;
-  const [value, set_value] = createSignal<Cache<T>["cache"]>(_value);
+  const _value = cache.value;
+  const [value, set_value] = createSignal<Cache<T>["value"]>(_value);
 
   createEffect(() => {
 
     function onChange(dependency: Dependency, action: Action) {
       const { key, index, value } = action;
-      // console.log(key);
       if (index === undefined) {
-        set_value([...cache.cache]);
+        set_value([...cache.value]);
       } else {
         set_value((cache) => {
           cache = [...cache]
@@ -654,26 +616,10 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
       }
     }
 
-    // function onChangeValid() {
-    //   if (arguments.length == 2) set_value([...cache.cache]);
-    //   if (arguments.length == 3) {
-    //     const [_, index, valid] = arguments;
-    //     if (value()[index]?.valid === valid) return;
-
-    //     set_value((cache) => {
-    //       cache = [...cache]
-    //       cache[index] = { ...cache[index], valid };
-    //       return cache;
-    //     });
-    //   }
-    // }
-
     cache.onMutate((action) => ["value", "valid"].includes(action.key), onChange);
-    // cache.onChangeValid(onChangeValid);
 
     onCleanup(() => {
       cache.unsubscribe(onChange)
-      // cache.unsubscribe(onChangeValid)
     });
   });
 
@@ -686,40 +632,25 @@ function createRendrCacheSignal<T>(cache: Cache<T>) {
 
 function createRendrCacheStore<T>(cache: Cache<T>) {
 
-  const [store, set_store] = createStore<Cache<T>["cache"]>([...cache.cache]);
+  const [store, set_store] = createStore<Cache<T>["value"]>([...cache.value]);
 
   function onChange(dependency: Dependency, action: Action) {
     const { key, index, value } = action;
     if (index === undefined) {
-      set_store([...cache.cache]);
+      set_store([...cache.value]);
     } else {
       if (store[index] === undefined)
-        set_store(index, { ...cache.cache[index] })
-      else
+        set_store(index, { ...cache.value[index] })
+      else // @ts-ignore
         set_store(index, key, value);
     }
   }
 
-  // function onChangeValid() {
-  //   if (arguments.length == 2) set_store([...cache.cache]);
-  //   if (arguments.length == 3) {
-  //     const [_, index, valid] = arguments;
-  //     if (store[index] === undefined) {
-  //       set_store(index, { ...cache.cache[index] })
-  //     } else {
-  //       set_store(index, "valid", valid);
-  //     }
-  //   }
-  // }
-
   cache.onMutate({ key: "value" }, onChange);
   cache.onMutate({ key: "valid" }, onChange);
 
-  // cache.onChangeValid(onChangeValid);
-
   onCleanup(() => {
     cache.unsubscribe(onChange)
-    // cache.unsubscribe(onChangeValid)
   });
 
 
