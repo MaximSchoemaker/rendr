@@ -79,46 +79,46 @@ const data_sketch = createSketch(sketch => (tick_par) => {
       state.push({ x, y })
    });
 
-   const state3_cache = null
-   // const state3_cache = sketch.simulateQueue([], FRAMES, (state, frame, _, t) => {
-   //    // wait(50000);
-   //    const count = state3_count_par.get();
-   //    // console.log(frame, count, state);
-   //    for (let i = 0; i < count; i++) {
-   //       const x = Math.random() * t;
-   //       const y = map(Math.random(), 0, 1, 2 / 4, 3 / 4)
-   //       state.push({ x, y })
-   //    }
-   // }, {
-   //    // max_queue_length: 2,
-   //    // interval_ms: 0,
+   // const state3_cache = null
+   const state3_cache = sketch.simulate([], FRAMES, (state, frame, _, t) => {
+      // wait(50000);
+      const count = state3_count_par.get();
+      // console.log(frame, count, state);
+      for (let i = 0; i < count; i++) {
+         const x = Math.random() * t;
+         const y = map(Math.random(), 0, 1, 2 / 4, 3 / 4)
+         state.push({ x, y })
+      }
+   }, {
+      // max_queue_length: 2,
+      // interval_ms: 0,
 
-   //    // batch_timeout_ms: 20,
-   //    // timeout_ms: 20,
-   // });
+      // batch_timeout_ms: 20,
+      // timeout_ms: 20,
+   });
 
-   const state4_cache = null
-   // const state4_cache = sketch.simulate([], FRAMES, (state, frame, count, t) => {
-   //    // wait(10000);
+   // const state4_cache = null
+   const state4_cache = sketch.simulate([], FRAMES, (state, frame, count, t) => {
+      // wait(10000);
 
-   //    // const index = 0;
-   //    // const index = frame;
-   //    const index = Math.floor(Math.random() * FRAMES);
-   //    // const index = Math.floor(invCosn(t) * (FRAMES - 1));
-   //    // const index = FRAMES - frame - 1;
+      // const index = 0;
+      // const index = frame;
+      const index = Math.floor(Math.random() * FRAMES);
+      // const index = Math.floor(invCosn(t) * (FRAMES - 1));
+      // const index = FRAMES - frame - 1;
 
-   //    const state3 = state3_cache.getLatest(index);
-   //    // const state3 = state3_cache.get(index);
-   //    if (!state3) return
+      const state3 = state3_cache.getLatest(index);
+      // const state3 = state3_cache.get(index);
+      if (!state3) return
 
-   //    const state3_map = state3.map(({ x, y }) => ({
-   //       x,
-   //       y: map(Math.random(), 0, 1, 3 / 4, 4 / 4)
-   //       // y: map(y, 2 / 4, 3 / 4, 3 / 4, 4 / 4)
-   //    }));
-   //    return state3_map;
-   //    state.push(...state3_map);
-   // });
+      const state3_map = state3.map(({ x, y }) => ({
+         x,
+         y: map(Math.random(), 0, 1, 3 / 4, 4 / 4)
+         // y: map(y, 2 / 4, 3 / 4, 3 / 4, 4 / 4)
+      }));
+      return state3_map;
+      state.push(...state3_map);
+   });
 
    return {
       state1_par, state2_par,
@@ -229,14 +229,14 @@ const master_sketch = createSketch(sketch => (tick_par) => {
    } = data_sketch.init(tick_par);
 
    // const frame_par = null;
-   const frame_cache = null;
-   const gen1_frame_par = null, gen1_count_par = null;
-   const gen2_frame_par = null;
+   // const frame_cache = null;
+   // const gen1_frame_par = null, gen1_count_par = null;
+   // const gen2_frame_par = null;
 
    const { frame_par } = draw_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
-   // const { frame_cache } = animate_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
-   // const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
-   // const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
+   const { frame_cache } = animate_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
+   const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
+   const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
 
    // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
    let state3_cache_view, state4_cache_view;
@@ -278,8 +278,8 @@ function Setup(createUI) {
                if (tick_par) ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
                if (state1_count_par) ui.createParameterNumber("State 1 Count", state1_count_par, { min: 0, max: 10000, step: 1 });
                if (state2_count_par) ui.createParameterNumber("State 2 Count", state2_count_par, { min: 0, max: 10000, step: 1 });
-               if (state3_count_par) ui.createParameterNumber("State 3 Count", state3_count_par, { min: 1, max: 50, step: 1 });
-               if (gen1_count_par) ui.createParameterNumber("Gen 1 Count", gen1_count_par, { min: 1, max: 100000, step: 1 });
+               if (state3_count_par) ui.createParameterNumber("State 3 Count", state3_count_par, { min: 0, max: 50, step: 1 });
+               if (gen1_count_par) ui.createParameterNumber("Gen 1 Count", gen1_count_par, { min: 0, max: 100000, step: 1 });
             });
 
             ui.createViewContainer(ui => {

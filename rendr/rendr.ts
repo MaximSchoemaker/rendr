@@ -565,18 +565,18 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       const worker = createReactiveWorker<T>(
          gen_worker_name(),
          main_worker_name,
-         () => {
-            const tick = tick_par.get()
-            if (tick === 0) state = structuredClone(initial_state_par.get());
-            state = callback(state, tick) ?? state;
-            return state;
-         },
-         (data) => { },
-         (worker) => { },
-         (state) => state_par.set(state),
-         (id) => {
-            if (id === initial_state_par.id) tick_par.set(0)
-            else if (id !== tick_par.id) tick_par.set(tick_par.value + 1);
+         {
+            executeWorker: () => {
+               const tick = tick_par.get()
+               if (tick === 0) state = structuredClone(initial_state_par.get());
+               state = callback(state, tick) ?? state;
+               return state;
+            },
+            receive: (state) => state_par.set(state),
+            onDependencyChanged: (id) => {
+               if (id === initial_state_par.id) tick_par.set(0)
+               else if (id !== tick_par.id) tick_par.set(tick_par.value + 1);
+            }
          }
       );
 
@@ -596,24 +596,26 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
       let state: T;
 
-      const worker = createReactiveQueueWorker<T, U>(
+      const worker = createReactiveQueueWorker(
          gen_worker_name(),
          main_worker_name,
          count_or_queue,
          interval_ms,
-         (index, count, item) => {
-            if (count <= index) index = 0;
-            if (index === 0) state = structuredClone(initial_state_par.get());
+         {
+            executeWorker: (index, count, item) => {
+               if (count <= index) index = 0;
+               if (index === 0) state = structuredClone(initial_state_par.get());
 
-            const new_state = callback(state, index, count, item)
-            state = new_state ?? state;
-            return state;
-         },
-         (data) => { },
-         (state) => state ?? initial_state_par.get(),
-         (worker) => { },
-         (state) => state_par.set(state),
-         (id, index) => { },
+               const new_state = callback(state, index, count, item)
+               state = new_state ?? state;
+               return state;
+            },
+            // (data) => { },
+            sendWorker: (state) => state ?? initial_state_par.get(),
+            // (worker) => { },
+            receive: (state) => state_par.set(state),
+            // (id, index) => { },
+         }
       );
 
       return state_par;
@@ -647,43 +649,45 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       const worker = createReactiveWorker(
          gen_worker_name(),
          main_worker_name,
-         () => {
-            previous_states[0] = initial_state_par.get();
-            const { index, invalidate_count } = index_par.get();
-            const i = mod(index, count);
-            let state = structuredClone(previous_states[i - 1]);
-            const t = i / count;
+         {
+            executeWorker: () => {
+               previous_states[0] = initial_state_par.get();
+               const { index, invalidate_count } = index_par.get();
+               const i = mod(index, count);
+               let state = structuredClone(previous_states[i - 1]);
+               const t = i / count;
 
-            const new_state = callback(state, i, count, t);
-            state = new_state ?? state;
-            previous_states[i] = structuredClone(state);
+               const new_state = callback(state, i, count, t);
+               state = new_state ?? state;
+               previous_states[i] = structuredClone(state);
 
-            return { i, state, invalidate_count }
-         },
-         () => { },
-         () => { },
-         ({ i, state, invalidate_count }, dependencies_ids_and_indexes) => {
+               return { i, state, invalidate_count }
+            },
 
-            if (state_cache.isValid(i)) return;
-            if (state_cache.invalidateCount(i) !== invalidate_count) return
+            receive: ({ i, state, invalidate_count }, dependencies_ids_and_indexes) => {
 
-            state_cache.set(i, state);
-            // state_cache.invalidateFrom(i + 1)
-            index_dependencies[i] = dependencies_ids_and_indexes;
-            requestNextIndex();
-         },
-         (dependency_id, dependency_index) => {
-            if (dependency_id === index_par.id) return;
-            index_dependencies.forEach((dependencies_ids_and_indexes, index) => {
-               if (!dependencies_ids_and_indexes) return;
-               if (dependencies_ids_and_indexes.find(({ id, index }) =>
-                  dependency_id === id && (index === undefined || index === dependency_index)
-               ))
-                  // state_cache.invalidateFrom(index)
-                  state_cache.invalidate(index)
-            });
-            requestNextIndex();
-         },
+               if (state_cache.isValid(i)) return;
+               if (state_cache.invalidateCount(i) !== invalidate_count) return
+
+               state_cache.set(i, state);
+               // state_cache.invalidateFrom(i + 1)
+               index_dependencies[i] = dependencies_ids_and_indexes;
+               requestNextIndex();
+            },
+
+            onDependencyChanged: (dependency_id, dependency_index) => {
+               if (dependency_id === index_par.id) return;
+               index_dependencies.forEach((dependencies_ids_and_indexes, index) => {
+                  if (!dependencies_ids_and_indexes) return;
+                  if (dependencies_ids_and_indexes.find(({ id, index }) =>
+                     dependency_id === id && (index === undefined || index === dependency_index)
+                  ))
+                     // state_cache.invalidateFrom(index)
+                     state_cache.invalidate(index)
+               });
+               requestNextIndex();
+            },
+         }
       );
 
       return state_cache;
@@ -771,17 +775,16 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       createReactiveWorker(
          gen_worker_name(),
          main_worker_name,
-         () => {
-            const canvas = callback();
-            const ctx = canvas.getContext('2d');
-            const bitmap = canvas.transferToImageBitmap();
-            ctx?.drawImage(bitmap, 0, 0);
-            return bitmap;
-         },
-         (data) => { },
-         (worker) => { },
-         (bitmap) => frame_par.set(bitmap),
-         (id, index) => { },
+         {
+            executeWorker: () => {
+               const canvas = callback();
+               const ctx = canvas.getContext('2d');
+               const bitmap = canvas.transferToImageBitmap();
+               ctx?.drawImage(bitmap, 0, 0);
+               return bitmap;
+            },
+            receive: (bitmap) => frame_par.set(bitmap),
+         }
       );
 
       return frame_par;
@@ -793,25 +796,24 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    function generate<T>(queue_par: Parameter<T[]>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<T>;
    function generate<T>(count_or_queue: Count_or_queue<T>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions) {
 
-      const frame_par = createParameter<ImageBitmap | null>(null);
+      const frame_par = createParameter<ImageBitmap | undefined>(undefined);
 
       const worker = createReactiveQueueWorker(
          gen_worker_name(),
          main_worker_name,
          count_or_queue,
          interval_ms,
-         (index, count, item) => callback(index, count, item),
-         (data) => { },
-         (canvas) => {
-            if (canvas === undefined) return;
-            const bitmap = canvas.transferToImageBitmap();
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(bitmap, 0, 0);
-            return bitmap;
+         {
+            executeWorker: callback,
+            sendWorker: (canvas) => {
+               if (canvas === undefined) return;
+               const bitmap = canvas.transferToImageBitmap();
+               const ctx = canvas.getContext('2d');
+               ctx?.drawImage(bitmap, 0, 0);
+               return bitmap;
+            },
+            receive: (bitmap) => frame_par.set(bitmap),
          },
-         (worker) => { },
-         (bitmap) => frame_par.set(bitmap),
-         (id, index) => { },
          options,
       );
 
@@ -851,44 +853,47 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       const worker = createReactiveWorker(
          gen_worker_name(),
          main_worker_name,
-         () => {
-            const { index, invalidate_count } = index_par.get();
-            const i = mod(index, frames);
 
-            const t = i / frames;
-            const canvas = callback(i, t);
-            const ctx = canvas.getContext('2d');
-            const bitmap = canvas.transferToImageBitmap();
-            ctx?.drawImage(bitmap, 0, 0);
+         {
+            executeWorker: () => {
+               const { index, invalidate_count } = index_par.get();
+               const i = mod(index, frames);
 
-            return { i, bitmap, invalidate_count }
-         },
-         () => { },
-         () => { },
-         ({ i, bitmap, invalidate_count }, dependencies_ids_and_indexes) => {
-            if (frame_cache.isValid(i)) return;
+               const t = i / frames;
+               const canvas = callback(i, t);
+               const ctx = canvas.getContext('2d');
+               const bitmap = canvas.transferToImageBitmap();
+               ctx?.drawImage(bitmap, 0, 0);
 
-            if (frame_cache.invalidateCount(i) !== invalidate_count) {
-               frame_cache.invalidSet(i, bitmap);
-               return;
-            }
+               return { i, bitmap, invalidate_count }
+            },
 
-            frame_cache.set(i, bitmap);
-            frames_dependencies[i] = dependencies_ids_and_indexes;
-            requestNextFrame();
-         },
-         (dependency_id, dependency_index) => {
-            if (dependency_id === index_par.id) return;
+            receive: ({ i, bitmap, invalidate_count }, dependencies_ids_and_indexes) => {
+               if (frame_cache.isValid(i)) return;
 
-            frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
-               if (dependencies_ids_and_indexes.find(({ id, index }) =>
-                  dependency_id === id && (index === undefined || index === dependency_index)
-               )) {
-                  frame_cache.invalidate(frame)
+               if (frame_cache.invalidateCount(i) !== invalidate_count) {
+                  frame_cache.invalidSet(i, bitmap);
+                  return;
                }
-            });
 
-            requestNextFrame();
+               frame_cache.set(i, bitmap);
+               frames_dependencies[i] = dependencies_ids_and_indexes;
+               requestNextFrame();
+            },
+
+            onDependencyChanged: (dependency_id, dependency_index) => {
+               if (dependency_id === index_par.id) return;
+
+               frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
+                  if (dependencies_ids_and_indexes.find(({ id, index }) =>
+                     dependency_id === id && (index === undefined || index === dependency_index)
+                  )) {
+                     frame_cache.invalidate(frame)
+                  }
+               });
+
+               requestNextFrame();
+            }
          }
       );
 
@@ -990,21 +995,21 @@ type ReceiveWorker<T> = (data: T) => void;
 type Execute<T> = (worker: Worker) => T | void;
 type Receive<T> = (data: T) => void;
 
-export function createWorker<T, U>(name: string, parent_name: string, executeWorker: ExecuteWorker<T>, receiveWorker: ReceiveWorker<T>, execute: Execute<U>, receive: Receive<U>) {
+export function createWorker<T, U>(name: string, parent_name: string, executeWorker?: ExecuteWorker<T>, receiveWorker?: ReceiveWorker<T>, execute?: Execute<U>, receive?: Receive<U>) {
 
    if (WORKER_NAME === name) {
-      addEventListener("message", (evt) => receiveWorker(evt.data));
+      addEventListener("message", (evt) => receiveWorker?.(evt.data));
 
-      const res = executeWorker();
+      const res = executeWorker?.();
       if (res !== undefined) postMessage(res);
    }
    else if (WORKER_NAME === parent_name) {
       const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
       global_workers.add(worker);
 
-      worker.addEventListener("message", (evt) => receive(evt.data));
+      worker.addEventListener("message", (evt) => receive?.(evt.data));
 
-      const res = execute(worker);
+      const res = execute?.(worker);
       if (res !== undefined) worker.postMessage(res);
 
       return worker;
@@ -1017,14 +1022,24 @@ type ReceiveWorkerReactive = ReceiveWorker<{ id: number, action: Action }>
 type ExecuteReactive<T> = Execute<{ value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }>;
 type ReceiveReactive<T> = (value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes) => void;
 
+type ReactiveWorkerCallbacks<T> = {
+   executeWorker?: ExecuteWorker<T>,
+   receiveWorker?: ReceiveWorkerReactive,
+   execute?: ExecuteReactive<T>,
+   receive?: ReceiveReactive<T>,
+   onDependencyChanged?: OnDependencyChanged
+}
+
 export function createReactiveWorker<T>(
    name: string,
    parent_name: string,
-   executeWorker: ExecuteWorker<T>,
-   receiveWorker: ReceiveWorkerReactive,
-   execute: ExecuteReactive<T>,
-   receive: ReceiveReactive<T>,
-   onDependencyChanged: OnDependencyChanged
+   {
+      executeWorker,
+      receiveWorker,
+      execute,
+      receive,
+      onDependencyChanged,
+   }: ReactiveWorkerCallbacks<T>
 ) {
 
    const dependecy_records: { id: number, index?: number }[] = [];
@@ -1032,7 +1047,6 @@ export function createReactiveWorker<T>(
    const addDependencyRecord = (id: number, index?: number) => dependecy_records.push({ id, index });
 
    const retrig_par = createParameter(false);
-
    const worker = createWorker<
       { id: number, action: Action },
       { value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
@@ -1042,7 +1056,7 @@ export function createReactiveWorker<T>(
       () => {
          createEffect(() => {
             retrig_par.get();
-            const ret = executeWorker();
+            const ret = executeWorker?.();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
                .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
             if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
@@ -1058,12 +1072,12 @@ export function createReactiveWorker<T>(
          // console.log(action);
          dependency.mutate(action);
          retrig_par.set(!retrig_par.value);
-         receiveWorker(data);
+         receiveWorker?.(data);
       },
       execute,
       (data) => {
          const { value, dependencies_ids_and_indexes } = data;
-         receive(value, dependencies_ids_and_indexes);
+         receive?.(value, dependencies_ids_and_indexes);
 
          dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
             const dep = global_dependencies.get(id);
@@ -1094,27 +1108,37 @@ export function createReactiveWorker<T>(
    function onDepChange(dependency: Dependency, action: Action) {
       const { id } = dependency;
       worker?.postMessage({ id, action });
-      onDependencyChanged(dependency.id, action.index);
+      onDependencyChanged?.(dependency.id, action.index);
    }
 
    return worker;
 }
 
-type Send<T, U> = (value: U) => T
+type SendWorker<T, U> = (value?: U) => T
 type ExecuteWorkerReactiveQueue<T, U> = (index: number, count: number, item: U) => T
 type ReactiveQueueWorkerOptions = { reset_on_count_change?: boolean, reset_on_queue_change?: boolean };
+type ReactiveQueueWorkerCallbacks<T, U, V> = {
+   executeWorker?: ExecuteWorkerReactiveQueue<V, U>,
+   receiveWorker?: ReceiveWorkerReactive,
+   sendWorker?: SendWorker<T, V>,
+   execute?: ExecuteReactive<T>,
+   receive?: ReceiveReactive<T>,
+   onDependencyChanged?: OnDependencyChanged,
+}
 
-export function createReactiveQueueWorker<T, U>(
+export function createReactiveQueueWorker<T, U, V>(
    name: string,
    parent_name: string,
    count_or_queue: Count_or_queue<U>,
    interval_ms: number,
-   executeWorker: ExecuteWorkerReactiveQueue<any, U>,
-   receiveWorker: ReceiveWorkerReactive,
-   send: Send<T, ReturnType<typeof executeWorker>>,
-   execute: ExecuteReactive<T>,
-   receive: ReceiveReactive<T>,
-   onDependencyChanged: OnDependencyChanged,
+   {
+      executeWorker,
+      receiveWorker,
+      sendWorker,
+      execute,
+      receive,
+      onDependencyChanged,
+   }: ReactiveQueueWorkerCallbacks<T, U, V>,
    options: ReactiveQueueWorkerOptions = {}
 ) {
 
@@ -1136,197 +1160,74 @@ export function createReactiveQueueWorker<T, U>(
    const worker = createReactiveWorker(
       name,
       parent_name,
-      () => {
-         clearTimeout(timeout);
-         work();
+      {
+         executeWorker: () => {
+            clearTimeout(timeout);
+            work();
 
-         function work() {
-            global_effect_dependencies_stack.push(new Set());
-            const queue = queue_par?.get();
-            const count = queue ? queue.length : count_par.get();
-            if (count > 0 && index >= count) {
-               global_effect_dependencies_stack.pop();
+            function work() {
+               if (!executeWorker) return;
+
+               global_effect_dependencies_stack.push(new Set());
+               const queue = queue_par?.get();
+               const count = queue ? queue.length : count_par.get();
+               if (count > 0 && index >= count) {
+                  global_effect_dependencies_stack.pop();
+                  return;
+               }
+
+               let ret;
+               const time = Date.now();
+               for (; index < count && Date.now() - time < interval_ms; index++) {
+                  const item = queue && queue[index];
+                  ret = executeWorker(index, count, item);
+               }
+               const dependencies = global_effect_dependencies_stack.pop();
+               const dependencies_ids_and_indexes = [...(dependencies ?? [])]
+                  .map(({ dependency, index }) => ({ id: dependency.id, index }));
+
+               const value = sendWorker?.(ret);
+               postMessage({ value, dependencies_ids_and_indexes })
+
+               if (index != count) {
+                  clearTimeout(timeout);
+                  timeout = setTimeout(work);
+               }
+            }
+         },
+
+         receiveWorker: (data) => {
+            const { id, action } = data;
+            const { value } = action;
+
+            const dependency = global_dependencies.get(id);
+            if (!dependency) {
+               console.warn("dependency not found", id, global_dependencies);
                return;
             }
 
-            let ret;
-            const time = Date.now();
-            for (; index < count && Date.now() - time < interval_ms; index++) {
-               const item = queue && queue[index];
-               ret = executeWorker(index, count, item);
+            if (count_par?.id === id) {
+               if (reset_on_count_change) index = 0;
+               if (value <= index) index = 0;
+            } else if (queue_par?.id === id) {
+               if (reset_on_queue_change) index = 0;
+               else if (value.length <= index) index = 0;
+               else if (value.length === (dependency as typeof queue_par).value.length) index = 0;
+            } else {
+               index = 0;
             }
-            const dependencies = global_effect_dependencies_stack.pop();
-            const dependencies_ids_and_indexes = [...(dependencies ?? [])]
-               .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-            const value = send(ret);
-            postMessage({ value, dependencies_ids_and_indexes })
+            receiveWorker?.(data);
+         },
 
-            if (index != count) {
-               clearTimeout(timeout);
-               timeout = setTimeout(work);
-            }
-         }
-      },
-      (data) => {
-         const { id, action } = data;
-         const { value } = action;
-
-         const dependency = global_dependencies.get(id);
-         if (!dependency) {
-            console.warn("dependency not found", id, global_dependencies);
-            return;
-         }
-
-         if (count_par?.id === id) {
-            if (reset_on_count_change) index = 0;
-            if (value <= index) index = 0;
-         } else if (queue_par?.id === id) {
-            if (reset_on_queue_change) index = 0;
-            else if (value.length <= index) index = 0;
-            else if (value.length === (dependency as typeof queue_par).value.length) index = 0;
-         } else {
-            index = 0;
-         }
-
-         receiveWorker(data);
-      },
-      execute,
-      receive,
-      onDependencyChanged,
-
+         execute,
+         receive,
+         onDependencyChanged,
+      }
    );
 
    return worker;
 }
-
-// export function createReactiveQueueWorker<T, U>(
-//    name: string,
-//    parent_name: string,
-//    count_or_queue: Count_or_queue<U>,
-//    interval_ms: number,
-//    executeWorker: ExecuteWorkerReactiveQueue<any, U>,
-//    send: Send<T, ReturnType<typeof executeWorker>>,
-//    receive: ReceiveReactive<T>,
-//    onDependencyChanged?: OnDependencyChanged,
-//    options: ReactiveQueueWorkerOptions = {}
-// ) {
-
-//    const count_or_queue_par = isParameter(count_or_queue) ? count_or_queue as Parameter<number | any[]> : createParameter(count_or_queue);
-//    const { reset_on_count_change, reset_on_queue_change } = options;
-
-//    let queue_par: Parameter<U[]>;
-//    let count_par: Parameter<number>;
-
-//    const value = count_or_queue_par.get();
-//    if (typeof value === 'number')
-//       count_par = count_or_queue_par as Parameter<number>
-//    else
-//       queue_par = count_or_queue_par as Parameter<U[]>
-
-//    const retrig_par = createParameter(false);
-
-//    let index = 0;
-
-//    const worker = createWorker<
-//       { id: number, action: Action },
-//       { value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
-//    >(
-//       name,
-//       parent_name,
-//       () => {
-//          let timeout: number;
-//          createEffect(() => {
-//             retrig_par.get();
-//             clearTimeout(timeout);
-//             work();
-//          }, { batch: true });
-
-//          function work() {
-//             global_effect_dependencies_stack.push(new Set());
-//             const queue = queue_par?.get();
-//             const count = queue ? queue.length : count_par.get();
-//             if (count > 0 && index >= count) {
-//                global_effect_dependencies_stack.pop();
-//                return;
-//             }
-
-//             let ret;
-//             const time = Date.now();
-//             for (; index < count && Date.now() - time < interval_ms; index++) {
-//                const item = queue && queue[index];
-//                ret = executeWorker(index, count, item);
-//             }
-//             const dependencies = global_effect_dependencies_stack.pop();
-//             const dependencies_ids_and_indexes = [...(dependencies ?? [])]
-//                .map(({ dependency, index }) => ({ id: dependency.id, index }));
-
-//             const value = send(ret);
-//             postMessage({ value, dependencies_ids_and_indexes })
-
-//             if (index != count) {
-//                clearTimeout(timeout);
-//                timeout = setTimeout(work);
-//             }
-//          }
-//       },
-//       (data) => {
-//          const { id, action } = data;
-//          const { value } = action;
-
-//          const dependency = global_dependencies.get(id);
-//          if (!dependency) {
-//             console.warn("dependency not found", id, global_dependencies);
-//             return;
-//          }
-
-//          if (count_par?.id === id) {
-//             if (reset_on_count_change) index = 0;
-//             if (value <= index) index = 0;
-//          } else if (queue_par?.id === id) {
-//             if (reset_on_queue_change) index = 0;
-//             else if (value.length <= index) index = 0;
-//             else if (value.length === (dependency as typeof queue_par).value.length) index = 0;
-//          } else {
-//             index = 0;
-//          }
-
-//          dependency.mutate(action);
-//          retrig_par.set(!retrig_par.value)
-//       },
-//       (worker) => {
-//          // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-//          //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-//          // });
-//       },
-//       (data) => {
-//          const { value, dependencies_ids_and_indexes } = data;
-//          receive(value, dependencies_ids_and_indexes)
-
-//          dependencies_ids_and_indexes.forEach(({ id, index }) => {
-//             const dep = global_dependencies.get(id);
-//             if (!dep) {
-//                console.warn("dependency not found", id, global_dependencies);
-//                return;
-//             }
-
-//             if (!dep.hasListener(onDepChange))
-//                onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get() });
-//             else
-//                dep.unsubscribe(onDepChange);
-//             dep.onChange(onDepChange);
-//          });
-//       },
-//    );
-
-//    function onDepChange(dependency: Dependency, action: Action) {
-//       const { id } = dependency;
-//       worker?.postMessage({ id, action });
-//       onDependencyChanged && onDependencyChanged(id, action.index);
-//    }
-
-//    return worker;
-// }
 
 type ExecuteWorkerReactiveCache<T> = (index: number) => T
 type ReactiveCacheWorkerOptions = {
