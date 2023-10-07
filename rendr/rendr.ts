@@ -571,6 +571,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             state = callback(state, tick) ?? state;
             return state;
          },
+         (data) => { },
+         (worker) => { },
          (state) => state_par.set(state),
          (id) => {
             if (id === initial_state_par.id) tick_par.set(0)
@@ -607,8 +609,11 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             state = new_state ?? state;
             return state;
          },
+         (data) => { },
          (state) => state ?? initial_state_par.get(),
+         (worker) => { },
          (state) => state_par.set(state),
+         (id, index) => { },
       );
 
       return state_par;
@@ -655,6 +660,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
             return { i, state, invalidate_count }
          },
+         () => { },
+         () => { },
          ({ i, state, invalidate_count }, dependencies_ids_and_indexes) => {
 
             if (state_cache.isValid(i)) return;
@@ -771,7 +778,10 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             ctx?.drawImage(bitmap, 0, 0);
             return bitmap;
          },
+         (data) => { },
+         (worker) => { },
          (bitmap) => frame_par.set(bitmap),
+         (id, index) => { },
       );
 
       return frame_par;
@@ -791,6 +801,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
          count_or_queue,
          interval_ms,
          (index, count, item) => callback(index, count, item),
+         (data) => { },
          (canvas) => {
             if (canvas === undefined) return;
             const bitmap = canvas.transferToImageBitmap();
@@ -798,8 +809,9 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             ctx.drawImage(bitmap, 0, 0);
             return bitmap;
          },
+         (worker) => { },
          (bitmap) => frame_par.set(bitmap),
-         undefined,
+         (id, index) => { },
          options,
       );
 
@@ -851,6 +863,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
             return { i, bitmap, invalidate_count }
          },
+         () => { },
+         () => { },
          ({ i, bitmap, invalidate_count }, dependencies_ids_and_indexes) => {
             if (frame_cache.isValid(i)) return;
 
@@ -973,8 +987,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
 type ExecuteWorker<T> = () => T | void;
 type ReceiveWorker<T> = (data: T) => void;
-type Execute<U> = (worker: Worker) => U | void;
-type Receive<U> = (data: U) => void;
+type Execute<T> = (worker: Worker) => T | void;
+type Receive<T> = (data: T) => void;
 
 export function createWorker<T, U>(name: string, parent_name: string, executeWorker: ExecuteWorker<T>, receiveWorker: ReceiveWorker<T>, execute: Execute<U>, receive: Receive<U>) {
 
@@ -999,13 +1013,25 @@ export function createWorker<T, U>(name: string, parent_name: string, executeWor
 
 type OnDependencyChanged = (id: number, index?: number) => void;
 type Dependencies_ids_and_indexes = { id: number, index?: number, timestamp?: number }[]
+type ReceiveWorkerReactive = ReceiveWorker<{ id: number, action: Action }>
+type ExecuteReactive<T> = Execute<{ value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }>;
 type ReceiveReactive<T> = (value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes) => void;
 
-export function createReactiveWorker<T>(name: string, parent_name: string, executeWorker: ExecuteWorker<T>, receive: ReceiveReactive<T>, onDependencyChanged?: OnDependencyChanged) {
+export function createReactiveWorker<T>(
+   name: string,
+   parent_name: string,
+   executeWorker: ExecuteWorker<T>,
+   receiveWorker: ReceiveWorkerReactive,
+   execute: ExecuteReactive<T>,
+   receive: ReceiveReactive<T>,
+   onDependencyChanged: OnDependencyChanged
+) {
 
    const dependecy_records: { id: number, index?: number }[] = [];
    const hasDependencyRecord = (id: number, index?: number) => dependecy_records.some(r => r.id === id && r.index === index);
    const addDependencyRecord = (id: number, index?: number) => dependecy_records.push({ id, index });
+
+   const retrig_par = createParameter(false);
 
    const worker = createWorker<
       { id: number, action: Action },
@@ -1015,11 +1041,11 @@ export function createReactiveWorker<T>(name: string, parent_name: string, execu
       parent_name,
       () => {
          createEffect(() => {
-            const timestamp = Date.now();
+            retrig_par.get();
             const ret = executeWorker();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
                .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
-            if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes, timestamp })
+            if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
          }, { batch: true });
       },
       (data) => {
@@ -1031,15 +1057,13 @@ export function createReactiveWorker<T>(name: string, parent_name: string, execu
          }
          // console.log(action);
          dependency.mutate(action);
+         retrig_par.set(!retrig_par.value);
+         receiveWorker(data);
       },
-      (worker) => {
-         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-         // });
-      },
+      execute,
       (data) => {
          const { value, dependencies_ids_and_indexes } = data;
-         receive(value, dependencies_ids_and_indexes)
+         receive(value, dependencies_ids_and_indexes);
 
          dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
             const dep = global_dependencies.get(id);
@@ -1070,7 +1094,7 @@ export function createReactiveWorker<T>(name: string, parent_name: string, execu
    function onDepChange(dependency: Dependency, action: Action) {
       const { id } = dependency;
       worker?.postMessage({ id, action });
-      onDependencyChanged && onDependencyChanged(dependency.id, action.index);
+      onDependencyChanged(dependency.id, action.index);
    }
 
    return worker;
@@ -1086,9 +1110,11 @@ export function createReactiveQueueWorker<T, U>(
    count_or_queue: Count_or_queue<U>,
    interval_ms: number,
    executeWorker: ExecuteWorkerReactiveQueue<any, U>,
+   receiveWorker: ReceiveWorkerReactive,
    send: Send<T, ReturnType<typeof executeWorker>>,
+   execute: ExecuteReactive<T>,
    receive: ReceiveReactive<T>,
-   onDependencyChanged?: OnDependencyChanged,
+   onDependencyChanged: OnDependencyChanged,
    options: ReactiveQueueWorkerOptions = {}
 ) {
 
@@ -1104,23 +1130,15 @@ export function createReactiveQueueWorker<T, U>(
    else
       queue_par = count_or_queue_par as Parameter<U[]>
 
-   const retrig_par = createParameter(false);
-
    let index = 0;
+   let timeout: number;
 
-   const worker = createWorker<
-      { id: number, action: Action },
-      { value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
-   >(
+   const worker = createReactiveWorker(
       name,
       parent_name,
       () => {
-         let timeout: number;
-         createEffect(() => {
-            retrig_par.get();
-            clearTimeout(timeout);
-            work();
-         }, { batch: true });
+         clearTimeout(timeout);
+         work();
 
          function work() {
             global_effect_dependencies_stack.push(new Set());
@@ -1171,42 +1189,144 @@ export function createReactiveQueueWorker<T, U>(
             index = 0;
          }
 
-         dependency.mutate(action);
-         retrig_par.set(!retrig_par.value)
+         receiveWorker(data);
       },
-      (worker) => {
-         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-         // });
-      },
-      (data) => {
-         const { value, dependencies_ids_and_indexes } = data;
-         receive(value, dependencies_ids_and_indexes)
+      execute,
+      receive,
+      onDependencyChanged,
 
-         dependencies_ids_and_indexes.forEach(({ id, index }) => {
-            const dep = global_dependencies.get(id);
-            if (!dep) {
-               console.warn("dependency not found", id, global_dependencies);
-               return;
-            }
-
-            if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get() });
-            else
-               dep.unsubscribe(onDepChange);
-            dep.onChange(onDepChange);
-         });
-      },
    );
-
-   function onDepChange(dependency: Dependency, action: Action) {
-      const { id } = dependency;
-      worker?.postMessage({ id, action });
-      onDependencyChanged && onDependencyChanged(id, action.index);
-   }
 
    return worker;
 }
+
+// export function createReactiveQueueWorker<T, U>(
+//    name: string,
+//    parent_name: string,
+//    count_or_queue: Count_or_queue<U>,
+//    interval_ms: number,
+//    executeWorker: ExecuteWorkerReactiveQueue<any, U>,
+//    send: Send<T, ReturnType<typeof executeWorker>>,
+//    receive: ReceiveReactive<T>,
+//    onDependencyChanged?: OnDependencyChanged,
+//    options: ReactiveQueueWorkerOptions = {}
+// ) {
+
+//    const count_or_queue_par = isParameter(count_or_queue) ? count_or_queue as Parameter<number | any[]> : createParameter(count_or_queue);
+//    const { reset_on_count_change, reset_on_queue_change } = options;
+
+//    let queue_par: Parameter<U[]>;
+//    let count_par: Parameter<number>;
+
+//    const value = count_or_queue_par.get();
+//    if (typeof value === 'number')
+//       count_par = count_or_queue_par as Parameter<number>
+//    else
+//       queue_par = count_or_queue_par as Parameter<U[]>
+
+//    const retrig_par = createParameter(false);
+
+//    let index = 0;
+
+//    const worker = createWorker<
+//       { id: number, action: Action },
+//       { value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
+//    >(
+//       name,
+//       parent_name,
+//       () => {
+//          let timeout: number;
+//          createEffect(() => {
+//             retrig_par.get();
+//             clearTimeout(timeout);
+//             work();
+//          }, { batch: true });
+
+//          function work() {
+//             global_effect_dependencies_stack.push(new Set());
+//             const queue = queue_par?.get();
+//             const count = queue ? queue.length : count_par.get();
+//             if (count > 0 && index >= count) {
+//                global_effect_dependencies_stack.pop();
+//                return;
+//             }
+
+//             let ret;
+//             const time = Date.now();
+//             for (; index < count && Date.now() - time < interval_ms; index++) {
+//                const item = queue && queue[index];
+//                ret = executeWorker(index, count, item);
+//             }
+//             const dependencies = global_effect_dependencies_stack.pop();
+//             const dependencies_ids_and_indexes = [...(dependencies ?? [])]
+//                .map(({ dependency, index }) => ({ id: dependency.id, index }));
+
+//             const value = send(ret);
+//             postMessage({ value, dependencies_ids_and_indexes })
+
+//             if (index != count) {
+//                clearTimeout(timeout);
+//                timeout = setTimeout(work);
+//             }
+//          }
+//       },
+//       (data) => {
+//          const { id, action } = data;
+//          const { value } = action;
+
+//          const dependency = global_dependencies.get(id);
+//          if (!dependency) {
+//             console.warn("dependency not found", id, global_dependencies);
+//             return;
+//          }
+
+//          if (count_par?.id === id) {
+//             if (reset_on_count_change) index = 0;
+//             if (value <= index) index = 0;
+//          } else if (queue_par?.id === id) {
+//             if (reset_on_queue_change) index = 0;
+//             else if (value.length <= index) index = 0;
+//             else if (value.length === (dependency as typeof queue_par).value.length) index = 0;
+//          } else {
+//             index = 0;
+//          }
+
+//          dependency.mutate(action);
+//          retrig_par.set(!retrig_par.value)
+//       },
+//       (worker) => {
+//          // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+//          //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+//          // });
+//       },
+//       (data) => {
+//          const { value, dependencies_ids_and_indexes } = data;
+//          receive(value, dependencies_ids_and_indexes)
+
+//          dependencies_ids_and_indexes.forEach(({ id, index }) => {
+//             const dep = global_dependencies.get(id);
+//             if (!dep) {
+//                console.warn("dependency not found", id, global_dependencies);
+//                return;
+//             }
+
+//             if (!dep.hasListener(onDepChange))
+//                onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get() });
+//             else
+//                dep.unsubscribe(onDepChange);
+//             dep.onChange(onDepChange);
+//          });
+//       },
+//    );
+
+//    function onDepChange(dependency: Dependency, action: Action) {
+//       const { id } = dependency;
+//       worker?.postMessage({ id, action });
+//       onDependencyChanged && onDependencyChanged(id, action.index);
+//    }
+
+//    return worker;
+// }
 
 type ExecuteWorkerReactiveCache<T> = (index: number) => T
 type ReactiveCacheWorkerOptions = {
