@@ -17,7 +17,7 @@ export type Dependency = {
    unsubscribe: (callback: onMutateCallback) => void;
    cleanup: () => void;
    hasListener: (callback: onMutateCallback) => boolean;
-   lastSetTimestamp: (index?: number) => number | undefined;
+   setCount: (index?: number) => number | undefined;
 }
 
 export type Parameter<T> = Dependency & {
@@ -51,7 +51,7 @@ export type Action = {
    index?: number;
    validate?: boolean;
    source?: string;
-   timestamp?: number;
+   set_count?: number;
 }
 
 export type Match = {
@@ -177,7 +177,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
 
    const id = global_dependency_id++;
    let listeners = new Set<ListenerRecord>();
-   let last_set_timestamp = Date.now();
+   let set_counter = Date.now();
 
    function onMutate(match: Match, callback: onMutateCallback) {
       listeners.add({ match, callback });
@@ -197,14 +197,14 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
 
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
-      const { key, value, timestamp } = action; // @ts-ignore
+      const { key, value, set_count } = action; // @ts-ignore
       if (parameter[key] === value) return; // @ts-ignore
       parameter[key] = value;
 
       if (key === "value") {
-         last_set_timestamp = timestamp ?? Date.now();
-         action.timestamp = last_set_timestamp;
-         // mutate({ key: "last_set_timestamp", value: Date.now() });
+         set_counter = set_count ?? set_counter + 1;
+         action.set_count = set_counter;
+         // mutate({ key: "set_counter", value: Date.now() });
          if (name && typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
       }
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(parameter, action))
@@ -219,8 +219,8 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       return parameter.value;
    }
 
-   function lastSetTimestamp() {
-      return last_set_timestamp;
+   function setCount() {
+      return set_counter;
    }
 
    function cleanup() {
@@ -232,7 +232,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       value: initial_value,
       listeners,
       name,
-      last_set_timestamp,
+      set_counter,
       onMutate,
       onChange,
       unsubscribe,
@@ -240,7 +240,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       mutate,
       set,
       get,
-      lastSetTimestamp,
+      setCount,
       cleanup,
    }
 
@@ -253,7 +253,7 @@ type onGetCallback = (index?: number, valid?: boolean) => void
 type CacheItem<T> = {
    value?: T,
    valid?: boolean,
-   last_set_timestamp?: number,
+   set_counter?: number,
    invalid_timestamp?: number,
    invalidate_count?: number,
 }
@@ -267,7 +267,7 @@ export function createCache<T>(count = 0): Cache<T> {
 
    let listeners = new Set<ListenerRecord>();
    let get_listeners = new Set<onGetCallback>();
-   let last_set_timestamp = Date.now();
+   let set_counter = Date.now();
    let invalid_timestamp = Date.now();
    let invalidate_count = 0;
 
@@ -289,7 +289,7 @@ export function createCache<T>(count = 0): Cache<T> {
    }
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
-      const { key, value, index, timestamp } = action;
+      const { key, value, index, set_count } = action;
       if (index !== undefined) {
          // @ts-ignore
          if (cache.value[index]?.[key] === value) return;
@@ -298,9 +298,9 @@ export function createCache<T>(count = 0): Cache<T> {
          cache.value[index][key] = value;
 
          if (key === "value") {
-            cache.value[index].last_set_timestamp = timestamp ?? Date.now()
-            // mutate({ key: "last_set_timestamp", index, value: Date.now() });
-            action.timestamp = cache.value[index].last_set_timestamp;
+            cache.value[index].set_counter = set_count ?? (cache.value[index].set_counter ?? 0) + 1;
+            // mutate({ key: "set_counter", index, value: Date.now() });
+            action.set_count = cache.value[index].set_counter;
          }
 
          if (index > count)
@@ -316,9 +316,9 @@ export function createCache<T>(count = 0): Cache<T> {
          } else cache[key] = value;
 
          if (key === "value") {
-            last_set_timestamp = timestamp ?? Date.now()
-            mutate({ key: "last_set_timestamp", value: Date.now() });
-            action.timestamp = last_set_timestamp;
+            set_counter = set_count ?? set_counter + 1;
+            mutate({ key: "set_counter", value: Date.now() });
+            action.set_count = set_counter;
          }
 
       }
@@ -423,9 +423,9 @@ export function createCache<T>(count = 0): Cache<T> {
       if (index === undefined) return invalidate_count;
       return cache.value[index]?.invalidate_count;
    }
-   function lastSetTimestamp(index?: number) {
-      if (index === undefined) return last_set_timestamp;
-      return cache.value[index]?.last_set_timestamp;
+   function setCount(index?: number) {
+      if (index === undefined) return set_counter;
+      return cache.value[index]?.set_counter;
    }
    function clear(index?: number) {
       if (index == null)
@@ -458,7 +458,7 @@ export function createCache<T>(count = 0): Cache<T> {
       invalidateFrom,
       invalidateCount,
       invalidTimestamp,
-      lastSetTimestamp,
+      setCount,
       cleanup,
    }
 
@@ -755,8 +755,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
             //    const dependency = global_dependencies.get(id);
             //    if (!dependency) continue;
-            //    const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-            //    if (last_set_timestamp !== timestamp && timestamp < (last_set_timestamp ?? 0)) {
+            //    const set_counter = dependency.lastSetTimestamp(dep_index);
+            //    if (set_counter !== timestamp && timestamp < (set_counter ?? 0)) {
             //       index_dependencies[index] = [];
             //       invalidate(index);
             //       return;
@@ -962,8 +962,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
    //          for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
    //             const dependency = global_dependencies.get(id);
-   //             const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-   //             if (timestamp < last_set_timestamp) {
+   //             const set_counter = dependency.lastSetTimestamp(dep_index);
+   //             if (timestamp < set_counter) {
    //                invalidate(index);
    //                return;
    //             }
@@ -1067,6 +1067,7 @@ export function createReactiveWorker<T>(
    const addDependencyRecord = (id: number, index?: number) => dependecy_records.push({ id, index });
 
    const retrig_par = createParameter(false);
+
    const worker = createWorker<
       { id: number, action: Action },
       { value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
@@ -1078,7 +1079,7 @@ export function createReactiveWorker<T>(
             retrig_par.get();
             const ret = executeWorker?.();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
-               .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
+               .map(({ dependency, index }) => ({ id: dependency.id, index, set_count: dependency.setCount(index) }));
             if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
          }, { batch: true });
       },
@@ -1107,16 +1108,16 @@ export function createReactiveWorker<T>(
             }
 
             if (!dep.hasListener(onDepChange)) {
-               onDepChange(dep, { key: "value", value: dep.get(), timestamp: dep.lastSetTimestamp() });
+               onDepChange(dep, { key: "value", value: dep.get(), set_count: dep.setCount() });
             } else {
                dep.unsubscribe(onDepChange);
             }
 
             if (!hasDependencyRecord(id, index)) {
                addDependencyRecord(id, index);
-               const last_set_timestamp = dep.lastSetTimestamp(index);
-               if (last_set_timestamp !== timestamp) {
-                  onDepChange(dep, { key: "value", index, value: dep.get(index), timestamp: last_set_timestamp });
+               const set_count = dep.setCount(index);
+               if (set_count !== timestamp) {
+                  onDepChange(dep, { key: "value", index, value: dep.get(index), set_count });
                }
             }
 

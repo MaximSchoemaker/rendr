@@ -85,7 +85,7 @@ export function createParameter(initial_value, name) {
     }
     const id = global_dependency_id++;
     let listeners = new Set();
-    let last_set_timestamp = Date.now();
+    let set_counter = Date.now();
     function onMutate(match, callback) {
         listeners.add({ match, callback });
     }
@@ -100,14 +100,14 @@ export function createParameter(initial_value, name) {
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
-        const { key, value, timestamp } = action; // @ts-ignore
+        const { key, value, set_count } = action; // @ts-ignore
         if (parameter[key] === value)
             return; // @ts-ignore
         parameter[key] = value;
         if (key === "value") {
-            last_set_timestamp = timestamp ?? Date.now();
-            action.timestamp = last_set_timestamp;
-            // mutate({ key: "last_set_timestamp", value: Date.now() });
+            set_counter = set_count ?? set_counter + 1;
+            action.set_count = set_counter;
+            // mutate({ key: "set_counter", value: Date.now() });
             if (name && typeof localStorage !== 'undefined')
                 localStorage[name] = JSON.stringify(value);
         }
@@ -120,8 +120,8 @@ export function createParameter(initial_value, name) {
         global_effect_dependencies()?.add({ dependency: parameter });
         return parameter.value;
     }
-    function lastSetTimestamp() {
-        return last_set_timestamp;
+    function setCount() {
+        return set_counter;
     }
     function cleanup() {
         listeners.clear();
@@ -131,7 +131,7 @@ export function createParameter(initial_value, name) {
         value: initial_value,
         listeners,
         name,
-        last_set_timestamp,
+        set_counter,
         onMutate,
         onChange,
         unsubscribe,
@@ -139,7 +139,7 @@ export function createParameter(initial_value, name) {
         mutate,
         set,
         get,
-        lastSetTimestamp,
+        setCount,
         cleanup,
     };
     global_dependencies.set(parameter.id, parameter);
@@ -151,7 +151,7 @@ export function createCache(count = 0) {
     // cache: [],
     let listeners = new Set();
     let get_listeners = new Set();
-    let last_set_timestamp = Date.now();
+    let set_counter = Date.now();
     let invalid_timestamp = Date.now();
     let invalidate_count = 0;
     function onMutate(match, callback) {
@@ -172,7 +172,7 @@ export function createCache(count = 0) {
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
-        const { key, value, index, timestamp } = action;
+        const { key, value, index, set_count } = action;
         if (index !== undefined) {
             // @ts-ignore
             if (cache.value[index]?.[key] === value)
@@ -182,9 +182,9 @@ export function createCache(count = 0) {
             // @ts-ignore
             cache.value[index][key] = value;
             if (key === "value") {
-                cache.value[index].last_set_timestamp = timestamp ?? Date.now();
-                // mutate({ key: "last_set_timestamp", index, value: Date.now() });
-                action.timestamp = cache.value[index].last_set_timestamp;
+                cache.value[index].set_counter = set_count ?? (cache.value[index].set_counter ?? 0) + 1;
+                // mutate({ key: "set_counter", index, value: Date.now() });
+                action.set_count = cache.value[index].set_counter;
             }
             if (index > count)
                 count = index;
@@ -201,9 +201,9 @@ export function createCache(count = 0) {
             else
                 cache[key] = value;
             if (key === "value") {
-                last_set_timestamp = timestamp ?? Date.now();
-                mutate({ key: "last_set_timestamp", value: Date.now() });
-                action.timestamp = last_set_timestamp;
+                set_counter = set_count ?? set_counter + 1;
+                mutate({ key: "set_counter", value: Date.now() });
+                action.set_count = set_counter;
             }
         }
         listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(cache, action));
@@ -313,10 +313,10 @@ export function createCache(count = 0) {
             return invalidate_count;
         return cache.value[index]?.invalidate_count;
     }
-    function lastSetTimestamp(index) {
+    function setCount(index) {
         if (index === undefined)
-            return last_set_timestamp;
-        return cache.value[index]?.last_set_timestamp;
+            return set_counter;
+        return cache.value[index]?.set_counter;
     }
     function clear(index) {
         if (index == null)
@@ -348,7 +348,7 @@ export function createCache(count = 0) {
         invalidateFrom,
         invalidateCount,
         invalidTimestamp,
-        lastSetTimestamp,
+        setCount,
         cleanup,
     };
     global_dependencies.set(id, cache);
@@ -555,8 +555,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
             //    const dependency = global_dependencies.get(id);
             //    if (!dependency) continue;
-            //    const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-            //    if (last_set_timestamp !== timestamp && timestamp < (last_set_timestamp ?? 0)) {
+            //    const set_counter = dependency.lastSetTimestamp(dep_index);
+            //    if (set_counter !== timestamp && timestamp < (set_counter ?? 0)) {
             //       index_dependencies[index] = [];
             //       invalidate(index);
             //       return;
@@ -704,8 +704,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
     //          }
     //          for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
     //             const dependency = global_dependencies.get(id);
-    //             const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-    //             if (timestamp < last_set_timestamp) {
+    //             const set_counter = dependency.lastSetTimestamp(dep_index);
+    //             if (timestamp < set_counter) {
     //                invalidate(index);
     //                return;
     //             }
@@ -771,7 +771,7 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
             retrig_par.get();
             const ret = executeWorker?.();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
-                .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
+                .map(({ dependency, index }) => ({ id: dependency.id, index, set_count: dependency.setCount(index) }));
             if (ret !== undefined)
                 postMessage({ value: ret, dependencies_ids_and_indexes });
         }, { batch: true });
@@ -796,16 +796,16 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
                 return;
             }
             if (!dep.hasListener(onDepChange)) {
-                onDepChange(dep, { key: "value", value: dep.get(), timestamp: dep.lastSetTimestamp() });
+                onDepChange(dep, { key: "value", value: dep.get(), set_count: dep.setCount() });
             }
             else {
                 dep.unsubscribe(onDepChange);
             }
             if (!hasDependencyRecord(id, index)) {
                 addDependencyRecord(id, index);
-                const last_set_timestamp = dep.lastSetTimestamp(index);
-                if (last_set_timestamp !== timestamp) {
-                    onDepChange(dep, { key: "value", index, value: dep.get(index), timestamp: last_set_timestamp });
+                const set_count = dep.setCount(index);
+                if (set_count !== timestamp) {
+                    onDepChange(dep, { key: "value", index, value: dep.get(index), set_count });
                 }
             }
             dep.onChange(onDepChange);
