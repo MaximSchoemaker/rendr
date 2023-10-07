@@ -80,7 +80,7 @@ const data_sketch = createSketch(sketch => (tick_par) => {
    });
 
    // const state3_cache = null
-   const state3_cache = sketch.simulate([], FRAMES, (state, frame, _, t) => {
+   const state3_cache = sketch.simulateQueue([], FRAMES, (state, frame, _, t) => {
       // wait(50000);
       const count = state3_count_par.get();
       // console.log(frame, count, state);

@@ -85,7 +85,7 @@ export function createParameter(initial_value, name) {
     }
     const id = global_dependency_id++;
     let listeners = new Set();
-    let set_counter = Date.now();
+    let set_counter = 0;
     function onMutate(match, callback) {
         listeners.add({ match, callback });
     }
@@ -107,7 +107,7 @@ export function createParameter(initial_value, name) {
         if (key === "value") {
             set_counter = set_count ?? set_counter + 1;
             action.set_count = set_counter;
-            // mutate({ key: "set_counter", value: Date.now() });
+            // mutate({ key: "set_counter", value: set_counter });
             if (name && typeof localStorage !== 'undefined')
                 localStorage[name] = JSON.stringify(value);
         }
@@ -147,13 +147,9 @@ export function createParameter(initial_value, name) {
 }
 export function createCache(count = 0) {
     const id = global_dependency_id++;
-    // cache: n_arr(count, () => ({ valid: false })), 
-    // cache: [],
     let listeners = new Set();
     let get_listeners = new Set();
-    let set_counter = Date.now();
-    let invalid_timestamp = Date.now();
-    let invalidate_count = 0;
+    let set_counter = 0;
     function onMutate(match, callback) {
         listeners.add({ match, callback });
     }
@@ -273,26 +269,24 @@ export function createCache(count = 0) {
             cache.value[index] = {};
         mutate({ key: "valid", value: true, index });
     }
-    function invalidate(index, timestamp) {
+    function invalidate(index, invalidate_count) {
         if (index === undefined) {
-            _invalidateAll(timestamp);
+            _invalidateAll(invalidate_count);
         }
         else {
-            _invalidateIndex(index, timestamp);
+            _invalidateIndex(index, invalidate_count);
         }
     }
-    function _invalidateAll(timestamp) {
+    function _invalidateAll(invalidate_count) {
         // for (let i = 0; i < count; i++) _invalidateIndex(i);
-        cache.value.forEach((_, index) => _invalidateIndex(index, timestamp));
+        cache.value.forEach((_, index) => _invalidateIndex(index, invalidate_count));
     }
-    function _invalidateIndex(index, timestamp) {
+    function _invalidateIndex(index, invalidate_count) {
         if (!cache.value[index])
             cache.value[index] = {};
         mutate({ key: "valid", value: false, index });
-        // mutate({ key: "invalid_timestamp", value: timestamp ?? Date.now(), index });
         // mutate({ key: "invalidate_count", value: (cache.value[index].invalidate_count ?? 0) + 1, index });
-        cache.value[index].invalid_timestamp = timestamp ?? Date.now();
-        cache.value[index].invalidate_count = (cache.value[index].invalidate_count ?? 0) + 1;
+        cache.value[index].invalidate_count = invalidate_count ?? (cache.value[index].invalidate_count ?? 0) + 1;
     }
     function invalidateFrom(index) {
         if (index === undefined) {
@@ -303,14 +297,9 @@ export function createCache(count = 0) {
                 if (cache.value[i])
                     invalidate(i);
     }
-    function invalidTimestamp(index) {
-        if (index === undefined)
-            return invalid_timestamp;
-        return cache.value[index]?.invalid_timestamp;
-    }
     function invalidateCount(index) {
         if (index === undefined)
-            return invalidate_count;
+            console.warn("wrong invalidateCount call");
         return cache.value[index]?.invalidate_count;
     }
     function setCount(index) {
@@ -347,7 +336,6 @@ export function createCache(count = 0) {
         invalidate,
         invalidateFrom,
         invalidateCount,
-        invalidTimestamp,
         setCount,
         cleanup,
     };
@@ -531,8 +519,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         state_cache.set(0, initial_state);
         function invalidate(index) {
             state_cache.invalidate(index);
-            const timestamp = state_cache.invalidTimestamp(index);
-            worker?.postMessage({ kind: "invalidate", index, timestamp });
+            const invalidate_count = state_cache.invalidateCount(index);
+            worker?.postMessage({ kind: "invalidate", index, invalidate_count });
         }
         const index_dependencies = [];
         const previous_states = [initial_state];
@@ -548,9 +536,9 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             state = new_state ?? state;
             previous_states[i] = state;
             return state;
-        }, (state, index, timestamp, dependencies_ids_and_indexes) => {
+        }, (state, index, invalidate_count, dependencies_ids_and_indexes) => {
             // if (state_cache.isValid(i)) return;
-            if (state_cache.invalidTimestamp(index) !== timestamp)
+            if (state_cache.invalidateCount(index) !== invalidate_count)
                 return;
             // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
             //    const dependency = global_dependencies.get(id);
@@ -789,7 +777,7 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
     }, execute, (data) => {
         const { value, dependencies_ids_and_indexes } = data;
         receive?.(value, dependencies_ids_and_indexes);
-        dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
+        dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {
                 console.warn("dependency not found", id, global_dependencies);
@@ -803,9 +791,9 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
             }
             if (!hasDependencyRecord(id, index)) {
                 addDependencyRecord(id, index);
-                const set_count = dep.setCount(index);
-                if (set_count !== timestamp) {
-                    onDepChange(dep, { key: "value", index, value: dep.get(index), set_count });
+                const current_set_count = dep.setCount(index);
+                if (set_count !== current_set_count) {
+                    onDepChange(dep, { key: "value", index, value: dep.get(index), set_count: current_set_count });
                 }
             }
             dep.onChange(onDepChange);
@@ -918,13 +906,13 @@ export function createReactiveCacheWorker(name, parent_name, cache, executeWorke
             for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
                 if (cache.isValid(index))
                     continue;
-                const timestamp = cache.invalidTimestamp(index);
+                const invalidate_count = cache.invalidateCount(index);
                 global_effect_dependencies_stack.push(new Set());
                 const ret = executeWorker(index);
                 const dependencies = global_effect_dependencies_stack.pop();
                 const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                     .map(({ dependency, index }) => ({ id: dependency.id, index }));
-                postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes });
+                postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
                 cache.set(index, ret);
                 queue_count++;
             }
@@ -943,8 +931,8 @@ export function createReactiveCacheWorker(name, parent_name, cache, executeWorke
                 retrig_par.set(!retrig_par.value);
                 break;
             case "invalidate":
-                const { index, timestamp } = data;
-                cache.invalidate(index, timestamp);
+                const { index, invalidate_count } = data;
+                cache.invalidate(index, invalidate_count);
                 retrig_par.set(!retrig_par.value);
                 break;
         }
@@ -953,8 +941,8 @@ export function createReactiveCacheWorker(name, parent_name, cache, executeWorke
         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
         // });
     }, (data) => {
-        const { value, index, timestamp, dependencies_ids_and_indexes } = data;
-        receive(value, index, timestamp, dependencies_ids_and_indexes);
+        const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
+        receive(value, index, invalidate_count, dependencies_ids_and_indexes);
         dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {

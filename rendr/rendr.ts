@@ -36,9 +36,8 @@ export type Cache<T> = Dependency & {
    getLatestValid: (index: number) => T | undefined,
    set: (index: number, value: T) => void,
    invalidSet: (index: number, value: T) => void,
-   invalidate: (index: number, timestamp?: number) => void,
+   invalidate: (index: number, invalidate_count?: number) => void,
    isValid: (index: number) => boolean,
-   invalidTimestamp: (index: number) => number | undefined,
    invalidateCount: (index: number) => number | undefined,
    onGet: (callback: onGetCallback) => void,
 }
@@ -177,7 +176,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
 
    const id = global_dependency_id++;
    let listeners = new Set<ListenerRecord>();
-   let set_counter = Date.now();
+   let set_counter = 0;
 
    function onMutate(match: Match, callback: onMutateCallback) {
       listeners.add({ match, callback });
@@ -204,7 +203,7 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       if (key === "value") {
          set_counter = set_count ?? set_counter + 1;
          action.set_count = set_counter;
-         // mutate({ key: "set_counter", value: Date.now() });
+         // mutate({ key: "set_counter", value: set_counter });
          if (name && typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
       }
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(parameter, action))
@@ -254,7 +253,6 @@ type CacheItem<T> = {
    value?: T,
    valid?: boolean,
    set_counter?: number,
-   invalid_timestamp?: number,
    invalidate_count?: number,
 }
 
@@ -262,14 +260,9 @@ export function createCache<T>(count = 0): Cache<T> {
 
    const id = global_dependency_id++;
 
-   // cache: n_arr(count, () => ({ valid: false })), 
-   // cache: [],
-
    let listeners = new Set<ListenerRecord>();
    let get_listeners = new Set<onGetCallback>();
-   let set_counter = Date.now();
-   let invalid_timestamp = Date.now();
-   let invalidate_count = 0;
+   let set_counter = 0;
 
    function onMutate(match: Match, callback: onMutateCallback) {
       listeners.add({ match, callback });
@@ -388,26 +381,23 @@ export function createCache<T>(count = 0): Cache<T> {
       if (!cache.value[index]) cache.value[index] = {};
       mutate({ key: "valid", value: true, index });
    }
-   function invalidate(index: number, timestamp?: number) {
+   function invalidate(index: number, invalidate_count?: number) {
       if (index === undefined) {
-         _invalidateAll(timestamp);
+         _invalidateAll(invalidate_count);
       } else {
-         _invalidateIndex(index, timestamp);
+         _invalidateIndex(index, invalidate_count);
       }
    }
-   function _invalidateAll(timestamp?: number) {
+   function _invalidateAll(invalidate_count?: number) {
       // for (let i = 0; i < count; i++) _invalidateIndex(i);
-      cache.value.forEach((_, index) => _invalidateIndex(index, timestamp));
+      cache.value.forEach((_, index) => _invalidateIndex(index, invalidate_count));
    }
-   function _invalidateIndex(index: number, timestamp?: number) {
+   function _invalidateIndex(index: number, invalidate_count?: number) {
       if (!cache.value[index]) cache.value[index] = {};
 
       mutate({ key: "valid", value: false, index });
-      // mutate({ key: "invalid_timestamp", value: timestamp ?? Date.now(), index });
       // mutate({ key: "invalidate_count", value: (cache.value[index].invalidate_count ?? 0) + 1, index });
-
-      cache.value[index].invalid_timestamp = timestamp ?? Date.now();
-      cache.value[index].invalidate_count = (cache.value[index].invalidate_count ?? 0) + 1;
+      cache.value[index].invalidate_count = invalidate_count ?? (cache.value[index].invalidate_count ?? 0) + 1;
    }
    function invalidateFrom(index: number) {
       if (index === undefined) {
@@ -415,12 +405,8 @@ export function createCache<T>(count = 0): Cache<T> {
       } else for (let i = index; i < count; i++)
          if (cache.value[i]) invalidate(i);
    }
-   function invalidTimestamp(index: number) {
-      if (index === undefined) return invalid_timestamp;
-      return cache.value[index]?.invalid_timestamp;
-   }
    function invalidateCount(index: number) {
-      if (index === undefined) return invalidate_count;
+      if (index === undefined) console.warn("wrong invalidateCount call");
       return cache.value[index]?.invalidate_count;
    }
    function setCount(index?: number) {
@@ -457,7 +443,6 @@ export function createCache<T>(count = 0): Cache<T> {
       invalidate,
       invalidateFrom,
       invalidateCount,
-      invalidTimestamp,
       setCount,
       cleanup,
    }
@@ -720,8 +705,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
       function invalidate(index: number) {
          state_cache.invalidate(index)
-         const timestamp = state_cache.invalidTimestamp(index);
-         worker?.postMessage({ kind: "invalidate", index, timestamp });
+         const invalidate_count = state_cache.invalidateCount(index);
+         worker?.postMessage({ kind: "invalidate", index, invalidate_count });
       }
 
       const index_dependencies: Dependencies_ids_and_indexes[] = [];
@@ -747,10 +732,10 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
             return state
          },
-         (state, index, timestamp, dependencies_ids_and_indexes) => {
+         (state, index, invalidate_count, dependencies_ids_and_indexes) => {
             // if (state_cache.isValid(i)) return;
 
-            if (state_cache.invalidTimestamp(index) !== timestamp) return
+            if (state_cache.invalidateCount(index) !== invalidate_count) return
 
             // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
             //    const dependency = global_dependencies.get(id);
@@ -1037,7 +1022,7 @@ export function createWorker<T, U>(name: string, parent_name: string, executeWor
 }
 
 type OnDependencyChanged = (id: number, index?: number) => void;
-type Dependencies_ids_and_indexes = { id: number, index?: number, timestamp?: number }[]
+type Dependencies_ids_and_indexes = { id: number, index?: number, set_count?: number }[]
 type ReceiveWorkerReactive = ReceiveWorker<{ id: number, action: Action }>
 type ExecuteReactive<T> = Execute<{ value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }>;
 type ReceiveReactive<T> = (value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes) => void;
@@ -1100,7 +1085,7 @@ export function createReactiveWorker<T>(
          const { value, dependencies_ids_and_indexes } = data;
          receive?.(value, dependencies_ids_and_indexes);
 
-         dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
+         dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {
                console.warn("dependency not found", id, global_dependencies);
@@ -1115,9 +1100,9 @@ export function createReactiveWorker<T>(
 
             if (!hasDependencyRecord(id, index)) {
                addDependencyRecord(id, index);
-               const set_count = dep.setCount(index);
-               if (set_count !== timestamp) {
-                  onDepChange(dep, { key: "value", index, value: dep.get(index), set_count });
+               const current_set_count = dep.setCount(index);
+               if (set_count !== current_set_count) {
+                  onDepChange(dep, { key: "value", index, value: dep.get(index), set_count: current_set_count });
                }
             }
 
@@ -1260,7 +1245,7 @@ type ReactiveCacheWorkerOptions = {
 type ReceiveReactiveCache<T> = (
    value: T,
    index: number,
-   timestamp: number,
+   invalidate_count: number,
    dependencies_ids_and_indexes: Dependencies_ids_and_indexes
 ) => void;
 
@@ -1278,8 +1263,8 @@ export function createReactiveCacheWorker<T>(
    const retrig_par = createParameter(false);
 
    const worker = createWorker<
-      ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, timestamp: number }),
-      { value: T, index: number, timestamp: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
+      ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, invalidate_count: number }),
+      { value: T, index: number, invalidate_count: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
    >(
       name,
       parent_name,
@@ -1304,7 +1289,7 @@ export function createReactiveCacheWorker<T>(
             let index;
             for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
                if (cache.isValid(index)) continue;
-               const timestamp = cache.invalidTimestamp(index);
+               const invalidate_count = cache.invalidateCount(index);
 
                global_effect_dependencies_stack.push(new Set());
                const ret = executeWorker(index);
@@ -1313,7 +1298,7 @@ export function createReactiveCacheWorker<T>(
                const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-               postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes })
+               postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes })
 
                cache.set(index, ret);
 
@@ -1338,8 +1323,8 @@ export function createReactiveCacheWorker<T>(
                retrig_par.set(!retrig_par.value)
                break;
             case "invalidate":
-               const { index, timestamp } = data;
-               cache.invalidate(index, timestamp);
+               const { index, invalidate_count } = data;
+               cache.invalidate(index, invalidate_count);
 
                retrig_par.set(!retrig_par.value)
                break;
@@ -1351,8 +1336,8 @@ export function createReactiveCacheWorker<T>(
          // });
       },
       (data) => {
-         const { value, index, timestamp, dependencies_ids_and_indexes } = data;
-         receive(value, index, timestamp, dependencies_ids_and_indexes)
+         const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
+         receive(value, index, invalidate_count, dependencies_ids_and_indexes)
 
          dependencies_ids_and_indexes.forEach(({ id, index }) => {
             const dep = global_dependencies.get(id);
