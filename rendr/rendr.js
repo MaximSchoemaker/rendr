@@ -106,12 +106,13 @@ export function createParameter(initial_value, name) {
         },
         mutate(action) {
             action.source ??= WORKER_NAME;
-            const { key, value } = action; // @ts-ignore
+            const { key, value, timestamp } = action; // @ts-ignore
             if (this[key] === value)
                 return; // @ts-ignore
             this[key] = value;
             if (key === "value") {
-                this.last_set_timestamp = Date.now();
+                this.last_set_timestamp = timestamp ?? Date.now();
+                action.timestamp = this.last_set_timestamp;
                 // this.mutate({ key: "last_set_timestamp", value: Date.now() });
                 if (name && typeof localStorage !== 'undefined')
                     localStorage[name] = JSON.stringify(value);
@@ -163,7 +164,7 @@ export function createCache(count = 0) {
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
-        const { key, value, index } = action;
+        const { key, value, index, timestamp } = action;
         if (index !== undefined) {
             // @ts-ignore
             if (cache[index]?.[key] === value)
@@ -172,9 +173,11 @@ export function createCache(count = 0) {
                 cache[index] = {};
             // @ts-ignore
             cache[index][key] = value;
-            if (key === "value")
-                cache[index].last_set_timestamp = Date.now();
-            // if (key === "value") mutate({ key: "last_set_timestamp", index, value: Date.now() });
+            if (key === "value") {
+                cache[index].last_set_timestamp = timestamp ?? Date.now();
+                // mutate({ key: "last_set_timestamp", index, value: Date.now() });
+                action.timestamp = cache[index].last_set_timestamp;
+            }
             if (index > count)
                 count = index;
             if (action.validate)
@@ -182,12 +185,14 @@ export function createCache(count = 0) {
         }
         else {
             const _key = key === "value" ? "cache" : key; // @ts-ignore
-            if (this[_key] === value)
+            if (ret[_key] === value)
                 return; // @ts-ignore
-            this[_key] = value;
-            if (key === "value")
-                last_set_timestamp = Date.now();
-            // if (key === "value") mutate({ key: "last_set_timestamp", value: Date.now() });
+            ret[_key] = value;
+            if (key === "value") {
+                last_set_timestamp = timestamp ?? Date.now();
+                mutate({ key: "last_set_timestamp", value: Date.now() });
+                action.timestamp = last_set_timestamp;
+            }
         }
         listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(ret, action));
     }
@@ -333,6 +338,7 @@ export function createCache(count = 0) {
         invalidateFrom,
         invalidateCount,
         invalidTimestamp,
+        lastSetTimestamp,
         cleanup,
     };
     global_dependencies.set(ret.id, ret);
@@ -477,12 +483,6 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 return;
             if (state_cache.invalidateCount(i) !== invalidate_count)
                 return;
-            // if (state_cache[i] === undefined && dependencies_ids_and_indexes.length) {
-            //    state_cache[i] = dependencies_ids_and_indexes;
-            //    state_cache.invalidate(i);
-            //    requestNextIndex();
-            //    return;
-            // }
             state_cache.set(i, state);
             // state_cache.invalidateFrom(i + 1)
             index_dependencies[i] = dependencies_ids_and_indexes;
@@ -491,6 +491,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             if (dependency_id === index_par.id)
                 return;
             index_dependencies.forEach((dependencies_ids_and_indexes, index) => {
+                if (!dependencies_ids_and_indexes)
+                    return;
                 if (dependencies_ids_and_indexes.find(({ id, index }) => dependency_id === id && (index === undefined || index === dependency_index)))
                     // state_cache.invalidateFrom(index)
                     state_cache.invalidate(index);
@@ -499,67 +501,58 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         });
         return state_cache;
     }
-    // function simulateQueue(initial_state, count, callback, options = {}) {
-    //    const state_cache = createCache(count);
-    //    state_cache.set(0, initial_state);
-    //    function invalidate(index) {
-    //       state_cache.invalidate(index)
-    //       const timestamp = state_cache.invalidTimestamp(index);
-    //       worker.postMessage({ kind: "invalidate", index, timestamp });
-    //    }
-    //    const index_dependencies = [];
-    //    const previous_states = [initial_state];
-    //    const worker = createReactiveCacheWorker(
-    //       gen_worker_name(),
-    //       main_worker_name,
-    //       state_cache,
-    //       (index, timestamp) => {
-    //          const i = mod(index, count);
-    //          if (i === 0) {
-    //             previous_states[0] = structuredClone(initial_state);
-    //             return { i, state: previous_states[0], timestamp };
-    //          }
-    //          let state = structuredClone(previous_states[i - 1]);
-    //          const t = i / count;
-    //          const new_state = callback(state, i, t);
-    //          state = new_state ?? state;
-    //          previous_states[i] = state;
-    //          return state
-    //       },
-    //       (state, index, timestamp, dependencies_ids_and_indexes) => {
-    //          // if (state_cache.isValid(i)) return;
-    //          if (state_cache.invalidTimestamp(index) !== timestamp) return
-    //          for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
-    //             const dependency = global_dependencies.get(id);
-    //             const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-    //             if (timestamp < last_set_timestamp) {
-    //                index_dependencies[index] = [];
-    //                invalidate(index);
-    //                return;
-    //             }
-    //          }
-    //          // if (index_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-    //          //    index_dependencies[index] = [];
-    //          //    invalidate(index);
-    //          //    return
-    //          // }
-    //          state_cache.set(index, state);
-    //          index_dependencies[index] = dependencies_ids_and_indexes;
-    //       },
-    //       (dependency_id, dependency_index) => {
-    //          for (let [index, dependencies_ids_and_indexes] of index_dependencies.entries()) {
-    //             if (!dependencies_ids_and_indexes) continue;
-    //             if (dependencies_ids_and_indexes.find(({ id, index }) =>
-    //                dependency_id === id && (index === undefined || index === dependency_index)
-    //             )) {
-    //                invalidate(index);
-    //             }
-    //          }
-    //       },
-    //       options,
-    //    );
-    //    return state_cache;
-    // }
+    function simulateQueue(initial_state, count, callback, options = {}) {
+        const state_cache = createCache(count);
+        state_cache.set(0, initial_state);
+        function invalidate(index) {
+            state_cache.invalidate(index);
+            const timestamp = state_cache.invalidTimestamp(index);
+            worker?.postMessage({ kind: "invalidate", index, timestamp });
+        }
+        const index_dependencies = [];
+        const previous_states = [initial_state];
+        const worker = createReactiveCacheWorker(gen_worker_name(), main_worker_name, state_cache, (index) => {
+            const i = mod(index, count);
+            if (i === 0) {
+                previous_states[0] = structuredClone(initial_state);
+                return previous_states[0];
+            }
+            let state = structuredClone(previous_states[i - 1]);
+            const t = i / count;
+            const new_state = callback(state, i, count, t);
+            state = new_state ?? state;
+            previous_states[i] = state;
+            return state;
+        }, (state, index, timestamp, dependencies_ids_and_indexes) => {
+            // if (state_cache.isValid(i)) return;
+            if (state_cache.invalidTimestamp(index) !== timestamp)
+                return;
+            // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
+            //    const dependency = global_dependencies.get(id);
+            //    if (!dependency) continue;
+            //    const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
+            //    if (last_set_timestamp !== timestamp && timestamp < (last_set_timestamp ?? 0)) {
+            //       index_dependencies[index] = [];
+            //       invalidate(index);
+            //       return;
+            //    }
+            // }
+            if (index_dependencies[index] === undefined) {
+                index_dependencies[index] = [];
+                invalidate(index);
+                return;
+            }
+            index_dependencies[index] = dependencies_ids_and_indexes;
+            state_cache.set(index, state);
+        }, (dependency_id, dependency_index) => {
+            index_dependencies.forEach((dependencies_ids_and_indexes, i) => {
+                if (dependencies_ids_and_indexes.find(({ id, index }) => dependency_id === id && (index === undefined || index === dependency_index))) {
+                    invalidate(i);
+                }
+            });
+        }, options);
+        return state_cache;
+    }
     function draw(callback) {
         const frame_par = createParameter(null);
         createReactiveWorker(gen_worker_name(), main_worker_name, () => {
@@ -622,17 +615,9 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             if (frame_cache.isValid(i))
                 return;
             if (frame_cache.invalidateCount(i) !== invalidate_count) {
-                // frames_dependencies[i] = dependencies_ids_and_indexes;
                 frame_cache.invalidSet(i, bitmap);
-                requestNextFrame();
                 return;
             }
-            // if (frames_dependencies[i] === undefined && dependencies_ids_and_indexes.length) {
-            //    frames_dependencies[i] = dependencies_ids_and_indexes;
-            //    frame_cache.invalidate(i);
-            //    requestNextFrame();
-            //    return;
-            // }
             frame_cache.set(i, bitmap);
             frames_dependencies[i] = dependencies_ids_and_indexes;
             requestNextFrame();
@@ -642,7 +627,6 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
                 if (dependencies_ids_and_indexes.find(({ id, index }) => dependency_id === id && (index === undefined || index === dependency_index))) {
                     frame_cache.invalidate(frame);
-                    // frames_dependencies[frame] = [];
                 }
             });
             requestNextFrame();
@@ -717,7 +701,7 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         update,
         construct,
         simulate,
-        // simulateQueue,
+        simulateQueue,
         draw,
         generate,
         animate,
@@ -742,18 +726,27 @@ export function createWorker(name, parent_name, executeWorker, receiveWorker, ex
     }
 }
 export function createReactiveWorker(name, parent_name, executeWorker, receive, onDependencyChanged) {
+    const dependecy_records = [];
+    const hasDependencyRecord = (id, index) => dependecy_records.some(r => r.id === id && r.index === index);
+    const addDependencyRecord = (id, index) => dependecy_records.push({ id, index });
     const worker = createWorker(name, parent_name, () => {
         createEffect(() => {
+            const timestamp = Date.now();
             const ret = executeWorker();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
-                .map(({ dependency, index }) => ({ id: dependency.id, index }));
+                .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
             if (ret !== undefined)
-                postMessage({ value: ret, dependencies_ids_and_indexes });
+                postMessage({ value: ret, dependencies_ids_and_indexes, timestamp });
         }, { batch: true });
     }, (data) => {
         const { id, action } = data;
         const dependency = global_dependencies.get(id);
-        dependency?.mutate(action);
+        if (!dependency) {
+            console.warn("dependency not found", id, global_dependencies);
+            return;
+        }
+        // console.log(action);
+        dependency.mutate(action);
     }, (worker) => {
         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
@@ -761,16 +754,25 @@ export function createReactiveWorker(name, parent_name, executeWorker, receive, 
     }, (data) => {
         const { value, dependencies_ids_and_indexes } = data;
         receive(value, dependencies_ids_and_indexes);
-        dependencies_ids_and_indexes.forEach(({ id, index }) => {
+        dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {
                 console.warn("dependency not found", id, global_dependencies);
                 return;
             }
-            if (!dep.hasListener(onDepChange))
-                onDepChange(dep, { key: "value", value: dep.get() });
-            else
+            if (!dep.hasListener(onDepChange)) {
+                onDepChange(dep, { key: "value", value: dep.get(), timestamp: dep.lastSetTimestamp() });
+            }
+            else {
                 dep.unsubscribe(onDepChange);
+            }
+            if (!hasDependencyRecord(id, index)) {
+                addDependencyRecord(id, index);
+                const last_set_timestamp = dep.lastSetTimestamp(index);
+                if (last_set_timestamp !== timestamp) {
+                    onDepChange(dep, { key: "value", index, value: dep.get(index), timestamp: last_set_timestamp });
+                }
+            }
             dep.onChange(onDepChange);
         });
     });
@@ -878,88 +880,87 @@ export function createReactiveQueueWorker(name, parent_name, count_or_queue, int
     }
     return worker;
 }
-// export function createReactiveCacheWorker(name, parent_name, cache, execute, receive, onDependencyChanged, options = {}) {
-//    const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
-//    const retrig_par = createParameter(false);
-//    const worker = createWorker(
-//       name,
-//       parent_name,
-//       () => {
-//          let timeout;
-//          createEffect(() => {
-//             retrig_par.get();
-//             clearTimeout(timeout);
-//             work();
-//          }, {
-//             batch: true,
-//             batch_timeout_ms
-//          });
-//          function work() {
-//             if (cache.count == 0) return;
-//             const time = Date.now();
-//             const polling = () => interval_ms === undefined || Date.now() - time <= interval_ms
-//             const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length
-//             let queue_count = 0;
-//             let index;
-//             for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
-//                if (cache.isValid(index)) continue;
-//                const timestamp = cache.invalidTimestamp(index);
-//                global_effect_dependencies_stack.push(new Set());
-//                const ret = execute(index);
-//                const dependencies = global_effect_dependencies_stack.pop();
-//                const dependencies_ids_and_indexes = [...dependencies]
-//                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
-//                postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes })
-//                cache.set(index, ret);
-//                queue_count++;
-//             }
-//             if (index != cache.count) {
-//                clearTimeout(timeout);
-//                timeout = setTimeout(work, timeout_ms);
-//             }
-//          }
-//       },
-//       (data) => {
-//          const { kind } = data;
-//          switch (kind) {
-//             case "dependency":
-//                const { id, action } = data;
-//                const dependency = global_dependencies.get(id);
-//                dependency.mutate(action);
-//                retrig_par.set(!retrig_par.value)
-//                break;
-//             case "invalidate":
-//                const { index, timestamp } = data;
-//                cache.invalidate(index, timestamp);
-//                retrig_par.set(!retrig_par.value)
-//                break;
-//          }
-//       },
-//       (worker) => {
-//          // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-//          //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-//          // });
-//       },
-//       (data) => {
-//          const { value, index, timestamp, dependencies_ids_and_indexes } = data;
-//          receive(value, index, timestamp, dependencies_ids_and_indexes)
-//          dependencies_ids_and_indexes.forEach(({ id, index }) => {
-//             const dep = global_dependencies.get(id);
-//             if (!dep.hasListener(onDepChange))
-//                onDepChange(dep, { key: "value", value: dep.get() });
-//             else
-//                dep.unsubscribe(onDepChange);
-//             dep.onChange(onDepChange);
-//          });
-//       },
-//    );
-//    function onDepChange(dependency, action) {
-//       const { id } = dependency;
-//       worker.postMessage({ kind: "dependency", id, action });
-//       onDependencyChanged && onDependencyChanged(id, action.index);
-//    }
-//    return worker;
-// }
+export function createReactiveCacheWorker(name, parent_name, cache, executeWorker, receive, onDependencyChanged, options = {}) {
+    const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
+    const retrig_par = createParameter(false);
+    const worker = createWorker(name, parent_name, () => {
+        let timeout;
+        createEffect(() => {
+            retrig_par.get();
+            clearTimeout(timeout);
+            work();
+        }, {
+            batch: true,
+            batch_timeout_ms
+        });
+        function work() {
+            if (cache.count == 0)
+                return;
+            const time = Date.now();
+            const polling = () => interval_ms === undefined || Date.now() - time <= interval_ms;
+            const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length;
+            let queue_count = 0;
+            let index;
+            for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
+                if (cache.isValid(index))
+                    continue;
+                const timestamp = cache.invalidTimestamp(index);
+                global_effect_dependencies_stack.push(new Set());
+                const ret = executeWorker(index);
+                const dependencies = global_effect_dependencies_stack.pop();
+                const dependencies_ids_and_indexes = [...(dependencies ?? [])]
+                    .map(({ dependency, index }) => ({ id: dependency.id, index }));
+                postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes });
+                cache.set(index, ret);
+                queue_count++;
+            }
+            if (index != cache.count) {
+                clearTimeout(timeout);
+                timeout = setTimeout(work, timeout_ms);
+            }
+        }
+    }, (data) => {
+        const { kind } = data;
+        switch (kind) {
+            case "dependency":
+                const { id, action } = data;
+                const dependency = global_dependencies.get(id);
+                dependency?.mutate(action);
+                retrig_par.set(!retrig_par.value);
+                break;
+            case "invalidate":
+                const { index, timestamp } = data;
+                cache.invalidate(index, timestamp);
+                retrig_par.set(!retrig_par.value);
+                break;
+        }
+    }, (worker) => {
+        // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+        //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+        // });
+    }, (data) => {
+        const { value, index, timestamp, dependencies_ids_and_indexes } = data;
+        receive(value, index, timestamp, dependencies_ids_and_indexes);
+        dependencies_ids_and_indexes.forEach(({ id, index }) => {
+            const dep = global_dependencies.get(id);
+            if (!dep) {
+                console.warn("dependency not found", id, global_dependencies);
+                return;
+            }
+            if (!dep.hasListener(onDepChange))
+                onDepChange(dep, { key: "value", value: dep.get() });
+            else
+                dep.unsubscribe(onDepChange);
+            dep.onChange(onDepChange);
+        });
+    });
+    function onDepChange(dependency, action) {
+        const { id } = dependency;
+        worker?.postMessage({ kind: "dependency", id, action });
+        onDependencyChanged && onDependencyChanged(id, action.index);
+    }
+    return worker;
+}
 // export function createLoop(callback, interval = 0) {
 //    let timeout;
 //    const loop = () => {

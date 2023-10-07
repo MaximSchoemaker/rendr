@@ -11,12 +11,13 @@ type Dependency = {
    id: number;
    name?: string;
    mutate: (action: Action) => void;
-   get: () => any;
+   get: (index?: number) => any;
    onMutate: (match: Match, callback: onMutateCallback) => void;
    onChange: (callback: onMutateCallback) => void;
    unsubscribe: (callback: onMutateCallback) => void;
    cleanup: () => void;
    hasListener: (callback: onMutateCallback) => boolean;
+   lastSetTimestamp: (index?: number) => number | undefined;
 }
 
 type Parameter<T> = Dependency & {
@@ -29,13 +30,15 @@ type Parameter<T> = Dependency & {
 
 type Cache<T> = Dependency & {
    cache: CacheItem<T>[]
-   get: (index: number) => T,
+   count: number,
+   get: (() => CacheItem<T>[]) | ((index: number) => T),
    getLatest: (index: number) => T | undefined,
    getLatestValid: (index: number) => T | undefined,
    set: (index: number, value: T) => void,
    invalidSet: (index: number, value: T) => void,
-   invalidate: (index: number) => void,
+   invalidate: (index: number, timestamp?: number) => void,
    isValid: (index: number) => boolean,
+   invalidTimestamp: (index: number) => number | undefined,
    invalidateCount: (index: number) => number | undefined,
    onGet: (callback: onGetCallback) => void,
 }
@@ -48,6 +51,7 @@ type Action = {
    index?: number;
    validate?: boolean;
    source?: string;
+   timestamp?: number;
 }
 
 type Match = {
@@ -194,16 +198,16 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       },
       mutate(action: Action) {
          action.source ??= WORKER_NAME;
-         const { key, value } = action; // @ts-ignore
+         const { key, value, timestamp } = action; // @ts-ignore
          if (this[key] === value) return; // @ts-ignore
          this[key] = value;
 
          if (key === "value") {
-            this.last_set_timestamp = Date.now();
+            this.last_set_timestamp = timestamp ?? Date.now();
+            action.timestamp = this.last_set_timestamp;
             // this.mutate({ key: "last_set_timestamp", value: Date.now() });
             if (name && typeof localStorage !== 'undefined') localStorage[name] = JSON.stringify(value);
          }
-
          this.listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(this, action))
       },
       set(value: T) {
@@ -266,7 +270,7 @@ export function createCache<T>(count = 0): Cache<T> {
    }
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
-      const { key, value, index } = action;
+      const { key, value, index, timestamp } = action;
       if (index !== undefined) {
          // @ts-ignore
          if (cache[index]?.[key] === value) return;
@@ -274,8 +278,11 @@ export function createCache<T>(count = 0): Cache<T> {
          // @ts-ignore
          cache[index][key] = value;
 
-         if (key === "value") cache[index].last_set_timestamp = Date.now()
-         // if (key === "value") mutate({ key: "last_set_timestamp", index, value: Date.now() });
+         if (key === "value") {
+            cache[index].last_set_timestamp = timestamp ?? Date.now()
+            // mutate({ key: "last_set_timestamp", index, value: Date.now() });
+            action.timestamp = cache[index].last_set_timestamp;
+         }
 
          if (index > count)
             count = index;
@@ -283,11 +290,14 @@ export function createCache<T>(count = 0): Cache<T> {
          if (action.validate) validate(index);
       } else {
          const _key = key === "value" ? "cache" : key;// @ts-ignore
-         if (this[_key] === value) return// @ts-ignore
-         this[_key] = value;
+         if (ret[_key] === value) return// @ts-ignore
+         ret[_key] = value;
 
-         if (key === "value") last_set_timestamp = Date.now()
-         // if (key === "value") mutate({ key: "last_set_timestamp", value: Date.now() });
+         if (key === "value") {
+            last_set_timestamp = timestamp ?? Date.now()
+            mutate({ key: "last_set_timestamp", value: Date.now() });
+            action.timestamp = last_set_timestamp;
+         }
 
       }
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(ret, action))
@@ -393,7 +403,7 @@ export function createCache<T>(count = 0): Cache<T> {
       if (index === undefined) return invalidate_count;
       return cache[index]?.invalidate_count;
    }
-   function lastSetTimestamp(index: number) {
+   function lastSetTimestamp(index?: number) {
       if (index === undefined) return last_set_timestamp;
       return cache[index]?.last_set_timestamp;
    }
@@ -428,6 +438,7 @@ export function createCache<T>(count = 0): Cache<T> {
       invalidateFrom,
       invalidateCount,
       invalidTimestamp,
+      lastSetTimestamp,
       cleanup,
    }
 
@@ -626,7 +637,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       }
       requestNextIndex();
 
-      const index_dependencies: Dependencies_ids_and_indexes[] = [];
+      const index_dependencies: (Dependencies_ids_and_indexes | undefined)[] = [];
       const previous_states = [initial_state_par.get()];
       const worker = createReactiveWorker(
          gen_worker_name(),
@@ -649,13 +660,6 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             if (state_cache.isValid(i)) return;
             if (state_cache.invalidateCount(i) !== invalidate_count) return
 
-            // if (state_cache[i] === undefined && dependencies_ids_and_indexes.length) {
-            //    state_cache[i] = dependencies_ids_and_indexes;
-            //    state_cache.invalidate(i);
-            //    requestNextIndex();
-            //    return;
-            // }
-
             state_cache.set(i, state);
             // state_cache.invalidateFrom(i + 1)
             index_dependencies[i] = dependencies_ids_and_indexes;
@@ -664,6 +668,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
          (dependency_id, dependency_index) => {
             if (dependency_id === index_par.id) return;
             index_dependencies.forEach((dependencies_ids_and_indexes, index) => {
+               if (!dependencies_ids_and_indexes) return;
                if (dependencies_ids_and_indexes.find(({ id, index }) =>
                   dependency_id === id && (index === undefined || index === dependency_index)
                ))
@@ -677,81 +682,80 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       return state_cache;
    }
 
-   // function simulateQueue(initial_state, count, callback, options = {}) {
+   function simulateQueue<T>(initial_state: T, count: number, callback: SimulateCallback<T>, options: ReactiveCacheWorkerOptions = {}) {
 
-   //    const state_cache = createCache(count);
-   //    state_cache.set(0, initial_state);
+      const state_cache = createCache(count);
+      state_cache.set(0, initial_state);
 
-   //    function invalidate(index) {
-   //       state_cache.invalidate(index)
-   //       const timestamp = state_cache.invalidTimestamp(index);
-   //       worker.postMessage({ kind: "invalidate", index, timestamp });
-   //    }
+      function invalidate(index: number) {
+         state_cache.invalidate(index)
+         const timestamp = state_cache.invalidTimestamp(index);
+         worker?.postMessage({ kind: "invalidate", index, timestamp });
+      }
 
-   //    const index_dependencies = [];
-   //    const previous_states = [initial_state];
-   //    const worker = createReactiveCacheWorker(
-   //       gen_worker_name(),
-   //       main_worker_name,
-   //       state_cache,
-   //       (index, timestamp) => {
-   //          const i = mod(index, count);
+      const index_dependencies: Dependencies_ids_and_indexes[] = [];
+      const previous_states = [initial_state];
+      const worker = createReactiveCacheWorker(
+         gen_worker_name(),
+         main_worker_name,
+         state_cache,
+         (index) => {
+            const i = mod(index, count);
 
-   //          if (i === 0) {
-   //             previous_states[0] = structuredClone(initial_state);
-   //             return { i, state: previous_states[0], timestamp };
-   //          }
+            if (i === 0) {
+               previous_states[0] = structuredClone(initial_state);
+               return previous_states[0];
+            }
 
-   //          let state = structuredClone(previous_states[i - 1]);
-   //          const t = i / count;
+            let state = structuredClone(previous_states[i - 1]);
+            const t = i / count;
 
-   //          const new_state = callback(state, i, t);
-   //          state = new_state ?? state;
-   //          previous_states[i] = state;
+            const new_state = callback(state, i, count, t);
+            state = new_state ?? state;
+            previous_states[i] = state;
 
-   //          return state
-   //       },
-   //       (state, index, timestamp, dependencies_ids_and_indexes) => {
+            return state
+         },
+         (state, index, timestamp, dependencies_ids_and_indexes) => {
+            // if (state_cache.isValid(i)) return;
 
-   //          // if (state_cache.isValid(i)) return;
-   //          if (state_cache.invalidTimestamp(index) !== timestamp) return
+            if (state_cache.invalidTimestamp(index) !== timestamp) return
 
-   //          for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
-   //             const dependency = global_dependencies.get(id);
-   //             const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
-   //             if (timestamp < last_set_timestamp) {
-   //                index_dependencies[index] = [];
-   //                invalidate(index);
-   //                return;
-   //             }
-   //          }
+            // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
+            //    const dependency = global_dependencies.get(id);
+            //    if (!dependency) continue;
+            //    const last_set_timestamp = dependency.lastSetTimestamp(dep_index);
+            //    if (last_set_timestamp !== timestamp && timestamp < (last_set_timestamp ?? 0)) {
+            //       index_dependencies[index] = [];
+            //       invalidate(index);
+            //       return;
+            //    }
+            // }
 
-   //          // if (index_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-   //          //    index_dependencies[index] = [];
-   //          //    invalidate(index);
-   //          //    return
-   //          // }
+            if (index_dependencies[index] === undefined) {
+               index_dependencies[index] = [];
+               invalidate(index);
+               return
+            }
 
-   //          state_cache.set(index, state);
+            index_dependencies[index] = dependencies_ids_and_indexes;
+            state_cache.set(index, state);
 
-   //          index_dependencies[index] = dependencies_ids_and_indexes;
-   //       },
-   //       (dependency_id, dependency_index) => {
-   //          for (let [index, dependencies_ids_and_indexes] of index_dependencies.entries()) {
-   //             if (!dependencies_ids_and_indexes) continue;
+         },
+         (dependency_id, dependency_index) => {
+            index_dependencies.forEach((dependencies_ids_and_indexes, i) => {
+               if (dependencies_ids_and_indexes.find(({ id, index }) =>
+                  dependency_id === id && (index === undefined || index === dependency_index)
+               )) {
+                  invalidate(i);
+               }
+            })
+         },
+         options,
+      );
 
-   //             if (dependencies_ids_and_indexes.find(({ id, index }) =>
-   //                dependency_id === id && (index === undefined || index === dependency_index)
-   //             )) {
-   //                invalidate(index);
-   //             }
-   //          }
-   //       },
-   //       options,
-   //    );
-
-   //    return state_cache;
-   // }
+      return state_cache;
+   }
 
    function draw(callback: DrawCallback) {
 
@@ -831,7 +835,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       }
       requestNextFrame();
 
-      const frames_dependencies: Dependencies_ids_and_indexes[] = []
+      const frames_dependencies: Dependencies_ids_and_indexes[] = [];
       const worker = createReactiveWorker(
          gen_worker_name(),
          main_worker_name,
@@ -851,18 +855,9 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             if (frame_cache.isValid(i)) return;
 
             if (frame_cache.invalidateCount(i) !== invalidate_count) {
-               // frames_dependencies[i] = dependencies_ids_and_indexes;
                frame_cache.invalidSet(i, bitmap);
-               requestNextFrame();
                return;
             }
-
-            // if (frames_dependencies[i] === undefined && dependencies_ids_and_indexes.length) {
-            //    frames_dependencies[i] = dependencies_ids_and_indexes;
-            //    frame_cache.invalidate(i);
-            //    requestNextFrame();
-            //    return;
-            // }
 
             frame_cache.set(i, bitmap);
             frames_dependencies[i] = dependencies_ids_and_indexes;
@@ -876,7 +871,6 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                   dependency_id === id && (index === undefined || index === dependency_index)
                )) {
                   frame_cache.invalidate(frame)
-                  // frames_dependencies[frame] = [];
                }
             });
 
@@ -968,7 +962,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       update,
       construct,
       simulate,
-      // simulateQueue,
+      simulateQueue,
 
       draw,
       generate,
@@ -1004,10 +998,14 @@ export function createWorker<T, U>(name: string, parent_name: string, executeWor
 }
 
 type OnDependencyChanged = (id: number, index?: number) => void;
-type Dependencies_ids_and_indexes = { id: number, index: number }[]
+type Dependencies_ids_and_indexes = { id: number, index?: number, timestamp?: number }[]
 type ReceiveReactive<T> = (value: T, dependencies_ids_and_indexes: Dependencies_ids_and_indexes) => void;
 
 export function createReactiveWorker<T>(name: string, parent_name: string, executeWorker: ExecuteWorker<T>, receive: ReceiveReactive<T>, onDependencyChanged?: OnDependencyChanged) {
+
+   const dependecy_records: { id: number, index?: number }[] = [];
+   const hasDependencyRecord = (id: number, index?: number) => dependecy_records.some(r => r.id === id && r.index === index);
+   const addDependencyRecord = (id: number, index?: number) => dependecy_records.push({ id, index });
 
    const worker = createWorker<
       { id: number, action: Action },
@@ -1017,16 +1015,22 @@ export function createReactiveWorker<T>(name: string, parent_name: string, execu
       parent_name,
       () => {
          createEffect(() => {
+            const timestamp = Date.now();
             const ret = executeWorker();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
-               .map(({ dependency, index }) => ({ id: dependency.id, index }));
-            if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
+               .map(({ dependency, index }) => ({ id: dependency.id, index, timestamp: dependency.lastSetTimestamp(index) }));
+            if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes, timestamp })
          }, { batch: true });
       },
       (data) => {
          const { id, action } = data;
          const dependency = global_dependencies.get(id);
-         dependency?.mutate(action);
+         if (!dependency) {
+            console.warn("dependency not found", id, global_dependencies);
+            return;
+         }
+         // console.log(action);
+         dependency.mutate(action);
       },
       (worker) => {
          // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
@@ -1037,17 +1041,26 @@ export function createReactiveWorker<T>(name: string, parent_name: string, execu
          const { value, dependencies_ids_and_indexes } = data;
          receive(value, dependencies_ids_and_indexes)
 
-         dependencies_ids_and_indexes.forEach(({ id, index }) => {
+         dependencies_ids_and_indexes.forEach(({ id, index, timestamp }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {
                console.warn("dependency not found", id, global_dependencies);
                return;
             }
 
-            if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { key: "value", value: dep.get() });
-            else
+            if (!dep.hasListener(onDepChange)) {
+               onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get(), timestamp: dep.lastSetTimestamp() });
+            } else {
                dep.unsubscribe(onDepChange);
+            }
+
+            if (!hasDependencyRecord(id, index)) {
+               addDependencyRecord(id, index);
+               const last_set_timestamp = dep.lastSetTimestamp(index);
+               if (last_set_timestamp !== timestamp) {
+                  onDepChange(dep, { key: "value", index, value: dep.get(index), timestamp: last_set_timestamp });
+               }
+            }
 
             dep.onChange(onDepChange);
          });
@@ -1178,7 +1191,7 @@ export function createReactiveQueueWorker<T, U>(
             }
 
             if (!dep.hasListener(onDepChange))
-               onDepChange(dep, { key: "value", value: dep.get() });
+               onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get() });
             else
                dep.unsubscribe(onDepChange);
             dep.onChange(onDepChange);
@@ -1195,104 +1208,135 @@ export function createReactiveQueueWorker<T, U>(
    return worker;
 }
 
-// export function createReactiveCacheWorker(name, parent_name, cache, execute, receive, onDependencyChanged, options = {}) {
-//    const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
+type ExecuteWorkerReactiveCache<T> = (index: number) => T
+type ReactiveCacheWorkerOptions = {
+   interval_ms?: number,
+   timeout_ms?: number,
+   batch_timeout_ms?: number,
+   max_queue_length?: number
+};
+type ReceiveReactiveCache<T> = (
+   value: T,
+   index: number,
+   timestamp: number,
+   dependencies_ids_and_indexes: Dependencies_ids_and_indexes
+) => void;
 
-//    const retrig_par = createParameter(false);
+export function createReactiveCacheWorker<T>(
+   name: string,
+   parent_name: string,
+   cache: Cache<T>,
+   executeWorker: ExecuteWorkerReactiveCache<T>,
+   receive: ReceiveReactiveCache<T>,
+   onDependencyChanged?: OnDependencyChanged,
+   options: ReactiveCacheWorkerOptions = {}
+) {
+   const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
 
-//    const worker = createWorker(
-//       name,
-//       parent_name,
-//       () => {
-//          let timeout;
-//          createEffect(() => {
-//             retrig_par.get();
-//             clearTimeout(timeout);
-//             work();
-//          }, {
-//             batch: true,
-//             batch_timeout_ms
-//          });
+   const retrig_par = createParameter(false);
 
-//          function work() {
-//             if (cache.count == 0) return;
+   const worker = createWorker<
+      ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, timestamp: number }),
+      { value: T, index: number, timestamp: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
+   >(
+      name,
+      parent_name,
+      () => {
+         let timeout: number;
+         createEffect(() => {
+            retrig_par.get();
+            clearTimeout(timeout);
+            work();
+         }, {
+            batch: true,
+            batch_timeout_ms
+         });
 
-//             const time = Date.now();
-//             const polling = () => interval_ms === undefined || Date.now() - time <= interval_ms
-//             const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length
-//             let queue_count = 0;
-//             let index;
-//             for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
-//                if (cache.isValid(index)) continue;
-//                const timestamp = cache.invalidTimestamp(index);
+         function work() {
+            if (cache.count == 0) return;
 
-//                global_effect_dependencies_stack.push(new Set());
-//                const ret = execute(index);
+            const time = Date.now();
+            const polling = () => interval_ms === undefined || Date.now() - time <= interval_ms
+            const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length
+            let queue_count = 0;
+            let index;
+            for (index = 0; index < cache.count && polling() && maxQueueLength(); index++) {
+               if (cache.isValid(index)) continue;
+               const timestamp = cache.invalidTimestamp(index);
 
-//                const dependencies = global_effect_dependencies_stack.pop();
-//                const dependencies_ids_and_indexes = [...dependencies]
-//                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
+               global_effect_dependencies_stack.push(new Set());
+               const ret = executeWorker(index);
 
-//                postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes })
+               const dependencies = global_effect_dependencies_stack.pop();
+               const dependencies_ids_and_indexes = [...(dependencies ?? [])]
+                  .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-//                cache.set(index, ret);
+               postMessage({ value: ret, index, timestamp, dependencies_ids_and_indexes })
 
-//                queue_count++;
-//             }
+               cache.set(index, ret);
 
-//             if (index != cache.count) {
-//                clearTimeout(timeout);
-//                timeout = setTimeout(work, timeout_ms);
-//             }
-//          }
-//       },
-//       (data) => {
-//          const { kind } = data;
-//          switch (kind) {
-//             case "dependency":
-//                const { id, action } = data;
+               queue_count++;
+            }
 
-//                const dependency = global_dependencies.get(id);
-//                dependency.mutate(action);
+            if (index != cache.count) {
+               clearTimeout(timeout);
+               timeout = setTimeout(work, timeout_ms);
+            }
+         }
+      },
+      (data) => {
+         const { kind } = data;
+         switch (kind) {
+            case "dependency":
+               const { id, action } = data;
 
-//                retrig_par.set(!retrig_par.value)
-//                break;
-//             case "invalidate":
-//                const { index, timestamp } = data;
-//                cache.invalidate(index, timestamp);
+               const dependency = global_dependencies.get(id);
+               dependency?.mutate(action);
 
-//                retrig_par.set(!retrig_par.value)
-//                break;
-//          }
-//       },
-//       (worker) => {
-//          // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
-//          //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
-//          // });
-//       },
-//       (data) => {
-//          const { value, index, timestamp, dependencies_ids_and_indexes } = data;
-//          receive(value, index, timestamp, dependencies_ids_and_indexes)
+               retrig_par.set(!retrig_par.value)
+               break;
+            case "invalidate":
+               const { index, timestamp } = data;
+               cache.invalidate(index, timestamp);
 
-//          dependencies_ids_and_indexes.forEach(({ id, index }) => {
-//             const dep = global_dependencies.get(id);
-//             if (!dep.hasListener(onDepChange))
-//                onDepChange(dep, { key: "value", value: dep.get() });
-//             else
-//                dep.unsubscribe(onDepChange);
-//             dep.onChange(onDepChange);
-//          });
-//       },
-//    );
+               retrig_par.set(!retrig_par.value)
+               break;
+         }
+      },
+      (worker) => {
+         // [...global_dependencies.values()].filter(dep => dep.name).forEach((dependency) => {
+         //    dependency?.onMutate({}, ({ id }, action) => action.source === WORKER_NAME && worker.postMessage({ id, action }));
+         // });
+      },
+      (data) => {
+         const { value, index, timestamp, dependencies_ids_and_indexes } = data;
+         receive(value, index, timestamp, dependencies_ids_and_indexes)
 
-//    function onDepChange(dependency, action) {
-//       const { id } = dependency;
-//       worker.postMessage({ kind: "dependency", id, action });
-//       onDependencyChanged && onDependencyChanged(id, action.index);
-//    }
+         dependencies_ids_and_indexes.forEach(({ id, index }) => {
+            const dep = global_dependencies.get(id);
+            if (!dep) {
+               console.warn("dependency not found", id, global_dependencies);
+               return;
+            }
 
-//    return worker;
-// }
+            if (!dep.hasListener(onDepChange))
+               onDepChange(dep, { key: "value", value: (dep as Parameter<any>).get() });
+            else
+               dep.unsubscribe(onDepChange);
+
+            dep.onChange(onDepChange);
+         });
+      },
+   );
+
+   function onDepChange(dependency: Dependency, action: Action) {
+      const { id } = dependency;
+      worker?.postMessage({ kind: "dependency", id, action });
+      onDependencyChanged && onDependencyChanged(id, action.index);
+   }
+
+   return worker;
+}
 
 // export function createLoop(callback, interval = 0) {
 //    let timeout;

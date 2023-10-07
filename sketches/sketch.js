@@ -1,6 +1,6 @@
-import { resetGlobals, cleanupGlobals, createSketch, createSketchWorker, createCanvas, createParameter, createCache } from "/rendr/rendr.js";
-import { Draw2dContext } from "/rendr/library/Draw2d.js";
-import { n_arr, mod, map, invCosn } from "/rendr/library/Utils.js"
+import { resetGlobals, cleanupGlobals, createSketch, createSketchWorker, createCanvas, createParameter, createCache } from "../rendr/rendr.js";
+import { Draw2dContext } from "../rendr/library/Draw2d.js";
+import { n_arr, mod, map, invCosn } from "../rendr/library/Utils.js"
 
 const ROOT_WORKER_NAME = "root"
 const WORKER_NAME = self.name || ROOT_WORKER_NAME;
@@ -82,14 +82,13 @@ const data_sketch = createSketch(sketch => (tick_par) => {
    // const state3_cache = null
    const state3_cache = sketch.simulate([], FRAMES, (state, frame, _, t) => {
       // wait(50000);
-
       const count = state3_count_par.get();
+      // console.log(frame, count, state);
       for (let i = 0; i < count; i++) {
          const x = Math.random() * t;
          const y = map(Math.random(), 0, 1, 2 / 4, 3 / 4)
          state.push({ x, y })
       }
-
    }, {
       // max_queue_length: 2,
       // interval_ms: 0,
@@ -231,13 +230,13 @@ const master_sketch = createSketch(sketch => (tick_par) => {
 
    // const frame_par = null;
    // const frame_cache = null;
-   // const gen1_frame_par = null, gen1_count_par = null;
-   // const gen2_frame_par = null;
+   const gen1_frame_par = null, gen1_count_par = null;
+   const gen2_frame_par = null;
 
    const { frame_par } = draw_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
    const { frame_cache } = animate_sketch.init(tick_par, state1_par, state2_par, state3_cache, state4_cache);
-   const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
-   const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
+   // const { gen1_frame_par, gen1_count_par } = generate_sketch1.init(tick_par);
+   // const { gen2_frame_par } = generate_sketch2.init(tick_par, state1_par, state2_par);
 
    // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
    let state3_cache_view, state4_cache_view;
@@ -292,8 +291,8 @@ function Setup(createUI) {
 
             ui.createTimeline(FRAMES, tick_par, running_par, [
                frame_cache,
-               state3_cache_view,
                state4_cache_view,
+               state3_cache_view,
             ].filter(c => !!c));
          });
       })
