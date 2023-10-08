@@ -369,7 +369,7 @@ export function createSketchWorker(fn) {
         let sketch_output = typeof _sketch_output === 'function'
             ? _sketch_output(...args)
             : _sketch_output;
-        createWorker(sketch.main_worker_name, ROOT_WORKER_NAME, () => {
+        createWorker(main_worker_name, ROOT_WORKER_NAME, () => {
             for (const dependency of Object.values(sketch_output)) {
                 dependency?.onMutate({}, ({ id }, action) => action.source !== ROOT_WORKER_NAME && postMessage({ id, action: { ...action, source: WORKER_NAME } }));
             }
@@ -537,8 +537,6 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         return frame_cache;
     }
     return {
-        name,
-        main_worker_name,
         createCanvas,
         createParameter,
         createCache,

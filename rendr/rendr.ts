@@ -471,6 +471,7 @@ export function createCache<T>(count = 0): Cache<T> {
    return cache;
 }
 
+type Sketch = ReturnType<typeof constructSketch>
 type SketchInitArgs = Dependency[]
 type SketchFn<T> = (sketch: Sketch) => (T | ((...args: SketchInitArgs) => T));
 
@@ -520,7 +521,7 @@ export function createSketchWorker<T>(fn: SketchFn<T>) {
          { id: number, action: Action },
          { id: number, action: Action }
       >(
-         sketch.main_worker_name,
+         main_worker_name,
          ROOT_WORKER_NAME,
          () => {
             for (const dependency of Object.values(sketch_output as SketchInitArgs)) {
@@ -598,7 +599,6 @@ function createSetup(callback: SetupCallback) {
    return setup;
 }
 
-type Sketch = ReturnType<typeof constructSketch>
 type Count_or_queue<T> = number | T[] | Parameter<number> | Parameter<T[]>
 type UpdateCallback<T> = (state: T, tick: number) => T
 type ConstructCallback<T, U> = (state: T, index: number, count: number, item: U) => T
@@ -796,9 +796,6 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    }
 
    return {
-      name,
-      main_worker_name,
-
       createCanvas,
       createParameter,
       createCache,
