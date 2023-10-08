@@ -1,9 +1,12 @@
 import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
 import { createStore } from "solid-js/store";
 
-import styles from './App.module.css'; // @ts-ignore
+import styles from './App.module.css';
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
-import { Action, Cache, Dependency, Parameter, ParameterNumberOptions } from '../rendr/rendr';
+import { Action, Cache, Dependency, Parameter, ParameterNumberOptions, SetupCallback } from '../rendr/rendr';
+
+// @ts-ignore
+import setup from "../sketches/boids";
 
 type Component = (props?: any) => JSXElement
 
@@ -38,13 +41,16 @@ export class UI {
 const App = () => {
   return (
     <div class={styles.App}>
-      <Sketch sketch_path="/sketches/sketch.js" />
+      {/* <Sketch sketch_path="/sketches/sketch.js" /> */}
+      {/* <Sketch sketch_path="/sketches/boids.js" /> */}
+      <Sketch setup={setup} />
     </div>
   );
 };
 
 type SketchProps = {
-  sketch_path: string;
+  sketch_path?: string;
+  setup?: SetupCallback
 }
 
 const Sketch = (props: SketchProps) => {
@@ -60,14 +66,20 @@ const Sketch = (props: SketchProps) => {
     callback(ui);
   }
 
-  let released = false;
   let cleanup: () => void;
-  import(props.sketch_path /* @vite-ignore */
-  ).then((SetupSketch) => {
-    if (released) return
-    const Setup = SetupSketch.default;
-    cleanup = Setup(createUI);
-  })
+
+  if (props.setup) cleanup = props.setup(createUI);
+
+  if (props.sketch_path) {
+    import(props.sketch_path /* @vite-ignore */
+    ).then((SetupSketch) => {
+      if (released) return
+      const Setup = SetupSketch.default;
+      cleanup = Setup(createUI);
+    })
+  }
+
+  let released = false;
   onCleanup(() => {
     set_components([]);
     cleanup?.()
@@ -124,7 +136,7 @@ const ViewContainer = ({ callback, rest_props }: ViewContainerProps) => {
   callback(ui);
 
   const stored_selected = JSON.parse(localStorage.getItem("selected") ?? "null");
-  const [selected, set_selected] = createSignal<number | null>(stored_selected);
+  const [selected, set_selected] = createSignal<number | null>(Math.min(components().length - 1, stored_selected));
   createEffect(() => {
     localStorage.setItem("selected", JSON.stringify(selected()))
   });

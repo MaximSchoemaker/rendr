@@ -317,13 +317,13 @@ export function createCache<T>(count = 0): Cache<T> {
    }
 
    function set(index: number, value: T) {
-      if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
+      // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
       mutate({ key: "value", index, value });
       validate(index);
    }
 
    function invalidSet(index: number, value: T) {
-      if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
+      // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
       mutate({ key: "value", index, value });
    }
 
@@ -581,7 +581,8 @@ export type ParameterNumberOptions = {
    range?: number;
 }
 
-type SetupCallback = (createUI: CreateUI) => void;
+type Cleanup = () => void;
+export type SetupCallback = (createUI: CreateUI) => Cleanup;
 type CreateUI = (callback: (ui: UI) => void) => void;
 
 function createSetup(sketch_path: string, callback: SetupCallback) {
@@ -685,10 +686,14 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    function simulate<T>(initial_state: T, count: number, callback: SimulateCallback<T>, options: ReactiveCacheWorkerOptions = {}) {
       options = { strategy: "ping", ...options };
 
+      const initial_state_par = isParameter(initial_state)
+         ? initial_state as Parameter<T>
+         : createParameter<T>(initial_state as T);
       const state_cache = createCache(count);
-      state_cache.set(0, initial_state);
+      state_cache.set(0, initial_state_par.value);
+      state_cache.invalidate(0);
 
-      const previous_states = [initial_state];
+      const previous_states: T[] = [];
       const worker = createReactiveCacheWorker(
          gen_worker_name(),
          main_worker_name,
@@ -697,12 +702,12 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
             executeWorker: (index) => {
                const i = mod(index, count);
 
-               if (i === 0) {
-                  previous_states[0] = structuredClone(initial_state);
-                  return previous_states[0];
-               }
+               const initial_state = initial_state_par.get();
 
-               let state = structuredClone(previous_states[i - 1]);
+               let state = structuredClone(i > 0
+                  ? previous_states[i - 1]
+                  : initial_state
+               );
                const t = i / count;
 
                const new_state = callback(state, i, count, t);
@@ -785,8 +790,9 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                const t = i / frames;
                const canvas = callback(i, t);
-               const ctx = canvas.getContext('2d');
                const bitmap = canvas.transferToImageBitmap();
+
+               const ctx = canvas.getContext('2d');
                ctx?.drawImage(bitmap, 0, 0);
 
                return bitmap

@@ -36,8 +36,8 @@ class Draw2dContextBase {
       this.canvas = canvas;
    }
 
-   clear(color: string) {
-      Draw2d.clear(this.canvas, color);
+   clear(color: string, opacity = 1) {
+      Draw2d.clear(this.canvas, color, opacity);
    }
 
    config(config: Draw2dConfigT) {
@@ -155,7 +155,7 @@ export default class Draw2d {
       ctx.fill();
    }
 
-   static clear(canvas: HTMLCanvasElement & OffscreenCanvas, color: string) {
+   static clear(canvas: HTMLCanvasElement & OffscreenCanvas, color: string, opacity = 1) {
       const { width, height } = canvas;
 
       const ctx = canvas.getContext("2d");
@@ -164,8 +164,16 @@ export default class Draw2d {
       ctx.save();
       ctx.resetTransform();
       ctx.globalCompositeOperation = "copy";
-      ctx.fillStyle = color ?? "transparent";
-      ctx.fillRect(0, 0, width, height);
+      if (color) {
+         ctx.fillStyle = color;
+         ctx.globalAlpha = opacity;
+         ctx.beginPath();
+         ctx.rect(0, 0, width, height);
+         ctx.fill();
+      } else {
+         ctx.fillStyle = "transparent";
+         ctx.clearRect(0, 0, width, height);
+      }
       ctx.restore();
    }
 

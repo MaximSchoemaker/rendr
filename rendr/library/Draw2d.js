@@ -15,8 +15,8 @@ class Draw2dContextBase {
     constructor(canvas) {
         this.canvas = canvas;
     }
-    clear(color) {
-        Draw2d.clear(this.canvas, color);
+    clear(color, opacity = 1) {
+        Draw2d.clear(this.canvas, color, opacity);
     }
     config(config) {
         this._config = config;
@@ -125,7 +125,7 @@ export default class Draw2d {
             return;
         ctx.fill();
     }
-    static clear(canvas, color) {
+    static clear(canvas, color, opacity = 1) {
         const { width, height } = canvas;
         const ctx = canvas.getContext("2d");
         if (ctx === null)
@@ -133,8 +133,17 @@ export default class Draw2d {
         ctx.save();
         ctx.resetTransform();
         ctx.globalCompositeOperation = "copy";
-        ctx.fillStyle = color ?? "transparent";
-        ctx.fillRect(0, 0, width, height);
+        if (color) {
+            ctx.fillStyle = color;
+            ctx.globalAlpha = opacity;
+            ctx.beginPath();
+            ctx.rect(0, 0, width, height);
+            ctx.fill();
+        }
+        else {
+            ctx.fillStyle = "transparent";
+            ctx.clearRect(0, 0, width, height);
+        }
         ctx.restore();
     }
     static moveTo(canvas, x, y, config) {

@@ -1,7 +1,7 @@
-export function n_arr(n: number, callback: any) {
+export function n_arr<T>(n: number, callback: T | ((index: number, f: number, ff: number) => T)) {
    n = Math.max(0, Math.floor(n));
    return new Array(n).fill(null).map((_, i) => typeof callback === "function"
-      ? callback(i, i / n, i / (n - 1))
+      ? (callback as (index: number, f: number, ff: number) => T)?.(i, i / n, i / (n - 1))
       : callback
    );
 }

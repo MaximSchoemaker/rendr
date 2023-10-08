@@ -1,7 +1,7 @@
 export function n_arr(n, callback) {
     n = Math.max(0, Math.floor(n));
     return new Array(n).fill(null).map((_, i) => typeof callback === "function"
-        ? callback(i, i / n, i / (n - 1))
+        ? callback?.(i, i / n, i / (n - 1))
         : callback);
 }
 // const n_arr = (n, callback) => {
