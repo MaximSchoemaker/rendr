@@ -388,16 +388,12 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   let el: HTMLCanvasElement;
   let prev_bitmap: ImageBitmap;
   const loop = createAnimationLoop(() => {
-    // cache();
 
-    // const bitmap = running()
-    //   ? frame_cache.getLatestValid(tick())
-    //   : frame_cache.getLatest(tick());
-    if (running()) frame_cache.request(0);
-    else frame_cache.request(tick());
+    const request_index = running() ? 0 : tick();
+    frame_cache.request(request_index);
 
     let bitmap = frame_cache.getLatestValid(tick());
-    bitmap ??= frame_cache.get(tick());
+    bitmap ??= frame_cache.get(request_index);
 
     if (!bitmap || bitmap === prev_bitmap) return;
 
