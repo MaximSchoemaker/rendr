@@ -393,7 +393,11 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
     // const bitmap = running()
     //   ? frame_cache.getLatestValid(tick())
     //   : frame_cache.getLatest(tick());
-    const bitmap = frame_cache.getLatestValid(tick());
+    if (running()) frame_cache.request(0);
+    else frame_cache.request(tick());
+
+    let bitmap = frame_cache.getLatestValid(tick());
+    bitmap ??= frame_cache.get(tick());
 
     if (!bitmap || bitmap === prev_bitmap) return;
 

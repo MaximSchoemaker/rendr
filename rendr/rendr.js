@@ -148,7 +148,6 @@ export function createParameter(initial_value, name) {
 export function createCache(count = 0) {
     const id = global_dependency_id++;
     let listeners = new Set();
-    let get_listeners = new Set();
     let set_counter = 0;
     function onMutate(match, callback) {
         listeners.add({ match, callback });
@@ -159,12 +158,8 @@ export function createCache(count = 0) {
     function hasListener(callback) {
         return [...listeners].some(l => l.callback === callback);
     }
-    function onGet(callback) {
-        get_listeners.add(callback);
-    }
     function unsubscribe(callback) {
         listeners = new Set([...listeners].filter(l => l.callback !== callback));
-        get_listeners = new Set([...get_listeners].filter(c => c !== callback));
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
@@ -222,44 +217,40 @@ export function createCache(count = 0) {
             return _getIndex(...args);
     }
     function _getAll() {
-        get_listeners.forEach(callback => callback());
         global_effect_dependencies()?.add({ dependency: cache });
         return cache.value;
     }
     function _getIndex(index) {
-        get_listeners.forEach(callback => callback(index));
         global_effect_dependencies()?.add({ dependency: cache, index });
         return cache.value[index]?.value;
     }
     function getLatest(index = count - 1) {
-        get_listeners.forEach(callback => callback(index));
         if (cache.value[index]?.value !== undefined) {
             global_effect_dependencies()?.add({ dependency: cache, index });
             return cache.value[index].value;
         }
         global_effect_dependencies()?.add({ dependency: cache });
-        for (let i = 0; i < count; i++) {
-            const value = cache.value[mod(index - i, count)]?.value;
+        for (let i = index; i >= 0; i--) {
+            const value = cache.value[i]?.value;
             if (value !== undefined)
                 return value;
         }
     }
     function getLatestValid(index = count - 1) {
-        get_listeners.forEach(callback => callback(index, true));
         if (isValid(index)) {
             global_effect_dependencies()?.add({ dependency: cache, index });
             return cache.value[index].value;
         }
         global_effect_dependencies()?.add({ dependency: cache });
-        for (let i = 0; i < count; i++) {
-            const item = cache.value[mod(index - i, count)];
+        for (let i = index; i >= 0; i--) {
+            const item = cache.value[i];
             if (!item)
                 continue;
             const { value, valid } = item;
             if (valid)
                 return value;
         }
-        return getLatest(index);
+        // return getLatest(index);
     }
     function isValid(index) {
         return cache.value[index]?.valid ?? false;
@@ -314,9 +305,14 @@ export function createCache(count = 0) {
         else
             cache.value[index] = {};
     }
+    function request(index) {
+        mutate({ key: "request_index", value: index });
+    }
+    function requestIndex() {
+        return cache.request_index;
+    }
     function cleanup() {
         listeners.clear();
-        get_listeners.clear();
     }
     const cache = {
         id,
@@ -328,7 +324,6 @@ export function createCache(count = 0) {
         mutate,
         onMutate,
         onChange,
-        onGet,
         hasListener,
         unsubscribe,
         getLatest,
@@ -338,6 +333,9 @@ export function createCache(count = 0) {
         invalidateFrom,
         invalidateCount,
         setCount,
+        request,
+        request_index: 0,
+        requestIndex,
         cleanup,
     };
     global_dependencies.set(id, cache);
@@ -713,8 +711,8 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
             }
             const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length;
             let queue_count = 0;
-            let index;
-            for (index = 0; index < cache.count && maxQueueLength(); index++) {
+            for (let i = 0; i < cache.count && maxQueueLength(); i++) {
+                const index = mod(i + cache.requestIndex(), cache.count);
                 if (cache.isValid(index))
                     continue;
                 const invalidate_count = cache.invalidateCount(index);
@@ -808,6 +806,7 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
         });
         onDependencyChanged && onDependencyChanged(id, index);
     }
+    cache.onMutate({ key: "request_index" }, ({ id }, action) => worker?.postMessage({ kind: "dependency", id, action }));
     return worker;
 }
 // export function createLoop(callback, interval = 0) {

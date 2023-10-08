@@ -39,7 +39,9 @@ export type Cache<T> = Dependency & {
    invalidate: (index: number, invalidate_count?: number) => void,
    isValid: (index: number) => boolean,
    invalidateCount: (index: number) => number | undefined,
-   onGet: (callback: onGetCallback) => void,
+   // onGet: (callback: onGetCallback) => void,
+   request: (index: number) => void,
+   requestIndex: () => number,
 }
 
 // type Cache<T> = ReturnType<typeof createCache<T>>;
@@ -261,25 +263,24 @@ export function createCache<T>(count = 0): Cache<T> {
    const id = global_dependency_id++;
 
    let listeners = new Set<ListenerRecord>();
-   let get_listeners = new Set<onGetCallback>();
    let set_counter = 0;
 
    function onMutate(match: Match, callback: onMutateCallback) {
       listeners.add({ match, callback });
    }
+
    function onChange(callback: onMutateCallback) {
       onMutate({ key: "value" }, callback)
    }
+
    function hasListener(callback: onMutateCallback) {
       return [...listeners].some(l => l.callback === callback);
    }
-   function onGet(callback: onGetCallback) {
-      get_listeners.add(callback);
-   }
+
    function unsubscribe(callback: onMutateCallback | onGetCallback) {
       listeners = new Set([...listeners].filter(l => l.callback !== callback));
-      get_listeners = new Set([...get_listeners].filter(c => c !== callback));
    }
+
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
       const { key, value, index, set_count } = action;
@@ -317,11 +318,13 @@ export function createCache<T>(count = 0): Cache<T> {
       }
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(cache, action))
    }
+
    function set(index: number, value: T) {
       if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
       mutate({ key: "value", index, value });
       validate(index);
    }
+
    function invalidSet(index: number, value: T) {
       if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
       mutate({ key: "value", index, value });
@@ -333,54 +336,54 @@ export function createCache<T>(count = 0): Cache<T> {
       if (args.length == 0) return _getAll();
       if (args.length == 1) return _getIndex(...args);
    }
+
    function _getAll() {
-      get_listeners.forEach(callback => callback())
       global_effect_dependencies()?.add({ dependency: cache });
       return cache.value;
    }
+
    function _getIndex(index: number) {
-      get_listeners.forEach(callback => callback(index))
       global_effect_dependencies()?.add({ dependency: cache, index });
       return cache.value[index]?.value;
    }
-   function getLatest(index = count - 1) {
-      get_listeners.forEach(callback => callback(index))
 
+   function getLatest(index = count - 1) {
       if (cache.value[index]?.value !== undefined) {
          global_effect_dependencies()?.add({ dependency: cache, index });
          return cache.value[index].value;
       }
       global_effect_dependencies()?.add({ dependency: cache });
-      for (let i = 0; i < count; i++) {
-         const value = cache.value[mod(index - i, count)]?.value;
+      for (let i = index; i >= 0; i--) {
+         const value = cache.value[i]?.value;
          if (value !== undefined)
             return value;
       }
    }
-   function getLatestValid(index = count - 1) {
-      get_listeners.forEach(callback => callback(index, true))
 
+   function getLatestValid(index = count - 1) {
       if (isValid(index)) {
          global_effect_dependencies()?.add({ dependency: cache, index });
          return cache.value[index].value;
       }
       global_effect_dependencies()?.add({ dependency: cache });
-      for (let i = 0; i < count; i++) {
-         const item = cache.value[mod(index - i, count)];
+      for (let i = index; i >= 0; i--) {
+         const item = cache.value[i];
          if (!item) continue;
          const { value, valid } = item;
          if (valid) return value;
       }
 
-      return getLatest(index);
+      // return getLatest(index);
    }
    function isValid(index: number) {
       return cache.value[index]?.valid ?? false;
    }
+
    function validate(index: number) {
       if (!cache.value[index]) cache.value[index] = {};
       mutate({ key: "valid", value: true, index });
    }
+
    function invalidate(index: number, invalidate_count?: number) {
       if (index === undefined) {
          _invalidateAll(invalidate_count);
@@ -388,10 +391,12 @@ export function createCache<T>(count = 0): Cache<T> {
          _invalidateIndex(index, invalidate_count);
       }
    }
+
    function _invalidateAll(invalidate_count?: number) {
       // for (let i = 0; i < count; i++) _invalidateIndex(i);
       cache.value.forEach((_, index) => _invalidateIndex(index, invalidate_count));
    }
+
    function _invalidateIndex(index: number, invalidate_count?: number) {
       if (!cache.value[index]) cache.value[index] = {};
       // if (!cache.value[index].valid) return;
@@ -400,29 +405,41 @@ export function createCache<T>(count = 0): Cache<T> {
       // mutate({ key: "invalidate_count", value: (cache.value[index].invalidate_count ?? 0) + 1, index });
       cache.value[index].invalidate_count = invalidate_count ?? (cache.value[index].invalidate_count ?? 0) + 1;
    }
+
    function invalidateFrom(index: number) {
       if (index === undefined) {
          invalidate(index);
       } else for (let i = index; i < count; i++)
          if (cache.value[i]) invalidate(i);
    }
+
    function invalidateCount(index: number) {
       if (index === undefined) console.warn("wrong invalidateCount call");
       return cache.value[index]?.invalidate_count;
    }
+
    function setCount(index?: number) {
       if (index === undefined) return set_counter;
       return cache.value[index]?.set_counter;
    }
+
    function clear(index?: number) {
       if (index == null)
          cache.value = new Array<CacheItem<T>>(count)
       else
          cache.value[index] = {}
    }
+
+   function request(index: number) {
+      mutate({ key: "request_index", value: index });
+   }
+
+   function requestIndex() {
+      return cache.request_index;
+   }
+
    function cleanup() {
       listeners.clear();
-      get_listeners.clear();
    }
 
    const cache = {
@@ -435,7 +452,6 @@ export function createCache<T>(count = 0): Cache<T> {
       mutate,
       onMutate,
       onChange,
-      onGet,
       hasListener,
       unsubscribe,
       getLatest,
@@ -445,6 +461,9 @@ export function createCache<T>(count = 0): Cache<T> {
       invalidateFrom,
       invalidateCount,
       setCount,
+      request,
+      request_index: 0,
+      requestIndex,
       cleanup,
    }
 
@@ -1077,9 +1096,9 @@ export function createReactiveCacheWorker<T>(
 
             const maxQueueLength = () => max_queue_length === undefined || queue_count < max_queue_length
             let queue_count = 0;
-            let index;
 
-            for (index = 0; index < cache.count && maxQueueLength(); index++) {
+            for (let i = 0; i < cache.count && maxQueueLength(); i++) {
+               const index = mod(i + cache.requestIndex(), cache.count);
                if (cache.isValid(index)) continue;
                const invalidate_count = cache.invalidateCount(index);
 
@@ -1199,6 +1218,11 @@ export function createReactiveCacheWorker<T>(
 
       onDependencyChanged && onDependencyChanged(id, index);
    }
+
+   cache.onMutate(
+      { key: "request_index" },
+      ({ id }, action) => worker?.postMessage({ kind: "dependency", id, action })
+   );
 
    return worker;
 }
