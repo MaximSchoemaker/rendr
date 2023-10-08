@@ -458,61 +458,7 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         });
         return state_par;
     }
-    function simulate(initial_state, count, callback) {
-        const initial_state_par = isParameter(initial_state)
-            ? initial_state
-            : createParameter(initial_state);
-        const index_par = createParameter({ index: 0, invalidate_count: undefined });
-        const state_cache = createCache(count);
-        state_cache.set(0, initial_state_par.get());
-        let start_index = 0;
-        const requestNextIndex = () => {
-            for (let i = 0; i < count; i++) {
-                const index = mod(start_index + i, count);
-                if (!state_cache.isValid(index)) {
-                    index_par.set({ index, invalidate_count: state_cache.invalidateCount(index) });
-                    return;
-                }
-            }
-        };
-        requestNextIndex();
-        const index_dependencies = [];
-        const previous_states = [initial_state_par.get()];
-        const worker = createReactiveWorker(gen_worker_name(), main_worker_name, {
-            executeWorker: () => {
-                previous_states[0] = initial_state_par.get();
-                const { index, invalidate_count } = index_par.get();
-                const i = mod(index, count);
-                let state = structuredClone(previous_states[i - 1]);
-                const t = i / count;
-                const new_state = callback(state, i, count, t);
-                state = new_state ?? state;
-                previous_states[i] = structuredClone(state);
-                return { i, state, invalidate_count };
-            },
-            receive: ({ i, state, invalidate_count }, dependencies_ids_and_indexes) => {
-                index_dependencies[i] = dependencies_ids_and_indexes;
-                // if (state_cache.isValid(i)) return;
-                if (state_cache.invalidateCount(i) !== invalidate_count)
-                    return;
-                state_cache.set(i, state);
-                // state_cache.invalidateFrom(i + 1)
-                requestNextIndex();
-            },
-            onDependencyChanged: (id, index) => {
-                if (id === index_par.id)
-                    return;
-                index_dependencies.forEach((dependencies_ids_and_indexes, i) => {
-                    if (dependencies_ids_and_indexes.find((dep) => dep.id === id && (dep.index === undefined || dep.index === index))) {
-                        state_cache.invalidate(i);
-                    }
-                });
-                requestNextIndex();
-            },
-        });
-        return state_cache;
-    }
-    function simulateQueue(initial_state, count, callback, options = {}) {
+    function simulate(initial_state, count, callback, options = {}) {
         options = { strategy: "ping", ...options };
         const state_cache = createCache(count);
         state_cache.set(0, initial_state);
@@ -564,68 +510,7 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         }, options);
         return frame_par;
     }
-    function animate(frames, callback) {
-        const index_par = createParameter({ index: 0, invalidate_count: 0 });
-        const frame_cache = createCache(frames);
-        let start_frame = 0;
-        frame_cache.onGet((index, getLatestValid) => getLatestValid
-            ? start_frame = 0
-            : start_frame = index ?? 0);
-        const requestNextFrame = () => {
-            for (let i = 0; i < frames; i++) {
-                const frame = mod(start_frame + i, frames);
-                if (!frame_cache.isValid(frame)) {
-                    const new_index = {
-                        index: frame,
-                        invalidate_count: frame_cache.invalidateCount(frame),
-                    };
-                    if (index_par.value?.index === new_index.index &&
-                        index_par.value?.invalidate_count === new_index.invalidate_count) {
-                        return;
-                    }
-                    index_par.set(new_index);
-                    return;
-                }
-            }
-        };
-        requestNextFrame();
-        const frames_dependencies = [];
-        const worker = createReactiveWorker(gen_worker_name(), main_worker_name, {
-            executeWorker: () => {
-                const { index, invalidate_count } = index_par.get();
-                const i = mod(index, frames);
-                const t = i / frames;
-                const canvas = callback(i, t);
-                const ctx = canvas.getContext('2d');
-                const bitmap = canvas.transferToImageBitmap();
-                ctx?.drawImage(bitmap, 0, 0);
-                return { i, bitmap, invalidate_count };
-            },
-            receive: ({ i, bitmap, invalidate_count }, dependencies_ids_and_indexes) => {
-                if (frame_cache.isValid(i))
-                    return;
-                if (frame_cache.invalidateCount(i) !== invalidate_count) {
-                    frame_cache.invalidSet(i, bitmap);
-                    return;
-                }
-                frame_cache.set(i, bitmap);
-                frames_dependencies[i] = dependencies_ids_and_indexes;
-                requestNextFrame();
-            },
-            onDependencyChanged: (dependency_id, dependency_index) => {
-                if (dependency_id === index_par.id)
-                    return;
-                frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
-                    if (dependencies_ids_and_indexes.find(({ id, index }) => dependency_id === id && (index === undefined || index === dependency_index))) {
-                        frame_cache.invalidate(frame);
-                    }
-                });
-                requestNextFrame();
-            }
-        });
-        return frame_cache;
-    }
-    function animateQueue(frames, callback, options) {
+    function animate(frames, callback, options) {
         options = { invalid_set: true, ...options };
         const frame_cache = createCache(frames);
         const worker = createReactiveCacheWorker(gen_worker_name(), main_worker_name, frame_cache, {
@@ -647,11 +532,9 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         update,
         construct,
         simulate,
-        simulateQueue,
         draw,
         generate,
         animate,
-        animateQueue,
     };
 }
 export function createWorker(name, parent_name, executeWorker, receiveWorker, execute, receive) {

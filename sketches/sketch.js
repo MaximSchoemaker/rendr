@@ -80,7 +80,7 @@ const data_sketch = createSketch(sketch => (tick_par) => {
    });
 
    // const state3_cache = null
-   const state3_cache = sketch.simulateQueue([], FRAMES, (state, frame, _, t) => {
+   const state3_cache = sketch.simulate([], FRAMES, (state, frame, _, t) => {
       // wait(50000);
       const count = state3_count_par.get();
       // console.log(frame, count, state);
@@ -89,13 +89,10 @@ const data_sketch = createSketch(sketch => (tick_par) => {
          const y = map(Math.random(), 0, 1, 2 / 4, 3 / 4)
          state.push({ x, y })
       }
-   }, {
-      // strategy: "interval",
-      // interval_ms: 1000 / 30,
    });
 
    // const state4_cache = null
-   const state4_cache = sketch.simulateQueue([], FRAMES, (state, frame, count, t) => {
+   const state4_cache = sketch.simulate([], FRAMES, (state, frame, count, t) => {
       // wait(10000);
 
       // const index = 0;
@@ -154,7 +151,7 @@ const animate_sketch = createSketch(sketch => (tick_par, state1_par, state2_par,
    const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const frame_cache = null;
-   const frame_cache = sketch.animateQueue(FRAMES, (tick, t) => {
+   const frame_cache = sketch.animate(FRAMES, (tick, t) => {
       const view = backbuffer;
       const state = [
          ...state1_par.get(),
