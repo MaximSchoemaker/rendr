@@ -1203,10 +1203,9 @@ export function createReactiveCacheWorker<T>(
    const addDependencyRecord = (id: number, index?: number) => dependecy_records.push({ id, index });
 
    const retrig_par = createParameter(false);
-   const ping_par = createParameter(false);
 
    const worker = createWorker<
-      ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, invalidate_count: number }),
+      ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, invalidate_count: number } | { kind: "retrig" }),
       { value: T, index: number, invalidate_count: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
    >(
       name,
@@ -1238,7 +1237,6 @@ export function createReactiveCacheWorker<T>(
                const invalidate_count = cache.invalidateCount(index);
 
                global_effect_dependencies_stack.push(new Set());
-               if (strategy === "ping") ping_par.get();
                const ret = executeWorker?.(index);
 
                const dependencies = global_effect_dependencies_stack.pop();
@@ -1264,11 +1262,13 @@ export function createReactiveCacheWorker<T>(
                dependency?.mutate(action);
 
                receiveWorker?.(data);
-               retrig_par.set(!retrig_par.value)
                break;
             case "invalidate":
                const { index, invalidate_count } = data;
                cache.invalidate(index, invalidate_count);
+               break;
+            case "retrig":
+               retrig_par.set(!retrig_par.value)
                break;
          }
       },
@@ -1311,9 +1311,17 @@ export function createReactiveCacheWorker<T>(
             dep.onChange(onDepChange);
          });
 
-         if (strategy === "ping") ping_par.set(!ping_par.value);
+         if (strategy === "ping") retrig();
       },
    );
+
+   let retrig_timeout: number;
+   function retrig() {
+      clearTimeout(retrig_timeout);
+      retrig_timeout = setTimeout(() =>
+         worker?.postMessage({ kind: "retrig" })
+      );
+   }
 
    const index_dependencies: Dependencies_ids_and_indexes[] = []
 
@@ -1323,12 +1331,13 @@ export function createReactiveCacheWorker<T>(
       worker?.postMessage({ kind: "invalidate", index, invalidate_count });
    }
 
+
    function onDepChange(dependency: Dependency, action: Action) {
 
       const { id } = dependency;
       worker?.postMessage({ kind: "dependency", id, action });
 
-      if (dependency === ping_par) return;
+      retrig()
 
       const { index } = action;
       addDependencyRecord(id, index);
