@@ -4,9 +4,9 @@ import { createStore } from "solid-js/store";
 import styles from './App.module.css'; // @ts-ignore
 import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
-import { Action, Cache, Dependency, Parameter } from '../rendr/rendr';
+import { Action, Cache, Dependency, Parameter, ParameterNumberOptions } from '../rendr/rendr';
 
-class UI {
+export class UI {
   AddComponent;
   constructor(AddComponent: (component: JSXElement) => void) {
     this.AddComponent = AddComponent;
@@ -416,13 +416,6 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
       height={1080}
     />
   );
-}
-
-type ParameterNumberOptions = {
-  min?: number;
-  max?: number;
-  step?: number;
-  range?: number;
 }
 
 type ParameterNumberProps = {

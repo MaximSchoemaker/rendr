@@ -406,6 +406,18 @@ export function createSketchWorker(fn) {
         init,
     };
 }
+function createSetup(callback) {
+    function setup(createUI) {
+        resetGlobals();
+        callback(createUI);
+        return () => {
+            cleanupGlobals();
+        };
+    }
+    if (WORKER_NAME !== ROOT_WORKER_NAME)
+        setup(() => { });
+    return setup;
+}
 function constructSketch(name, main_worker_name, gen_worker_name) {
     function update(initial_state, callback) {
         const initial_state_par = isParameter(initial_state)
@@ -527,6 +539,9 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
     return {
         name,
         main_worker_name,
+        createCanvas,
+        createParameter,
+        createCache,
         update,
         construct,
         simulate,
@@ -835,3 +850,11 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
 //    ret.start();
 //    return ret;
 // }
+export default {
+    createSketch,
+    createSketchWorker,
+    createSetup,
+    createParameter,
+    createCache,
+    createCanvas,
+};

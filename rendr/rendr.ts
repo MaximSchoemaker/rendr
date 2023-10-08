@@ -566,6 +566,38 @@ export function createSketchWorker<T>(fn: SketchFn<T>) {
    }
 }
 
+type UI = {
+   createContainer: (callback: (ui: UI) => void) => void;
+   createViewContainer: (callback: (ui: UI) => void) => void;
+   createWindow: (callback: (ui: UI) => void) => void;
+   createTimeline: (frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) => void;
+   createView: (frame_par: Parameter<ImageBitmap>) => void;
+   createCacheView: (tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) => void;
+   createParameterNumber: (name: string, parameter: Parameter<number>, options: ParameterNumberOptions) => void;
+}
+
+export type ParameterNumberOptions = {
+   min?: number;
+   max?: number;
+   step?: number;
+   range?: number;
+}
+
+type SetupCallback = (createUI: CreateUI) => void;
+type CreateUI = (callback: (ui: UI) => void) => void;
+
+function createSetup(callback: SetupCallback) {
+   function setup(createUI: CreateUI) {
+      resetGlobals();
+      callback(createUI);
+      return () => {
+         cleanupGlobals();
+      }
+   }
+   if (WORKER_NAME !== ROOT_WORKER_NAME) setup(() => { });
+   return setup;
+}
+
 type Sketch = ReturnType<typeof constructSketch>
 type Count_or_queue<T> = number | T[] | Parameter<number> | Parameter<T[]>
 type UpdateCallback<T> = (state: T, tick: number) => T
@@ -766,6 +798,10 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    return {
       name,
       main_worker_name,
+
+      createCanvas,
+      createParameter,
+      createCache,
 
       update,
       construct,
@@ -1253,3 +1289,12 @@ export function createReactiveCacheWorker<T>(
 //    ret.start();
 //    return ret;
 // }
+
+export default {
+   createSketch,
+   createSketchWorker,
+   createSetup,
+   createParameter,
+   createCache,
+   createCanvas,
+}
