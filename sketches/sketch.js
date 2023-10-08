@@ -1,4 +1,4 @@
-import rendr from "../rendr/rendr.js";
+import rendr, { createParameter, createCache, createCanvas } from "../rendr/rendr.js";
 import { Draw2dContext } from "../rendr/library/Draw2d.js";
 import { map, invCosn } from "../rendr/library/Utils.js"
 
@@ -46,9 +46,9 @@ function wait(count) {
 
 const data_sketch = rendr.createSketch(sketch => (tick_par) => {
 
-   const state1_count_par = sketch.createParameter(0, "state1_count_par");
-   const state2_count_par = sketch.createParameter(0, "state2_count_par");
-   const state3_count_par = sketch.createParameter(0, "state3_count_par");
+   const state1_count_par = createParameter(0, "state1_count_par");
+   const state2_count_par = createParameter(0, "state2_count_par");
+   const state3_count_par = createParameter(0, "state3_count_par");
 
    // const state1_par = null;
    const state1_par = sketch.update([], (state) => {
@@ -120,7 +120,7 @@ const data_sketch = rendr.createSketch(sketch => (tick_par) => {
 
 const draw_sketch = rendr.createSketch(sketch => (tick_par, state1_par, state2_par, state3_cache, state4_cache) => {
 
-   const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const frame_par = null
    const frame_par = sketch.draw(() => {
@@ -145,7 +145,7 @@ const draw_sketch = rendr.createSketch(sketch => (tick_par, state1_par, state2_p
 
 const animate_sketch = rendr.createSketch(sketch => (tick_par, state1_par, state2_par, state3_cache, state4_cache) => {
 
-   const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const frame_cache = null;
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
@@ -168,8 +168,8 @@ const animate_sketch = rendr.createSketch(sketch => (tick_par, state1_par, state
 
 const generate_sketch1 = rendr.createSketch(sketch => (tick_par) => {
 
-   const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
-   const gen1_count_par = sketch.createParameter(0, "gen1_count_par");
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
+   const gen1_count_par = createParameter(0, "gen1_count_par");
 
    // const gen1_frame_par = null
    const gen1_frame_par = sketch.generate(gen1_count_par, 1000 / 60, (index) => {
@@ -189,7 +189,7 @@ const generate_sketch1 = rendr.createSketch(sketch => (tick_par) => {
 
 const generate_sketch2 = rendr.createSketch(sketch => (tick_par, state1_par, state2_par) => {
 
-   const backbuffer = sketch.createCanvas(WIDTH, HEIGHT);
+   const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const gen2_state_par = state1_par;
    const gen2_state_par = state2_par;
@@ -229,12 +229,12 @@ const master_sketch = rendr.createSketch(sketch => (tick_par) => {
    // let state3_cache_view = state3_cache, state4_cache_view = state4_cache;
    let state3_cache_view, state4_cache_view;
    if (state3_cache) {
-      state3_cache_view = sketch.createCache(state3_cache.count);
+      state3_cache_view = createCache(state3_cache.count);
       state3_cache_view.set(0, state3_cache.get(0));
       state3_cache.onMutate({ key: "valid" }, (dep, action) => state3_cache_view.mutate(action));
    }
    if (state4_cache) {
-      state4_cache_view = sketch.createCache(state4_cache.count);
+      state4_cache_view = createCache(state4_cache.count);
       state4_cache_view.set(0, state4_cache.get(0));
       state4_cache.onMutate({ key: "valid" }, (dep, action) => state4_cache_view.mutate(action));
    }
@@ -246,10 +246,10 @@ const master_sketch = rendr.createSketch(sketch => (tick_par) => {
    }
 });
 
-export default rendr.createSetup(createUI => {
+export default rendr.createSetup("/sketches/sketch.js", createUI => {
 
-   const tick_par = rendr.createParameter(0, "tick");
-   const running_par = rendr.createParameter(true, "running");
+   const tick_par = createParameter(0, "tick");
+   const running_par = createParameter(true, "running");
 
    for (let i = 0; i < 1; i++) {
       const {

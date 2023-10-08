@@ -2,43 +2,56 @@ import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, un
 import { createStore } from "solid-js/store";
 
 import styles from './App.module.css'; // @ts-ignore
-import Setup from "../sketches/sketch";
 import { mod, clamp, floorTo } from "../rendr/library/Utils";
 import { Action, Cache, Dependency, Parameter, ParameterNumberOptions } from '../rendr/rendr';
 
+type Component = (props?: any) => JSXElement
+
 export class UI {
   AddComponent;
-  constructor(AddComponent: (component: JSXElement) => void) {
+  constructor(AddComponent: (component: Component) => void) {
     this.AddComponent = AddComponent;
   }
   createContainer(callback: (ui: UI) => void) {
-    this.AddComponent(Container({ callback }));
+    this.AddComponent((props?: any) => <Container callback={callback} rest_props={props} />);
   }
   createViewContainer(callback: (ui: UI) => void) {
-    this.AddComponent(ViewContainer({ callback }));
+    this.AddComponent((props?: any) => <ViewContainer callback={callback} rest_props={props} />);
   }
   createWindow(callback: (ui: UI) => void) {
-    this.AddComponent(Window({ callback }));
+    this.AddComponent((props?: any) => <Window callback={callback} rest_props={props} />);
   }
   createTimeline(frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) {
-    this.AddComponent(Timeline({ frames, tick_par, running_par, caches }));
+    this.AddComponent((props?: any) => <Timeline frames={frames} tick_par={tick_par} running_par={running_par} caches={caches} rest_props={props} />);
   }
   createView(frame_par: Parameter<ImageBitmap>) {
-    this.AddComponent(View({ frame_par }));
+    this.AddComponent((props?: any) => <View frame_par={frame_par} rest_props={props} />);
   }
   createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) {
-    this.AddComponent(CacheView({ tick_par, running_par, frame_cache }));
+    this.AddComponent((props?: any) => <CacheView tick_par={tick_par} running_par={running_par} frame_cache={frame_cache} rest_props={props} />);
   }
   createParameterNumber(name: string, parameter: Parameter<number>, options: ParameterNumberOptions) {
-    this.AddComponent(ParameterNumber({ name, parameter, options }));
+    this.AddComponent((props?: any) => <ParameterNumber name={name} parameter={parameter} options={options} rest_props={props} />);
   }
 }
 
 const App = () => {
+  return (
+    <div class={styles.App}>
+      <Sketch sketch_path="/sketches/sketch.js" />
+    </div>
+  );
+};
 
-  const [components, set_components] = createSignal<JSXElement[]>([]);
+type SketchProps = {
+  sketch_path: string;
+}
 
-  function AddComponent(component: JSXElement) {
+const Sketch = (props: SketchProps) => {
+
+  const [components, set_components] = createSignal<Component[]>([]);
+
+  function AddComponent(component: Component) {
     set_components(components => [...components, component]);
   }
 
@@ -47,27 +60,39 @@ const App = () => {
     callback(ui);
   }
 
-  const cleanup = Setup(createUI);
-  cleanup && onCleanup(cleanup);
+  let released = false;
+  let cleanup: () => void;
+  import(props.sketch_path /* @vite-ignore */
+  ).then((SetupSketch) => {
+    if (released) return
+    const Setup = SetupSketch.default;
+    cleanup = Setup(createUI);
+  })
+  onCleanup(() => {
+    set_components([]);
+    cleanup?.()
+    released = true;
+  });
 
   return (
-    <div class={styles.App}>
+    <div class={styles.Sketch}>
       <For each={components()}>{
-        component => component
+        component => component()
       }</For>
     </div>
   );
-};
+}
 
 type ContainerProps = {
   callback: (ui: UI) => void;
+  rest_props: any;
 }
 
-const Container = ({ callback }: ContainerProps) => {
+const Container = ({ callback, rest_props }: ContainerProps) => {
 
-  const [components, set_components] = createSignal<JSXElement[]>([]);
+  const [components, set_components] = createSignal<(Component)[]>([]);
 
-  function AddComponent(component: JSXElement) {
+  function AddComponent(component: Component) {
     set_components(components => [...components, component]);
   }
 
@@ -75,8 +100,8 @@ const Container = ({ callback }: ContainerProps) => {
   callback(ui);
 
   return (
-    <div class={styles.Container}>
-      <For each={components()}>{component => component}</For>
+    <div  {...rest_props} class={styles.Container}>
+      <For each={components()}>{component => component()}</For>
     </div>
   );
 };
@@ -84,13 +109,14 @@ const Container = ({ callback }: ContainerProps) => {
 
 type ViewContainerProps = {
   callback: (ui: UI) => void;
+  rest_props: any;
 }
 
-const ViewContainer = ({ callback }: ViewContainerProps) => {
+const ViewContainer = ({ callback, rest_props }: ViewContainerProps) => {
 
-  const [components, set_components] = createSignal<JSXElement[]>([]);
+  const [components, set_components] = createSignal<(Component)[]>([]);
 
-  function AddComponent(component: JSXElement) {
+  function AddComponent(component: Component) {
     set_components(components => [...components, component]);
   }
 
@@ -103,37 +129,28 @@ const ViewContainer = ({ callback }: ViewContainerProps) => {
     localStorage.setItem("selected", JSON.stringify(selected()))
   });
 
-  function clickComponent(component: JSXElement, i: () => number | null) {
-    (component as HTMLElement).onclick = () =>
-      set_selected(selected => selected === null ? i() : null);
-    return component;
-  }
-
-  function getSelectedComponent() {
-    const index = Math.min(components().length - 1, selected()!);
-    return components()[index];
-  }
-
   return (
-    <div class={styles.ViewContainer}>
-      <Show when={components().length > 0}>
-        <Show when={selected() === null} fallback={clickComponent(getSelectedComponent(), selected)}>
-          <For each={components()}>{clickComponent}</For>
+    <div {...rest_props} class={styles.ViewContainer}>
+      <For each={components()}>{(component, i) =>
+        <Show when={selected() === null || selected() === i()} >
+          {component({ onClick: () => set_selected(selected => selected === null ? i() : null) })}
         </Show>
-      </Show>
-    </div>
+      }</For>
+    </div >
   );
 };
 
 type WindowProps = {
   callback: (ui: UI) => void;
+  rest_props: any;
 }
 
-const Window = ({ callback }: WindowProps) => {
+const Window = ({ callback, rest_props }: WindowProps) => {
 
-  const [components, set_components] = createSignal<JSXElement[]>([]);
 
-  function AddComponent(component: JSXElement) {
+  const [components, set_components] = createSignal<(Component)[]>([]);
+
+  function AddComponent(component: Component) {
     set_components(components => [...components, component]);
   }
 
@@ -141,9 +158,9 @@ const Window = ({ callback }: WindowProps) => {
   callback(ui);
 
   return (
-    <div class={styles.Window}>
+    <div {...rest_props} class={styles.Window}>
       <For each={components()}>{
-        component => component
+        component => component()
       }</For>
     </div>
   );
@@ -154,9 +171,10 @@ type TimelineProps = {
   tick_par: Parameter<number>;
   running_par: Parameter<boolean>;
   caches: Cache<any>[];
+  rest_props: any;
 }
 
-function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
+function Timeline({ frames, tick_par, running_par, caches, rest_props }: TimelineProps) {
   const [tick, set_tick] = createRendrParameterSignal<number>(tick_par);
   const [running, set_running] = createRendrParameterSignal<boolean>(running_par);
 
@@ -258,6 +276,7 @@ function Timeline({ frames, tick_par, running_par, caches }: TimelineProps) {
 
   return (
     <div
+      {...rest_props}
       ref={ref => el = ref}
       class={styles.Timeline}
     >
@@ -341,9 +360,10 @@ function Frame(props: FrameProps) {
 
 type ViewProps = {
   frame_par: Parameter<ImageBitmap>;
+  rest_props: any;
 }
 
-function View({ frame_par }: ViewProps) {
+function View({ frame_par, rest_props }: ViewProps) {
   const [frame] = createRendrParameterSignal<ImageBitmap>(frame_par);
 
   let el: HTMLCanvasElement;
@@ -366,6 +386,7 @@ function View({ frame_par }: ViewProps) {
 
   return (
     <canvas
+      {...rest_props}
       class={styles.View}
       ref={(ref) => el = ref}
       width={1080}
@@ -378,9 +399,10 @@ type CacheViewProps = {
   tick_par: Parameter<number>;
   running_par: Parameter<boolean>;
   frame_cache: Cache<ImageBitmap>;
+  rest_props: any;
 }
 
-function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
+function CacheView({ tick_par, running_par, frame_cache, rest_props }: CacheViewProps) {
   const [tick] = createRendrParameterSignal<number>(tick_par);
   const [running] = createRendrParameterSignal<boolean>(running_par);
   // const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
@@ -388,14 +410,13 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
   let el: HTMLCanvasElement;
   let prev_bitmap: ImageBitmap;
   const loop = createAnimationLoop(() => {
-
     const request_index = running() ? 0 : tick();
     frame_cache.request(request_index);
 
     let bitmap = frame_cache.getLatestValid(tick());
     bitmap ??= frame_cache.get(request_index);
 
-    if (!bitmap || bitmap === prev_bitmap) return;
+    if (!el || !bitmap || bitmap === prev_bitmap) return;
 
     el.width = bitmap.width;
     el.height = bitmap.height;
@@ -410,6 +431,7 @@ function CacheView({ tick_par, running_par, frame_cache }: CacheViewProps) {
 
   return (
     <canvas
+      {...rest_props}
       class={styles.View}
       ref={(ref) => el = ref}
       width={1080}
@@ -422,9 +444,10 @@ type ParameterNumberProps = {
   name: string;
   parameter: Parameter<number>;
   options: ParameterNumberOptions;
+  rest_props: any;
 }
 
-function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps) {
+function ParameterNumber({ name, parameter, options = {}, rest_props }: ParameterNumberProps) {
   const [value, set_value] = createRendrParameterSignal<number>(parameter);
 
   let scrubbing = false;
@@ -537,6 +560,7 @@ function ParameterNumber({ name, parameter, options = {} }: ParameterNumberProps
 
   return (
     <div
+      {...rest_props}
       ref={ref => el = ref}
       class={styles.Parameter}
       style={{ "--progress": progress() }}

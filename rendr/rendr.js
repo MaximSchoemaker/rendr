@@ -1,9 +1,8 @@
 import { mod } from "./library/Utils.js";
-// import SKETCH_PATH from "./sketch.js?url"
-const SKETCH_PATH = "/sketches/sketch.js";
 const ROOT_WORKER_NAME = "root";
 const WORKER_NAME = self.name || ROOT_WORKER_NAME;
 console.log("WORKER_NAME", WORKER_NAME);
+let global_sketch_path;
 let global_dependency_id = 0;
 let global_dependencies = new Map();
 let global_workers = new Set();
@@ -23,16 +22,13 @@ function global_effect_dependencies() {
 // const addEffectStack = (cleanup) => {
 //    effectStack.at(-1).push(cleanup);
 // }
-export function resetGlobals() {
+export function resetGlobals(sketch_path) {
+    global_sketch_path = sketch_path;
     global_dependencies = new Map();
     global_dependency_id = 0;
     global_workers = new Set();
     global_sketch_id = 0;
     global_effect_dependencies_stack = [new Set()];
-}
-export function cleanupGlobals() {
-    global_dependencies.forEach(dependency => dependency.cleanup());
-    global_workers.forEach(worker => worker.terminate());
 }
 export function createEffect(callback, options = { batch: false, batch_timeout_ms: 0 }) {
     let cleanup;
@@ -406,12 +402,16 @@ export function createSketchWorker(fn) {
         init,
     };
 }
-function createSetup(callback) {
+function createSetup(sketch_path, callback) {
     function setup(createUI) {
-        resetGlobals();
+        resetGlobals(sketch_path);
         callback(createUI);
+        const dependencies = [...global_dependencies.values()];
+        const workers = [...global_workers];
         return () => {
-            cleanupGlobals();
+            console.log("cleanup!!!", WORKER_NAME, dependencies, workers);
+            dependencies.forEach(dependency => dependency.cleanup());
+            workers.forEach(worker => worker.terminate());
         };
     }
     if (WORKER_NAME !== ROOT_WORKER_NAME)
@@ -537,9 +537,6 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         return frame_cache;
     }
     return {
-        createCanvas,
-        createParameter,
-        createCache,
         update,
         construct,
         simulate,
@@ -556,7 +553,7 @@ export function createWorker(name, parent_name, executeWorker, receiveWorker, ex
             postMessage(res);
     }
     else if (WORKER_NAME === parent_name) {
-        const worker = new Worker(new URL(SKETCH_PATH, import.meta.url), { type: "module", name });
+        const worker = new Worker(new URL(global_sketch_path, import.meta.url), { type: "module", name });
         global_workers.add(worker);
         worker.addEventListener("message", (evt) => receive?.(evt.data));
         const res = execute?.(worker);
@@ -852,7 +849,4 @@ export default {
     createSketch,
     createSketchWorker,
     createSetup,
-    createParameter,
-    createCache,
-    createCanvas,
 };
