@@ -80,7 +80,7 @@ const data_sketch = createSketch(sketch => (tick_par) => {
    });
 
    // const state3_cache = null
-   const state3_cache = sketch.simulate([], FRAMES, (state, frame, _, t) => {
+   const state3_cache = sketch.simulateQueue([], FRAMES, (state, frame, _, t) => {
       // wait(50000);
       const count = state3_count_par.get();
       // console.log(frame, count, state);
@@ -90,15 +90,12 @@ const data_sketch = createSketch(sketch => (tick_par) => {
          state.push({ x, y })
       }
    }, {
-      // max_queue_length: 2,
-      // interval_ms: 0,
-
-      // batch_timeout_ms: 20,
-      // timeout_ms: 20,
+      // strategy: "interval",
+      // interval_ms: 1000 / 30,
    });
 
    // const state4_cache = null
-   const state4_cache = sketch.simulate([], FRAMES, (state, frame, count, t) => {
+   const state4_cache = sketch.simulateQueue([], FRAMES, (state, frame, count, t) => {
       // wait(10000);
 
       // const index = 0;
@@ -157,7 +154,7 @@ const animate_sketch = createSketch(sketch => (tick_par, state1_par, state2_par,
    const backbuffer = createCanvas(WIDTH, HEIGHT);
 
    // const frame_cache = null;
-   const frame_cache = sketch.animate(FRAMES, (tick, t) => {
+   const frame_cache = sketch.animateQueue(FRAMES, (tick, t) => {
       const view = backbuffer;
       const state = [
          ...state1_par.get(),
@@ -168,9 +165,6 @@ const animate_sketch = createSketch(sketch => (tick_par, state1_par, state2_par,
          ...(state4_cache?.get(tick) ?? []),
       ];
       return drawScene(view, t, state);
-   }, {
-      // interval_ms: 1000
-      max_queue_length: 1
    });
 
    return {
