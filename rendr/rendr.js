@@ -540,16 +540,6 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
             // if (state_cache.isValid(i)) return;
             if (state_cache.invalidateCount(index) !== invalidate_count)
                 return;
-            // for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
-            //    const dependency = global_dependencies.get(id);
-            //    if (!dependency) continue;
-            //    const set_counter = dependency.lastSetTimestamp(dep_index);
-            //    if (set_counter !== timestamp && timestamp < (set_counter ?? 0)) {
-            //       index_dependencies[index] = [];
-            //       invalidate(index);
-            //       return;
-            //    }
-            // }
             if (index_dependencies[index] === undefined) {
                 index_dependencies[index] = [];
                 invalidate(index);
@@ -657,68 +647,39 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         });
         return frame_cache;
     }
-    // function animateQueue(frames, callback, options) {
-    //    const frame_cache = createCache(frames);
-    //    let start_frame = 0;
-    //    frame_cache.onGet((index, getLatestValid) => {
-    //       if (getLatestValid) start_frame = 0
-    //       else start_frame = index
-    //       // requestNextFrame();
-    //    });
-    //    function invalidate(index) {
-    //       frame_cache.invalidate(index)
-    //       const timestamp = frame_cache.invalidTimestamp(index);
-    //       worker.postMessage({ kind: "invalidate", index, timestamp });
-    //    }
-    //    const frames_dependencies = []
-    //    const worker = createReactiveCacheWorker(
-    //       gen_worker_name(),
-    //       main_worker_name,
-    //       frame_cache,
-    //       (index) => {
-    //          const i = mod(index, frames);
-    //          const t = i / frames;
-    //          const canvas = callback(i, t);
-    //          const ctx = canvas.getContext('2d');
-    //          const bitmap = canvas.transferToImageBitmap();
-    //          ctx.drawImage(bitmap, 0, 0);
-    //          return bitmap
-    //       },
-    //       (bitmap, index, timestamp, dependencies_ids_and_indexes) => {
-    //          // if (frame_cache.isValid(i)) return;
-    //          if (frame_cache.invalidTimestamp(index) !== timestamp) {
-    //             frame_cache.invalidSet(index, bitmap);
-    //             return;
-    //          }
-    //          for (let { id, index: dep_index } of dependencies_ids_and_indexes) {
-    //             const dependency = global_dependencies.get(id);
-    //             const set_counter = dependency.lastSetTimestamp(dep_index);
-    //             if (timestamp < set_counter) {
-    //                invalidate(index);
-    //                return;
-    //             }
-    //          }
-    //          // if (frames_dependencies[index] === undefined && dependencies_ids_and_indexes.length) {
-    //          //    frames_dependencies[index] = dependencies_ids_and_indexes;
-    //          //    invalidate(index);
-    //          //    return;
-    //          // }
-    //          frame_cache.set(index, bitmap);
-    //          frames_dependencies[index] = dependencies_ids_and_indexes;
-    //       },
-    //       (dependency_id, dependency_index) => {
-    //          frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
-    //             if (dependencies_ids_and_indexes.find(({ id, index }) =>
-    //                dependency_id === id && (index === undefined || index === dependency_index)
-    //             )) {
-    //                invalidate(frame);
-    //             }
-    //          });
-    //       },
-    //       options
-    //    );
-    //    return frame_cache;
-    // }
+    function animateQueue(frames, callback, options) {
+        const frame_cache = createCache(frames);
+        function invalidate(index) {
+            frame_cache.invalidate(index);
+            const invalidate_count = frame_cache.invalidateCount(index);
+            worker?.postMessage({ kind: "invalidate", index, invalidate_count });
+        }
+        const frames_dependencies = [];
+        const worker = createReactiveCacheWorker(gen_worker_name(), main_worker_name, frame_cache, (index) => {
+            const i = mod(index, frames);
+            const t = i / frames;
+            const canvas = callback(i, t);
+            const ctx = canvas.getContext('2d');
+            const bitmap = canvas.transferToImageBitmap();
+            ctx?.drawImage(bitmap, 0, 0);
+            return bitmap;
+        }, (bitmap, index, invalidate_count, dependencies_ids_and_indexes) => {
+            // if (frame_cache.isValid(i)) return;
+            if (frame_cache.invalidateCount(index) !== invalidate_count) {
+                frame_cache.invalidSet(index, bitmap);
+                return;
+            }
+            frame_cache.set(index, bitmap);
+            frames_dependencies[index] = dependencies_ids_and_indexes;
+        }, (dependency_id, dependency_index) => {
+            frames_dependencies.forEach((dependencies_ids_and_indexes, frame) => {
+                if (dependencies_ids_and_indexes.find(({ id, index }) => dependency_id === id && (index === undefined || index === dependency_index))) {
+                    invalidate(frame);
+                }
+            });
+        }, options);
+        return frame_cache;
+    }
     return {
         name,
         main_worker_name,
@@ -729,7 +690,7 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         draw,
         generate,
         animate,
-        // animateQueue,
+        animateQueue,
     };
 }
 export function createWorker(name, parent_name, executeWorker, receiveWorker, execute, receive) {
@@ -790,7 +751,6 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
                 dep.unsubscribe(onDepChange);
             }
             if (!hasDependencyRecord(id, index)) {
-                addDependencyRecord(id, index);
                 const current_set_count = dep.setCount(index);
                 if (set_count !== current_set_count) {
                     onDepChange(dep, { key: "value", index, value: dep.get(index), set_count: current_set_count });
@@ -802,7 +762,9 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
     function onDepChange(dependency, action) {
         const { id } = dependency;
         worker?.postMessage({ id, action });
-        onDependencyChanged?.(dependency.id, action.index);
+        const { index } = action;
+        addDependencyRecord(id, index);
+        onDependencyChanged?.(dependency.id, index);
     }
     return worker;
 }
@@ -883,7 +845,11 @@ export function createReactiveQueueWorker(name, parent_name, count_or_queue, int
     return worker;
 }
 export function createReactiveCacheWorker(name, parent_name, cache, executeWorker, receive, onDependencyChanged, options = {}) {
-    const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = options;
+    const default_options = { max_queue_length: 1 };
+    const { interval_ms, timeout_ms, batch_timeout_ms, max_queue_length } = { ...default_options, ...options };
+    const dependecy_records = [];
+    const hasDependencyRecord = (id, index) => dependecy_records.some(r => r.id === id && r.index === index);
+    const addDependencyRecord = (id, index) => dependecy_records.push({ id, index });
     const retrig_par = createParameter(false);
     const worker = createWorker(name, parent_name, () => {
         let timeout;
@@ -943,23 +909,33 @@ export function createReactiveCacheWorker(name, parent_name, cache, executeWorke
     }, (data) => {
         const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
         receive(value, index, invalidate_count, dependencies_ids_and_indexes);
-        dependencies_ids_and_indexes.forEach(({ id, index }) => {
+        dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {
                 console.warn("dependency not found", id, global_dependencies);
                 return;
             }
-            if (!dep.hasListener(onDepChange))
-                onDepChange(dep, { key: "value", value: dep.get() });
-            else
+            if (!dep.hasListener(onDepChange)) {
+                onDepChange(dep, { key: "value", value: dep.get(), set_count: dep.setCount() });
+            }
+            else {
                 dep.unsubscribe(onDepChange);
+            }
+            if (!hasDependencyRecord(id, index)) {
+                const current_set_count = dep.setCount(index);
+                if (set_count !== current_set_count) {
+                    onDepChange(dep, { key: "value", index, value: dep.get(index), set_count: current_set_count });
+                }
+            }
             dep.onChange(onDepChange);
         });
     });
     function onDepChange(dependency, action) {
         const { id } = dependency;
         worker?.postMessage({ kind: "dependency", id, action });
-        onDependencyChanged && onDependencyChanged(id, action.index);
+        const { index } = action;
+        addDependencyRecord(id, index);
+        onDependencyChanged && onDependencyChanged(id, index);
     }
     return worker;
 }
