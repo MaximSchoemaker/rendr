@@ -30,7 +30,7 @@ export class UI {
   createView(frame_par: Parameter<OffscreenCanvas>) {
     this.AddComponent((props?: any) => <View frame_par={frame_par} rest_props={props} />);
   }
-  createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) {
+  createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<OffscreenCanvas>) {
     this.AddComponent((props?: any) => <CacheView tick_par={tick_par} running_par={running_par} frame_cache={frame_cache} rest_props={props} />);
   }
   createParameterNumber(name: string, parameter: Parameter<number>, options: ParameterNumberOptions) {
@@ -41,9 +41,9 @@ export class UI {
 const App = () => {
   return (
     <div class={styles.App}>
-      <Sketch sketch_path="/sketches/sketch.js" />
+      {/* <Sketch sketch_path="/sketches/sketch.js" /> */}
       {/* <Sketch sketch_path="/sketches/boids.js" /> */}
-      {/* <Sketch setup={setup} /> */}
+      <Sketch setup={setup} />
     </div>
   );
 };
@@ -410,36 +410,44 @@ function View({ frame_par, rest_props }: ViewProps) {
 type CacheViewProps = {
   tick_par: Parameter<number>;
   running_par: Parameter<boolean>;
-  frame_cache: Cache<ImageBitmap>;
+  frame_cache: Cache<OffscreenCanvas>;
   rest_props: any;
 }
 
 function CacheView({ tick_par, running_par, frame_cache, rest_props }: CacheViewProps) {
   const [tick] = createRendrParameterSignal<number>(tick_par);
   const [running] = createRendrParameterSignal<boolean>(running_par);
-  // const [cache] = createRendrCacheSignal<ImageBitmap>(frame_cache);
+  // const [cache] = createRendrCacheSignal<OffscreenCanvas>(frame_cache);
 
   let el: HTMLCanvasElement;
-  let prev_bitmap: ImageBitmap;
+  let prev_frame: OffscreenCanvas | undefined;
   const loop = createAnimationLoop(() => {
     const request_index = running() ? 0 : tick();
     frame_cache.request(request_index);
 
-    let bitmap = frame_cache.getLatestValid(tick());
-    bitmap ??= frame_cache.get(request_index);
+    let frame = frame_cache.getLatestValid(tick());
+    frame ??= frame_cache.get(request_index);
 
-    if (!el || !bitmap || bitmap === prev_bitmap) return;
+    if (!el || !frame || frame === prev_frame) return;
 
-    el.width = bitmap.width;
-    el.height = bitmap.height;
+    el.width = frame.width;
+    el.height = frame.height;
 
     const ctx = el.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(bitmap, 0, 0);
-    prev_bitmap = bitmap;
+    ctx.drawImage(frame, 0, 0);
+    prev_frame = frame;
   });
   onCleanup(loop.stop);
+
+  function onForce(dependency: Dependency, action: Action) {
+    if (action.index === tick()) prev_frame = undefined
+  }
+  frame_cache.onMutate({ force: true }, onForce);
+  onCleanup(() => frame_cache.unsubscribe(onForce));
+
+
 
   return (
     <canvas

@@ -80,11 +80,11 @@
 }
 
 /* @container (max-width: 860px) { */
-@container (orientation: portrait) {
+/* @container (orientation: portrait) { */
     .Timeline {
     --gap: 0px;
   }
-}
+/* } */
 
 .rows {
   display: flex;

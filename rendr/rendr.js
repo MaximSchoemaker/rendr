@@ -159,10 +159,10 @@ export function createCache(count = 0) {
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
-        const { key, value, index, set_count } = action;
+        const { key, value, index, set_count, force } = action;
         if (index !== undefined) {
             // @ts-ignore
-            if (cache.value[index]?.[key] === value)
+            if (!force && cache.value[index]?.[key] === value)
                 return;
             if (!cache.value[index])
                 cache.value[index] = {};
@@ -180,7 +180,7 @@ export function createCache(count = 0) {
         }
         else {
             // @ts-ignore
-            if (cache[key] === value)
+            if (!force && cache[key] === value)
                 return;
             if (value == null) {
                 clear(); // @ts-ignore
@@ -195,14 +195,14 @@ export function createCache(count = 0) {
         }
         listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(cache, action));
     }
-    function set(index, value) {
+    function set(index, value, force) {
         // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
-        mutate({ key: "value", index, value });
+        mutate({ key: "value", index, value, force });
         validate(index);
     }
-    function invalidSet(index, value) {
+    function invalidSet(index, value, force) {
         // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
-        mutate({ key: "value", index, value });
+        mutate({ key: "value", index, value, force });
     }
     function get(...args) {
         if (args.length == 0)
@@ -488,6 +488,11 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 previous_states[i] = state;
                 return state;
             },
+            receive: (index, state, valid) => {
+                if (!valid)
+                    return;
+                state_cache.set(index, state);
+            },
         }, options);
         return state_cache;
     }
@@ -523,12 +528,22 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 ctx?.drawImage(bitmap, 0, 0);
                 return bitmap;
             },
-            receive: (bitmap) => frame_par.set(bitmap),
+            receive: (bitmap) => {
+                if (!bitmap) {
+                    frame_par.set(undefined);
+                    return;
+                }
+                const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+                const ctx = canvas.getContext("bitmaprenderer");
+                ctx?.transferFromImageBitmap(bitmap);
+                frame_par.set(canvas, true);
+                bitmap.close();
+            }
         }, options);
         return frame_par;
     }
     function animate(frames, callback, options) {
-        options = { invalid_set: true, ...options };
+        // options = { ...options };
         const frame_cache = createCache(frames);
         const worker = createReactiveCacheWorker(gen_worker_name(), main_worker_name, frame_cache, {
             executeWorker: (index) => {
@@ -540,6 +555,20 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 ctx?.drawImage(bitmap, 0, 0);
                 return bitmap;
             },
+            receive: (index, bitmap, valid) => {
+                // if (!bitmap) {
+                //    frame_cache.set(index, null);
+                //    return;
+                // }
+                const canvas = frame_cache.get(index) ?? createCanvas(bitmap.width, bitmap.height);
+                const ctx = canvas.getContext("bitmaprenderer");
+                ctx?.transferFromImageBitmap(bitmap);
+                bitmap.close();
+                if (valid)
+                    frame_cache.set(index, canvas, true);
+                else
+                    frame_cache.invalidSet(index, canvas, true);
+            }
         }, options);
         return frame_cache;
     }
@@ -712,7 +741,7 @@ export function createReactiveQueueWorker(name, parent_name, count_or_queue, int
 }
 export function createReactiveCacheWorker(name, parent_name, cache, { executeWorker, receiveWorker, execute, receive, onDependencyChanged, }, options = {}) {
     options = { max_queue_length: 1, strategy: "interval", ...options };
-    const { interval_ms, max_queue_length, invalid_set, strategy, transfer_value } = options;
+    const { interval_ms, max_queue_length, strategy, transfer_value } = options;
     const dependecy_records = [];
     const hasDependencyRecord = (id, index) => dependecy_records.some(r => r.id === id && r.index === index);
     const addDependencyRecord = (id, index) => dependecy_records.push({ id, index });
@@ -747,8 +776,9 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
                     .map(({ dependency, index }) => ({ id: dependency.id, index }));
                 const transfer = transfer_value ? [ret] : [];
                 postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
+                // if (ret !== undefined) cache.set(index, ret);
                 if (ret !== undefined)
-                    cache.set(index, ret);
+                    receive?.(index, ret, true);
                 queue_count++;
             }
         }
@@ -776,14 +806,9 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
         // });
     }, (data) => {
         const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
-        receive?.(value, index, invalidate_count, dependencies_ids_and_indexes);
         index_dependencies[index] = dependencies_ids_and_indexes;
-        if (cache.invalidateCount(index) !== invalidate_count) {
-            if (invalid_set)
-                cache.invalidSet(index, value);
-        }
-        else
-            cache.set(index, value);
+        const valid = cache.invalidateCount(index) === invalidate_count;
+        receive?.(index, value, valid);
         dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
             if (!dep) {

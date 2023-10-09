@@ -38,6 +38,8 @@ export type Match = {
    index?: number;
    validate?: boolean;
    source?: string;
+   set_count?: number;
+   force?: boolean;
 } | ((action: Action) => boolean);
 
 export type StackDependency = {
@@ -238,8 +240,8 @@ export type Cache<T> = Omit<Dependency, 'get'> & {
    get: (() => CacheItem<T>[]) & ((index: number) => T),
    getLatest: (index: number) => T | undefined,
    getLatestValid: (index: number) => T | undefined,
-   set: (index: number, value: T) => void,
-   invalidSet: (index: number, value: T) => void,
+   set: (index: number, value: T, force?: boolean) => void,
+   invalidSet: (index: number, value: T, force?: boolean) => void,
    invalidate: (index: number, invalidate_count?: number) => void,
    isValid: (index: number) => boolean,
    invalidateCount: (index: number) => number | undefined,
@@ -281,10 +283,10 @@ export function createCache<T>(count = 0): Cache<T> {
 
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
-      const { key, value, index, set_count } = action;
+      const { key, value, index, set_count, force } = action;
       if (index !== undefined) {
          // @ts-ignore
-         if (cache.value[index]?.[key] === value) return;
+         if (!force && cache.value[index]?.[key] === value) return;
          if (!cache.value[index]) cache.value[index] = {};
          // @ts-ignore
          cache.value[index][key] = value;
@@ -301,7 +303,7 @@ export function createCache<T>(count = 0): Cache<T> {
          if (action.validate) validate(index);
       } else {
          // @ts-ignore
-         if (cache[key] === value) return
+         if (!force && cache[key] === value) return
 
          if (value == null) {
             clear(); // @ts-ignore
@@ -317,15 +319,15 @@ export function createCache<T>(count = 0): Cache<T> {
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(cache, action))
    }
 
-   function set(index: number, value: T) {
+   function set(index: number, value: T, force?: boolean) {
       // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
-      mutate({ key: "value", index, value });
+      mutate({ key: "value", index, value, force });
       validate(index);
    }
 
-   function invalidSet(index: number, value: T) {
+   function invalidSet(index: number, value: T, force?: boolean) {
       // if (index === undefined || value === undefined) console.warn("set, wrong arguments: index and value undefined");
-      mutate({ key: "value", index, value });
+      mutate({ key: "value", index, value, force });
    }
 
    function get(): CacheItem<T>[];
@@ -571,7 +573,7 @@ type UI = {
    createWindow: (callback: (ui: UI) => void) => void;
    createTimeline: (frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) => void;
    createView: (frame_par: Parameter<OffscreenCanvas>) => void;
-   createCacheView: (tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) => void;
+   createCacheView: (tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<OffscreenCanvas>) => void;
    createParameterNumber: (name: string, parameter: Parameter<number>, options: ParameterNumberOptions) => void;
 }
 
@@ -717,6 +719,10 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                return state
             },
+            receive: (index, state, valid) => {
+               if (!valid) return;
+               state_cache.set(index, state);
+            },
          },
          options,
       );
@@ -752,13 +758,13 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
       return frame_par;
    }
 
-   function generate<T>(count: number, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
-   function generate<T>(count_par: Parameter<number>, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
-   function generate<T>(queue: T[], interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
-   function generate<T>(queue_par: Parameter<T[]>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
+   function generate<T>(count: number, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
+   function generate<T>(count_par: Parameter<number>, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
+   function generate<T>(queue: T[], interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
+   function generate<T>(queue_par: Parameter<T[]>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
    function generate<T>(count_or_queue: Count_or_queue<T>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions) {
 
-      const frame_par = createParameter<ImageBitmap | undefined>(undefined);
+      const frame_par = createParameter<OffscreenCanvas | undefined>(undefined);
 
       const worker = createReactiveQueueWorker(
          gen_worker_name(),
@@ -774,7 +780,17 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                ctx?.drawImage(bitmap, 0, 0);
                return bitmap;
             },
-            receive: (bitmap) => frame_par.set(bitmap),
+            receive: (bitmap) => {
+               if (!bitmap) {
+                  frame_par.set(undefined);
+                  return;
+               }
+               const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+               const ctx = canvas.getContext("bitmaprenderer");
+               ctx?.transferFromImageBitmap(bitmap);
+               frame_par.set(canvas, true);
+               bitmap.close();
+            }
          },
          options,
       );
@@ -783,9 +799,9 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    }
 
    function animate(frames: number, callback: AnimateCallback, options: ReactiveCacheWorkerOptions) {
-      options = { invalid_set: true, ...options };
+      // options = { ...options };
 
-      const frame_cache = createCache<ImageBitmap>(frames);
+      const frame_cache = createCache<OffscreenCanvas>(frames);
 
       const worker = createReactiveCacheWorker(
          gen_worker_name(),
@@ -804,7 +820,20 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                return bitmap
             },
+            receive: (index, bitmap, valid) => {
+               // if (!bitmap) {
+               //    frame_cache.set(index, null);
+               //    return;
+               // }
+               const canvas = frame_cache.get(index) ?? createCanvas(bitmap.width, bitmap.height);
 
+               const ctx = canvas.getContext("bitmaprenderer");
+               ctx?.transferFromImageBitmap(bitmap);
+               bitmap.close();
+
+               if (valid) frame_cache.set(index, canvas, true);
+               else frame_cache.invalidSet(index, canvas, true);
+            }
          },
          options
       );
@@ -1080,26 +1109,24 @@ type ReactiveCacheWorkerOptions = {
    // timeout_ms?: number,
    // batch_timeout_ms?: number,
    max_queue_length?: number,
-   invalid_set?: boolean,
    strategy?: "interval" | "ping",
    transfer_value?: boolean,
 };
 type ReceiveReactiveCache<T> = (
-   value: T,
    index: number,
-   invalidate_count: number,
-   dependencies_ids_and_indexes: Dependencies_ids_and_indexes
+   value: T,
+   valid: boolean,
 ) => void;
 
-type ReactiveCacheWorkerCallbacks<T> = {
-   executeWorker?: ExecuteWorkerReactiveCache<T>,
+type ReactiveCacheWorkerCallbacks<T, U> = {
+   executeWorker?: ExecuteWorkerReactiveCache<U>,
    receiveWorker?: ReceiveWorkerReactive,
    execute?: ExecuteReactive<T>,
-   receive?: ReceiveReactiveCache<T>,
+   receive?: ReceiveReactiveCache<U>,
    onDependencyChanged?: OnDependencyChanged,
 }
 
-export function createReactiveCacheWorker<T>(
+export function createReactiveCacheWorker<T, U>(
    name: string,
    parent_name: string,
    cache: Cache<T>,
@@ -1109,14 +1136,13 @@ export function createReactiveCacheWorker<T>(
       execute,
       receive,
       onDependencyChanged,
-   }: ReactiveCacheWorkerCallbacks<T>,
+   }: ReactiveCacheWorkerCallbacks<T, U>,
    options: ReactiveCacheWorkerOptions = {}
 ) {
    options = { max_queue_length: 1, strategy: "interval", ...options };
    const {
       interval_ms,
       max_queue_length,
-      invalid_set,
       strategy,
       transfer_value
    } = options;
@@ -1129,7 +1155,7 @@ export function createReactiveCacheWorker<T>(
 
    const worker = createWorker<
       ({ kind: "dependency", id: number, action: Action } | { kind: "invalidate", index: number, invalidate_count: number } | { kind: "retrig" }),
-      { value: T, index: number, invalidate_count: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
+      { value: U, index: number, invalidate_count: number, dependencies_ids_and_indexes: Dependencies_ids_and_indexes }
    >(
       name,
       parent_name,
@@ -1169,7 +1195,8 @@ export function createReactiveCacheWorker<T>(
                const transfer = transfer_value ? [ret as Transferable] : [];
                postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
 
-               if (ret !== undefined) cache.set(index, ret);
+               // if (ret !== undefined) cache.set(index, ret);
+               if (ret !== undefined) receive?.(index, ret, true);
 
                queue_count++;
             }
@@ -1204,13 +1231,10 @@ export function createReactiveCacheWorker<T>(
       },
       (data) => {
          const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
-         receive?.(value, index, invalidate_count, dependencies_ids_and_indexes);
 
          index_dependencies[index] = dependencies_ids_and_indexes;
-
-         if (cache.invalidateCount(index) !== invalidate_count) {
-            if (invalid_set) cache.invalidSet(index, value);
-         } else cache.set(index, value);
+         const valid = cache.invalidateCount(index) === invalidate_count
+         receive?.(index, value, valid);
 
          dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);

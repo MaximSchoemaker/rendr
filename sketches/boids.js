@@ -5,9 +5,9 @@ import { n_arr, map, invCosn, mod } from "../rendr/library/Utils.js"
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 500;
+const FRAMES = 1000;
 
-const sketch = rendr.createSketchWorker(sketch => (tick_par) => {
+const sketch = rendr.createSketch(sketch => (tick_par) => {
 
    const boids_count_par = createParameter(0, "boids_count_par");
 
