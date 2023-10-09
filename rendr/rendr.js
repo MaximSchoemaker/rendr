@@ -96,8 +96,8 @@ export function createParameter(initial_value, name) {
     }
     function mutate(action) {
         action.source ??= WORKER_NAME;
-        const { key, value, set_count } = action; // @ts-ignore
-        if (parameter[key] === value)
+        const { key, value, set_count, force } = action; // @ts-ignore
+        if (!force && parameter[key] === value)
             return; // @ts-ignore
         parameter[key] = value;
         if (key === "value") {
@@ -109,8 +109,8 @@ export function createParameter(initial_value, name) {
         }
         listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(parameter, action));
     }
-    function set(value) {
-        mutate({ key: "value", value });
+    function set(value, force) {
+        mutate({ key: "value", value, force });
     }
     function get() {
         global_effect_dependencies()?.add({ dependency: parameter });
@@ -501,7 +501,13 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 ctx?.drawImage(bitmap, 0, 0);
                 return bitmap;
             },
-            receive: (bitmap) => frame_par.set(bitmap),
+            receive: (bitmap) => {
+                const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+                const ctx = canvas.getContext("bitmaprenderer");
+                ctx?.transferFromImageBitmap(bitmap);
+                frame_par.set(canvas, true);
+                bitmap.close();
+            },
         });
         return frame_par;
     }
@@ -563,7 +569,8 @@ export function createWorker(name, parent_name, executeWorker, receiveWorker, ex
         return worker;
     }
 }
-export function createReactiveWorker(name, parent_name, { executeWorker, receiveWorker, execute, receive, onDependencyChanged, }) {
+export function createReactiveWorker(name, parent_name, { executeWorker, receiveWorker, execute, receive, onDependencyChanged, }, options = {}) {
+    const { transfer_value } = options;
     const dependecy_records = [];
     const hasDependencyRecord = (id, index) => dependecy_records.some(r => r.id === id && r.index === index);
     const addDependencyRecord = (id, index) => dependecy_records.push({ id, index });
@@ -574,8 +581,14 @@ export function createReactiveWorker(name, parent_name, { executeWorker, receive
             const ret = executeWorker?.();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
                 .map(({ dependency, index }) => ({ id: dependency.id, index, set_count: dependency.setCount(index) }));
-            if (ret !== undefined)
-                postMessage({ value: ret, dependencies_ids_and_indexes });
+            if (ret !== undefined) {
+                if (transfer_value) {
+                    console.log(ret);
+                    postMessage({ value: ret, dependencies_ids_and_indexes }, "*", [ret]);
+                }
+                else
+                    postMessage({ value: ret, dependencies_ids_and_indexes });
+            }
         }, { batch: true });
     }, (data) => {
         const { id, action } = data;
@@ -699,7 +712,7 @@ export function createReactiveQueueWorker(name, parent_name, count_or_queue, int
 }
 export function createReactiveCacheWorker(name, parent_name, cache, { executeWorker, receiveWorker, execute, receive, onDependencyChanged, }, options = {}) {
     options = { max_queue_length: 1, strategy: "interval", ...options };
-    const { interval_ms, max_queue_length, invalid_set, strategy } = options;
+    const { interval_ms, max_queue_length, invalid_set, strategy, transfer_value } = options;
     const dependecy_records = [];
     const hasDependencyRecord = (id, index) => dependecy_records.some(r => r.id === id && r.index === index);
     const addDependencyRecord = (id, index) => dependecy_records.push({ id, index });
@@ -732,6 +745,7 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
                 const dependencies = global_effect_dependencies_stack.pop();
                 const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                     .map(({ dependency, index }) => ({ id: dependency.id, index }));
+                const transfer = transfer_value ? [ret] : [];
                 postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
                 if (ret !== undefined)
                     cache.set(index, ret);

@@ -27,7 +27,7 @@ export class UI {
   createTimeline(frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) {
     this.AddComponent((props?: any) => <Timeline frames={frames} tick_par={tick_par} running_par={running_par} caches={caches} rest_props={props} />);
   }
-  createView(frame_par: Parameter<ImageBitmap>) {
+  createView(frame_par: Parameter<OffscreenCanvas>) {
     this.AddComponent((props?: any) => <View frame_par={frame_par} rest_props={props} />);
   }
   createCacheView(tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) {
@@ -41,9 +41,9 @@ export class UI {
 const App = () => {
   return (
     <div class={styles.App}>
-      {/* <Sketch sketch_path="/sketches/sketch.js" /> */}
+      <Sketch sketch_path="/sketches/sketch.js" />
       {/* <Sketch sketch_path="/sketches/boids.js" /> */}
-      <Sketch setup={setup} />
+      {/* <Sketch setup={setup} /> */}
     </div>
   );
 };
@@ -371,29 +371,29 @@ function Frame(props: FrameProps) {
 }
 
 type ViewProps = {
-  frame_par: Parameter<ImageBitmap>;
+  frame_par: Parameter<OffscreenCanvas>;
   rest_props: any;
 }
 
 function View({ frame_par, rest_props }: ViewProps) {
-  const [frame] = createRendrParameterSignal<ImageBitmap>(frame_par);
+  const [frame] = createRendrParameterSignal<OffscreenCanvas>(frame_par);
 
   let el: HTMLCanvasElement;
   createEffect(() => {
     const ctx = el.getContext('2d');
-    const bitmap = frame();
+    const canvas = frame();
 
-    if (!bitmap) {
+    if (!canvas) {
       ctx?.clearRect(0, 0, el.width, el.height);
       return;
     }
 
-    el.width = bitmap.width;
-    el.height = bitmap.height;
+    el.width = canvas.width;
+    el.height = canvas.height;
 
     if (!ctx) return;
 
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(canvas, 0, 0);
   });
 
   return (
@@ -605,13 +605,13 @@ function isMobile() {
 }
 
 function createRendrParameterSignal<T>(parameter: Parameter<T>) {
-  const _value = parameter.value;
-  const [value, set_value] = createSignal<T>(_value);
+  const value = parameter.value;
+  const [value_obj, set_value_obj] = createSignal<{ value: T }>({ value });
 
   createEffect(() => {
 
     function onChange() {
-      set_value(() => parameter.value);
+      set_value_obj(() => ({ value: parameter.value }));
     }
 
     parameter.onMutate({ key: "value" }, onChange);
@@ -623,7 +623,7 @@ function createRendrParameterSignal<T>(parameter: Parameter<T>) {
     parameter.set(new_value);
   }
 
-  return [value, setValue] as [typeof value, typeof setValue];
+  return [() => value_obj().value, setValue] as [() => typeof value, typeof setValue];
 }
 
 function createRendrCacheSignal<T>(cache: Cache<T>) {

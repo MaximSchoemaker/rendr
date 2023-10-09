@@ -20,31 +20,7 @@ export type Dependency = {
    setCount: (index?: number) => number | undefined;
 }
 
-export type Parameter<T> = Dependency & {
-   value: T;
-   set: (value: T) => void;
-   get: () => T;
-}
-
-// type Parameter<T> = ReturnType<typeof createParameter<T>>;
-
-export type Cache<T> = Dependency & {
-   value: CacheItem<T>[]
-   count: number,
-   get: (() => CacheItem<T>[]) | ((index: number) => T),
-   getLatest: (index: number) => T | undefined,
-   getLatestValid: (index: number) => T | undefined,
-   set: (index: number, value: T) => void,
-   invalidSet: (index: number, value: T) => void,
-   invalidate: (index: number, invalidate_count?: number) => void,
-   isValid: (index: number) => boolean,
-   invalidateCount: (index: number) => number | undefined,
-   // onGet: (callback: onGetCallback) => void,
-   request: (index: number) => void,
-   requestIndex: () => number,
-}
-
-// type Cache<T> = ReturnType<typeof createCache<T>>;
+// export type Dependency = Parameter<any> | Cache<any>;
 
 export type Action = {
    key: string;
@@ -53,6 +29,7 @@ export type Action = {
    validate?: boolean;
    source?: string;
    set_count?: number;
+   force?: boolean;
 }
 
 export type Match = {
@@ -161,6 +138,13 @@ export function matchActionTest(match: Match, action: Action) {
    return false;
 }
 
+// export type Parameter<T> = ReturnType<typeof createParameter<T>>;
+export type Parameter<T> = Omit<Dependency, 'get'> & {
+   value: T;
+   set: (value: T, force?: boolean) => void;
+   get: () => T;
+}
+
 type ListenerRecord = { match: Match, callback: onMutateCallback }
 
 export function createParameter<T>(initial_value: T, name?: string): Parameter<T> {
@@ -195,8 +179,8 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
 
    function mutate(action: Action) {
       action.source ??= WORKER_NAME;
-      const { key, value, set_count } = action; // @ts-ignore
-      if (parameter[key] === value) return; // @ts-ignore
+      const { key, value, set_count, force } = action; // @ts-ignore
+      if (!force && parameter[key] === value) return; // @ts-ignore
       parameter[key] = value;
 
       if (key === "value") {
@@ -208,8 +192,8 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
       listeners.forEach(({ match, callback }) => matchActionTest(match, action) && callback(parameter, action))
    }
 
-   function set(value: T) {
-      mutate({ key: "value", value });
+   function set(value: T, force?: boolean) {
+      mutate({ key: "value", value, force });
    }
 
    function get() {
@@ -245,6 +229,23 @@ export function createParameter<T>(initial_value: T, name?: string): Parameter<T
    global_dependencies.set(parameter.id, parameter);
 
    return parameter;
+}
+
+// export type Cache<T> = ReturnType<typeof createCache<T>>;
+export type Cache<T> = Omit<Dependency, 'get'> & {
+   value: CacheItem<T>[]
+   count: number,
+   get: (() => CacheItem<T>[]) & ((index: number) => T),
+   getLatest: (index: number) => T | undefined,
+   getLatestValid: (index: number) => T | undefined,
+   set: (index: number, value: T) => void,
+   invalidSet: (index: number, value: T) => void,
+   invalidate: (index: number, invalidate_count?: number) => void,
+   isValid: (index: number) => boolean,
+   invalidateCount: (index: number) => number | undefined,
+   // onGet: (callback: onGetCallback) => void,
+   request: (index: number) => void,
+   requestIndex: () => number,
 }
 
 type onGetCallback = (index?: number, valid?: boolean) => void
@@ -569,7 +570,7 @@ type UI = {
    createViewContainer: (callback: (ui: UI) => void) => void;
    createWindow: (callback: (ui: UI) => void) => void;
    createTimeline: (frames: number, tick_par: Parameter<number>, running_par: Parameter<boolean>, caches: Cache<any>[]) => void;
-   createView: (frame_par: Parameter<ImageBitmap>) => void;
+   createView: (frame_par: Parameter<OffscreenCanvas>) => void;
    createCacheView: (tick_par: Parameter<number>, running_par: Parameter<boolean>, frame_cache: Cache<ImageBitmap>) => void;
    createParameterNumber: (name: string, parameter: Parameter<number>, options: ParameterNumberOptions) => void;
 }
@@ -725,7 +726,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
    function draw(callback: DrawCallback) {
 
-      const frame_par = createParameter<ImageBitmap | null>(null);
+      const frame_par = createParameter<OffscreenCanvas | null>(null);
 
       createReactiveWorker(
          gen_worker_name(),
@@ -738,7 +739,13 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                ctx?.drawImage(bitmap, 0, 0);
                return bitmap;
             },
-            receive: (bitmap) => frame_par.set(bitmap),
+            receive: (bitmap) => {
+               const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+               const ctx = canvas.getContext("bitmaprenderer");
+               ctx?.transferFromImageBitmap(bitmap);
+               frame_par.set(canvas, true);
+               bitmap.close();
+            },
          }
       );
 
@@ -856,6 +863,8 @@ type ReactiveWorkerCallbacks<T> = {
    onDependencyChanged?: OnDependencyChanged
 }
 
+type ReactiveWorkerOptions = { transfer_value?: boolean };
+
 export function createReactiveWorker<T>(
    name: string,
    parent_name: string,
@@ -865,8 +874,10 @@ export function createReactiveWorker<T>(
       execute,
       receive,
       onDependencyChanged,
-   }: ReactiveWorkerCallbacks<T>
+   }: ReactiveWorkerCallbacks<T>,
+   options: ReactiveWorkerOptions = {},
 ) {
+   const { transfer_value } = options;
 
    const dependecy_records: { id: number, index?: number }[] = [];
    const hasDependencyRecord = (id: number, index?: number) => dependecy_records.some(r => r.id === id && r.index === index);
@@ -886,7 +897,12 @@ export function createReactiveWorker<T>(
             const ret = executeWorker?.();
             const dependencies_ids_and_indexes = [...(global_effect_dependencies() ?? [])]
                .map(({ dependency, index }) => ({ id: dependency.id, index, set_count: dependency.setCount(index) }));
-            if (ret !== undefined) postMessage({ value: ret, dependencies_ids_and_indexes })
+            if (ret !== undefined) {
+               if (transfer_value) {
+                  console.log(ret);
+                  postMessage({ value: ret, dependencies_ids_and_indexes }, "*", [ret as Transferable]);
+               } else postMessage({ value: ret, dependencies_ids_and_indexes })
+            }
          }, { batch: true });
       },
       (data) => {
@@ -914,7 +930,7 @@ export function createReactiveWorker<T>(
             }
 
             if (!dep.hasListener(onDepChange)) {
-               onDepChange(dep, { key: "value", value: dep.get(), set_count: dep.setCount() });
+               onDepChange(dep, { key: "value", value: (dep as Parameter<any> | Cache<any>).get(), set_count: dep.setCount() });
             } else {
                dep.unsubscribe(onDepChange);
             }
@@ -1066,6 +1082,7 @@ type ReactiveCacheWorkerOptions = {
    max_queue_length?: number,
    invalid_set?: boolean,
    strategy?: "interval" | "ping",
+   transfer_value?: boolean,
 };
 type ReceiveReactiveCache<T> = (
    value: T,
@@ -1100,7 +1117,8 @@ export function createReactiveCacheWorker<T>(
       interval_ms,
       max_queue_length,
       invalid_set,
-      strategy
+      strategy,
+      transfer_value
    } = options;
 
    const dependecy_records: { id: number, index?: number }[] = [];
@@ -1148,7 +1166,8 @@ export function createReactiveCacheWorker<T>(
                const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-               postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes })
+               const transfer = transfer_value ? [ret as Transferable] : [];
+               postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
 
                if (ret !== undefined) cache.set(index, ret);
 
@@ -1201,7 +1220,7 @@ export function createReactiveCacheWorker<T>(
             }
 
             if (!dep.hasListener(onDepChange)) {
-               onDepChange(dep, { key: "value", value: dep.get(), set_count: dep.setCount() });
+               onDepChange(dep, { key: "value", value: (dep as Parameter<any> | Cache<any>).get(), set_count: dep.setCount() });
             } else {
                dep.unsubscribe(onDepChange);
             }
