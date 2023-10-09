@@ -286,11 +286,13 @@ function Timeline({ frames, tick_par, running_par, caches, rest_props }: Timelin
     }
   };
 
+  const compressed = frames > 400;
+
   return (
     <div
       {...rest_props}
       ref={ref => el = ref}
-      class={styles.Timeline}
+      class={`${styles.Timeline} ${compressed ? styles.compressed : ''}`}
     >
       <div class={styles.rows}>
 
@@ -365,7 +367,7 @@ function Frame(props: FrameProps) {
       class={`${styles.frame} ${getStatusClass()}`}
     >
       {/* <div class={styles.flash} ref={ref => el = ref} /> */}
-      <div class={styles.frameTooltip}>{props.item?.value?.length}</div>
+      {/* <div class={styles.frameTooltip}>{props.item?.value?.length}</div> */}
     </div>
   );
 }
@@ -422,7 +424,7 @@ function CacheView({ tick_par, running_par, frame_cache, rest_props }: CacheView
   let el: HTMLCanvasElement;
   let prev_frame: OffscreenCanvas | undefined;
   const loop = createAnimationLoop(() => {
-    const request_index = running() ? 0 : tick();
+    const request_index = 0; //running() ? 0 : tick();
     frame_cache.request(request_index);
 
     let frame = frame_cache.getLatestValid(tick());

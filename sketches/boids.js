@@ -5,7 +5,7 @@ import { n_arr, map, invCosn, mod } from "../rendr/library/Utils.js"
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 1000;
+const FRAMES = 500;
 
 const sketch = rendr.createSketch(sketch => (tick_par) => {
 
@@ -96,11 +96,14 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
          boid.x = mod(boid.x + boid.vel_x);
          boid.y = mod(boid.y + boid.vel_y);
       });
+   }, {
+      //  max_queue_length: 10
    });
 
    const frame_cache = sketch.animate(FRAMES, (tick, t) => {
       const view = backbuffer;
-      const boids = boids_cache.getLatest(tick);
+      const boids = boids_cache.get(tick);
+      if (!boids) return null;
 
       const ctx = new Draw2dContext(view);
       ctx.clear("black");

@@ -458,11 +458,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 state = new_state ?? state;
                 return state;
             },
-            // (data) => { },
             sendWorker: (state) => state ?? initial_state_par.get(),
-            // (worker) => { },
             receive: (state) => state_par.set(state),
-            // (id, index) => { },
         });
         return state_par;
     }
@@ -550,6 +547,8 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 const i = mod(index, frames);
                 const t = i / frames;
                 const canvas = callback(i, t);
+                if (!canvas)
+                    return null;
                 const bitmap = canvas.transferToImageBitmap();
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(bitmap, 0, 0);
@@ -774,11 +773,12 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
                 const dependencies = global_effect_dependencies_stack.pop();
                 const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                     .map(({ dependency, index }) => ({ id: dependency.id, index }));
-                const transfer = transfer_value ? [ret] : [];
-                postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
-                // if (ret !== undefined) cache.set(index, ret);
-                if (ret !== undefined)
+                if (ret) {
+                    // const transfer = transfer_value ? [ret as Transferable] : [];
+                    postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
+                    // if (ret !== undefined) cache.set(index, ret);
                     receive?.(index, ret, true);
+                }
                 queue_count++;
             }
         }
@@ -807,7 +807,11 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
     }, (data) => {
         const { value, index, invalidate_count, dependencies_ids_and_indexes } = data;
         index_dependencies[index] = dependencies_ids_and_indexes;
-        const valid = cache.invalidateCount(index) === invalidate_count;
+        const valid = cache.invalidateCount(index) === invalidate_count
+            && dependencies_ids_and_indexes.every(({ id, index }) => {
+                const dep = global_dependencies.get(id);
+                return !dep.isValid || dep.isValid(index);
+            });
         receive?.(index, value, valid);
         dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
@@ -820,6 +824,7 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
             }
             else {
                 dep.unsubscribe(onDepChange);
+                dep.unsubscribe(onDepChangeValid);
             }
             if (!hasDependencyRecord(id, index)) {
                 const current_set_count = dep.setCount(index);
@@ -828,6 +833,7 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
                 }
             }
             dep.onChange(onDepChange);
+            dep.onMutate({ key: "valid", value: false }, onDepInvalidate);
         });
         if (strategy === "ping")
             retrig();
@@ -855,6 +861,15 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
             }
         });
         onDependencyChanged && onDependencyChanged(id, index);
+    }
+    function onDepInvalidate(dependency, action) {
+        const { id } = dependency;
+        const { index } = action;
+        index_dependencies.forEach((dependencies_ids_and_indexes, i) => {
+            if (dependencies_ids_and_indexes.find((dep) => dep.id === id && (dep.index === undefined || dep.index === index))) {
+                invalidate(i);
+            }
+        });
     }
     cache.onMutate({ key: "request_index" }, ({ id }, action) => worker?.postMessage({ kind: "dependency", id, action }));
     return worker;

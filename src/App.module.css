@@ -80,11 +80,15 @@
 }
 
 /* @container (max-width: 860px) { */
-/* @container (orientation: portrait) { */
+@container (orientation: portrait) {
     .Timeline {
     --gap: 0px;
   }
-/* } */
+}
+
+.compressed {
+  --gap: 0px;
+}
 
 .rows {
   display: flex;
@@ -115,7 +119,7 @@
 }
 
 @container (min-width: 500px) {
-  .active::before {
+  .Timeline:not(.compressed) .active::before {
     z-index: -1;
     content: '';
     position: absolute;

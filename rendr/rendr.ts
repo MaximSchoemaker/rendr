@@ -675,11 +675,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                state = new_state ?? state;
                return state;
             },
-            // (data) => { },
             sendWorker: (state) => state ?? initial_state_par.get(),
-            // (worker) => { },
             receive: (state) => state_par.set(state),
-            // (id, index) => { },
          }
       );
 
@@ -813,6 +810,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                const t = i / frames;
                const canvas = callback(i, t);
+               if (!canvas) return null;
+
                const bitmap = canvas.transferToImageBitmap();
 
                const ctx = canvas.getContext('2d');
@@ -1103,7 +1102,7 @@ export function createReactiveQueueWorker<T, U, V>(
    return worker;
 }
 
-type ExecuteWorkerReactiveCache<T> = (index: number) => T
+type ExecuteWorkerReactiveCache<T> = (index: number) => T | null
 type ReactiveCacheWorkerOptions = {
    interval_ms?: number,
    // timeout_ms?: number,
@@ -1192,11 +1191,13 @@ export function createReactiveCacheWorker<T, U>(
                const dependencies_ids_and_indexes = [...(dependencies ?? [])]
                   .map(({ dependency, index }) => ({ id: dependency.id, index }));
 
-               const transfer = transfer_value ? [ret as Transferable] : [];
-               postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
+               if (ret) {
+                  // const transfer = transfer_value ? [ret as Transferable] : [];
+                  postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
 
-               // if (ret !== undefined) cache.set(index, ret);
-               if (ret !== undefined) receive?.(index, ret, true);
+                  // if (ret !== undefined) cache.set(index, ret);
+                  receive?.(index, ret, true);
+               }
 
                queue_count++;
             }
@@ -1234,6 +1235,11 @@ export function createReactiveCacheWorker<T, U>(
 
          index_dependencies[index] = dependencies_ids_and_indexes;
          const valid = cache.invalidateCount(index) === invalidate_count
+            && dependencies_ids_and_indexes.every(({ id, index }) => {
+               const dep = global_dependencies.get(id);
+               return !dep.isValid || dep.isValid(index);
+            });
+
          receive?.(index, value, valid);
 
          dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
@@ -1247,6 +1253,7 @@ export function createReactiveCacheWorker<T, U>(
                onDepChange(dep, { key: "value", value: (dep as Parameter<any> | Cache<any>).get(), set_count: dep.setCount() });
             } else {
                dep.unsubscribe(onDepChange);
+               dep.unsubscribe(onDepChangeValid);
             }
 
             if (!hasDependencyRecord(id, index)) {
@@ -1257,6 +1264,7 @@ export function createReactiveCacheWorker<T, U>(
             }
 
             dep.onChange(onDepChange);
+            dep.onMutate({ key: "valid", value: false }, onDepInvalidate);
          });
 
          if (strategy === "ping") retrig();
@@ -1299,6 +1307,20 @@ export function createReactiveCacheWorker<T, U>(
       });
 
       onDependencyChanged && onDependencyChanged(id, index);
+   }
+
+   function onDepInvalidate(dependency: Dependency, action: Action) {
+
+      const { id } = dependency;
+      const { index } = action;
+
+      index_dependencies.forEach((dependencies_ids_and_indexes, i) => {
+         if (dependencies_ids_and_indexes.find((dep) =>
+            dep.id === id && (dep.index === undefined || dep.index === index)
+         )) {
+            invalidate(i);
+         }
+      });
    }
 
    cache.onMutate(
