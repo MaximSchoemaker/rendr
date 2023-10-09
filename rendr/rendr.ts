@@ -1253,7 +1253,7 @@ export function createReactiveCacheWorker<T, U>(
                onDepChange(dep, { key: "value", value: (dep as Parameter<any> | Cache<any>).get(), set_count: dep.setCount() });
             } else {
                dep.unsubscribe(onDepChange);
-               dep.unsubscribe(onDepChangeValid);
+               dep.unsubscribe(onDepInvalidate);
             }
 
             if (!hasDependencyRecord(id, index)) {

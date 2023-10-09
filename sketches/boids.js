@@ -18,6 +18,7 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
    const attraction_dist_par = createParameter(0, "attraction_dist_par");
 
    const friction_par = createParameter(0, "friction_par");
+   const max_speed_par = createParameter(0, "max_speed_par");
 
    const backbuffer = createCanvas(WIDTH, HEIGHT);
 
@@ -37,6 +38,7 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
       const repulsion_dist = repulsion_dist_par.get();
       const attraction_dist = attraction_dist_par.get();
       const friction = friction_par.get();
+      const max_speed = max_speed_par.get();
 
       boids.forEach(boid => {
          let avg_pos = { x: 0, y: 0 };
@@ -82,7 +84,6 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
             }
          }
 
-         const max_speed = 0.01;
          const speed = Math.sqrt(Math.pow(boid.vel_x, 2) + Math.pow(boid.vel_y, 2));
          if (speed > max_speed) {
             const coef = max_speed / speed;
@@ -115,7 +116,7 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
 
    return {
       boids_count_par,
-      friction_par,
+      friction_par, max_speed_par,
       repulsion_par, attraction_par,
       repulsion_dist_par, attraction_dist_par,
       boids_cache, frame_cache,
@@ -129,7 +130,7 @@ export default rendr.createSetup("/sketches/boids.js", createUI => {
 
    const {
       boids_count_par,
-      friction_par,
+      friction_par, max_speed_par,
       repulsion_par, attraction_par,
       repulsion_dist_par, attraction_dist_par,
       boids_cache, frame_cache,
@@ -141,10 +142,11 @@ export default rendr.createSetup("/sketches/boids.js", createUI => {
             // ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
             ui.createParameterNumber("boids count", boids_count_par, { min: 0, max: 1000, step: 1 });
             ui.createParameterNumber("repulsion", repulsion_par, { min: 0, max: 1, step: 0.01 });
-            ui.createParameterNumber("repulsion dist", repulsion_dist_par, { min: 0, max: 1, step: 0.01 });
+            ui.createParameterNumber("repulsion dist", repulsion_dist_par, { min: 0, max: 1, step: 0.001 });
             ui.createParameterNumber("attraction", attraction_par, { min: 0, max: 1, step: 0.01 });
-            ui.createParameterNumber("attraction dist", attraction_dist_par, { min: 0, max: 1, step: 0.01 });
+            ui.createParameterNumber("attraction dist", attraction_dist_par, { min: 0, max: 1, step: 0.001 });
             ui.createParameterNumber("friction", friction_par, { min: 0.9, max: 1, step: 0.001 });
+            ui.createParameterNumber("max_speed", max_speed_par, { min: 0, max: 0.02, step: 0.0001 });
          });
 
          ui.createViewContainer(ui => {

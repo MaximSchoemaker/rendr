@@ -824,7 +824,7 @@ export function createReactiveCacheWorker(name, parent_name, cache, { executeWor
             }
             else {
                 dep.unsubscribe(onDepChange);
-                dep.unsubscribe(onDepChangeValid);
+                dep.unsubscribe(onDepInvalidate);
             }
             if (!hasDependencyRecord(id, index)) {
                 const current_set_count = dep.setCount(index);
