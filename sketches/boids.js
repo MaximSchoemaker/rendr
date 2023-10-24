@@ -5,7 +5,7 @@ import { n_arr, map, invCosn, mod } from "../rendr/library/Utils.js"
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 500;
+const FRAMES = 2000;
 
 const sketch = rendr.createSketch(sketch => (tick_par) => {
 
@@ -109,7 +109,7 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
       const ctx = new Draw2dContext(view);
       ctx.clear("black");
       boids.forEach(p => {
-         ctx.circle(p.x * WIDTH, p.y * HEIGHT, 5, { beginPath: true, fill: true, fillStyle: "#F80" });
+         ctx.circle(p.x * WIDTH, p.y * HEIGHT, 2, { beginPath: true, fill: true, fillStyle: "#F80" });
       });
       return view;
    });
@@ -140,11 +140,11 @@ export default rendr.createSetup("/sketches/boids.js", createUI => {
       ui.createContainer(ui => {
          ui.createWindow(ui => {
             // ui.createParameterNumber("tick", tick_par, { min: 0, max: FRAMES - 1, step: 1 });
-            ui.createParameterNumber("boids count", boids_count_par, { min: 0, max: 1000, step: 1 });
+            ui.createParameterNumber("boids count", boids_count_par, { min: 0, max: 5000, step: 1 });
             ui.createParameterNumber("repulsion", repulsion_par, { min: 0, max: 1, step: 0.01 });
-            ui.createParameterNumber("repulsion dist", repulsion_dist_par, { min: 0, max: 1, step: 0.001 });
+            ui.createParameterNumber("repulsion dist", repulsion_dist_par, { min: 0, max: .1, step: 0.001 });
             ui.createParameterNumber("attraction", attraction_par, { min: 0, max: 1, step: 0.01 });
-            ui.createParameterNumber("attraction dist", attraction_dist_par, { min: 0, max: 1, step: 0.001 });
+            ui.createParameterNumber("attraction dist", attraction_dist_par, { min: 0, max: .1, step: 0.001 });
             ui.createParameterNumber("friction", friction_par, { min: 0.9, max: 1, step: 0.001 });
             ui.createParameterNumber("max_speed", max_speed_par, { min: 0, max: 0.02, step: 0.0001 });
          });

@@ -18,6 +18,7 @@ export type Dependency = {
    cleanup: () => void;
    hasListener: (callback: onMutateCallback) => boolean;
    setCount: (index?: number) => number | undefined;
+   isValid: boolean | ((index: number) => boolean);
 }
 
 // export type Dependency = Parameter<any> | Cache<any>;
@@ -684,7 +685,7 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    }
 
    function simulate<T>(initial_state: T, count: number, callback: SimulateCallback<T>, options: ReactiveCacheWorkerOptions = {}) {
-      options = { strategy: "ping", ...options };
+      options = { strategy: "ping", max_queue_length: 1, ...options };
 
       const initial_state_par = isParameter(initial_state)
          ? initial_state as Parameter<T>
@@ -798,8 +799,10 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
    function animate(frames: number, callback: AnimateCallback, options: ReactiveCacheWorkerOptions) {
       // options = { ...options };
 
-      const frame_cache = createCache<OffscreenCanvas>(frames);
-
+      const frame_cache = createCache<HTMLImageElement | null>(frames);
+      // let canvases: OffscreenCanvas[] = [];
+      let canvas: OffscreenCanvas;
+      let images: HTMLImageElement[] = [];
       const worker = createReactiveCacheWorker(
          gen_worker_name(),
          main_worker_name,
@@ -819,19 +822,47 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                return bitmap
             },
-            receive: (index, bitmap, valid) => {
-               // if (!bitmap) {
-               //    frame_cache.set(index, null);
-               //    return;
-               // }
-               const canvas = frame_cache.get(index) ?? createCanvas(bitmap.width, bitmap.height);
+            receive: async (index, bitmap, valid, invalidate_count) => {
+               if (!bitmap) {
+                  frame_cache.set(index, null);
+                  return;
+               }
+
+               // const canvas = canvases[index] ?? createCanvas(bitmap.width, bitmap.height);
+               canvas ??= createCanvas(bitmap.width, bitmap.height);
 
                const ctx = canvas.getContext("bitmaprenderer");
                ctx?.transferFromImageBitmap(bitmap);
                bitmap.close();
 
-               if (valid) frame_cache.set(index, canvas, true);
-               else frame_cache.invalidSet(index, canvas, true);
+               // frame_cache.value.forEach((item, index) => {
+               //    if (item.value === canvas)
+               //       item.valid = false;
+               // });
+               // frame_cache.set(index, canvas, true);
+               frame_cache.invalidSet(index, canvas, true);
+
+               if (frame_cache.invalidateCount(index) !== invalidate_count) return;
+
+               // if (valid) frame_cache.set(index, canvas, true);
+               // else frame_cache.invalidSet(index, canvas, true);
+
+               if (typeof Image === "undefined") return;
+
+               const blob = await canvas.convertToBlob();
+               const url = URL.createObjectURL(blob);
+               const image = images[index] ?? new Image();
+
+               image.onload = () => {
+                  // no longer need to read the blob so it's revoked
+                  URL.revokeObjectURL(url);
+
+                  if (frame_cache.invalidateCount(index) !== invalidate_count) return;
+
+                  if (valid) frame_cache.set(index, image, true);
+                  else frame_cache.invalidSet(index, image, true);
+               };
+               image.src = url;
             }
          },
          options
@@ -1115,6 +1146,7 @@ type ReceiveReactiveCache<T> = (
    index: number,
    value: T,
    valid: boolean,
+   invalidate_count: number,
 ) => void;
 
 type ReactiveCacheWorkerCallbacks<T, U> = {
@@ -1195,8 +1227,8 @@ export function createReactiveCacheWorker<T, U>(
                   // const transfer = transfer_value ? [ret as Transferable] : [];
                   postMessage({ value: ret, index, invalidate_count, dependencies_ids_and_indexes });
 
-                  // if (ret !== undefined) cache.set(index, ret);
-                  receive?.(index, ret, true);
+                  if (ret !== undefined) cache.set(index, ret);
+                  // receive?.(index, ret, true);
                }
 
                queue_count++;
@@ -1240,7 +1272,7 @@ export function createReactiveCacheWorker<T, U>(
                return !dep.isValid || dep.isValid(index);
             });
 
-         receive?.(index, value, valid);
+         receive?.(index, value, valid, invalidate_count);
 
          dependencies_ids_and_indexes.forEach(({ id, index, set_count }) => {
             const dep = global_dependencies.get(id);
@@ -1257,6 +1289,7 @@ export function createReactiveCacheWorker<T, U>(
             }
 
             if (!hasDependencyRecord(id, index)) {
+               // addDependencyRecord(id, index);
                const current_set_count = dep.setCount(index);
                if (set_count !== current_set_count) {
                   onDepChange(dep, { key: "value", index, value: dep.get(index), set_count: current_set_count });

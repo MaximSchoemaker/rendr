@@ -427,10 +427,13 @@ function CacheView({ tick_par, running_par, frame_cache, rest_props }: CacheView
     const request_index = 0; //running() ? 0 : tick();
     frame_cache.request(request_index);
 
-    let frame = frame_cache.getLatestValid(tick());
+    let frame = frame_cache.getLatest(tick());
     frame ??= frame_cache.get(request_index);
 
-    if (!el || !frame || frame === prev_frame) return;
+    if (!el
+      || !frame
+      // || frame === prev_frame
+    ) return;
 
     el.width = frame.width;
     el.height = frame.height;
