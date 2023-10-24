@@ -829,7 +829,8 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                }
 
                // const canvas = canvases[index] ?? createCanvas(bitmap.width, bitmap.height);
-               canvas ??= createCanvas(bitmap.width, bitmap.height);
+               // canvas ??= createCanvas(bitmap.width, bitmap.height);
+               canvas = createCanvas(bitmap.width, bitmap.height);
 
                const ctx = canvas.getContext("bitmaprenderer");
                ctx?.transferFromImageBitmap(bitmap);
@@ -840,12 +841,12 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                //       item.valid = false;
                // });
                // frame_cache.set(index, canvas, true);
-               frame_cache.invalidSet(index, canvas, true);
+               // frame_cache.invalidSet(index, canvas, true);
 
                if (frame_cache.invalidateCount(index) !== invalidate_count) return;
 
-               // if (valid) frame_cache.set(index, canvas, true);
-               // else frame_cache.invalidSet(index, canvas, true);
+               if (valid) frame_cache.set(index, canvas, true);
+               else frame_cache.invalidSet(index, canvas, true);
 
                if (typeof Image === "undefined") return;
 
