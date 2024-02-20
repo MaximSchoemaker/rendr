@@ -497,6 +497,7 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
         const frame_par = createParameter(null);
         createReactiveWorker(gen_worker_name(), main_worker_name, {
             executeWorker: () => {
+                // console.log("> execute draw");
                 const canvas = callback();
                 const ctx = canvas.getContext('2d');
                 const bitmap = canvas.transferToImageBitmap();
@@ -504,11 +505,13 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 return bitmap;
             },
             receive: (bitmap) => {
-                const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
-                const ctx = canvas.getContext("bitmaprenderer");
-                ctx?.transferFromImageBitmap(bitmap);
-                frame_par.set(canvas, true);
-                bitmap.close();
+                // console.log("< receive draw");
+                frame_par.set(bitmap);
+                // const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+                // const ctx = canvas.getContext("bitmaprenderer");
+                // ctx?.transferFromImageBitmap(bitmap);
+                // frame_par.set(canvas, true);
+                // bitmap.close();
             },
         });
         return frame_par;
@@ -526,15 +529,16 @@ function constructSketch(name, main_worker_name, gen_worker_name) {
                 return bitmap;
             },
             receive: (bitmap) => {
-                if (!bitmap) {
-                    frame_par.set(undefined);
-                    return;
-                }
-                const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
-                const ctx = canvas.getContext("bitmaprenderer");
-                ctx?.transferFromImageBitmap(bitmap);
-                frame_par.set(canvas, true);
-                bitmap.close();
+                frame_par.set(bitmap);
+                // if (!bitmap) {
+                //    frame_par.set(undefined);
+                //    return;
+                // }
+                // const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+                // const ctx = canvas.getContext("bitmaprenderer");
+                // ctx?.transferFromImageBitmap(bitmap);
+                // frame_par.set(canvas, true);
+                // bitmap.close();
             }
         }, options);
         return frame_par;

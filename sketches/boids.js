@@ -5,7 +5,7 @@ import { n_arr, map, invCosn, mod } from "../rendr/library/Utils.js"
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 2000;
+const FRAMES = 500;
 
 const sketch = rendr.createSketch(sketch => (tick_par) => {
 

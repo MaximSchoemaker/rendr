@@ -730,13 +730,14 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
    function draw(callback: DrawCallback) {
 
-      const frame_par = createParameter<OffscreenCanvas | null>(null);
+      const frame_par = createParameter<ImageBitmap | null>(null);
 
       createReactiveWorker(
          gen_worker_name(),
          main_worker_name,
          {
             executeWorker: () => {
+               // console.log("> execute draw");
                const canvas = callback();
                const ctx = canvas.getContext('2d');
                const bitmap = canvas.transferToImageBitmap();
@@ -744,25 +745,28 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                return bitmap;
             },
             receive: (bitmap) => {
-               const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
-               const ctx = canvas.getContext("bitmaprenderer");
-               ctx?.transferFromImageBitmap(bitmap);
-               frame_par.set(canvas, true);
-               bitmap.close();
+               // console.log("< receive draw");
+               frame_par.set(bitmap);
+
+               // const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+               // const ctx = canvas.getContext("bitmaprenderer");
+               // ctx?.transferFromImageBitmap(bitmap);
+               // frame_par.set(canvas, true);
+               // bitmap.close();
             },
-         }
+         },
       );
 
       return frame_par;
    }
 
-   function generate<T>(count: number, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
-   function generate<T>(count_par: Parameter<number>, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
-   function generate<T>(queue: T[], interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
-   function generate<T>(queue_par: Parameter<T[]>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<OffscreenCanvas | undefined>;
+   function generate<T>(count: number, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
+   function generate<T>(count_par: Parameter<number>, interval_ms: number, callback: GenerateCallback<number>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
+   function generate<T>(queue: T[], interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
+   function generate<T>(queue_par: Parameter<T[]>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions): Parameter<ImageBitmap | undefined>;
    function generate<T>(count_or_queue: Count_or_queue<T>, interval_ms: number, callback: GenerateCallback<T>, options: ReactiveQueueWorkerOptions) {
 
-      const frame_par = createParameter<OffscreenCanvas | undefined>(undefined);
+      const frame_par = createParameter<ImageBitmap | undefined>(undefined);
 
       const worker = createReactiveQueueWorker(
          gen_worker_name(),
@@ -779,15 +783,17 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
                return bitmap;
             },
             receive: (bitmap) => {
-               if (!bitmap) {
-                  frame_par.set(undefined);
-                  return;
-               }
-               const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
-               const ctx = canvas.getContext("bitmaprenderer");
-               ctx?.transferFromImageBitmap(bitmap);
-               frame_par.set(canvas, true);
-               bitmap.close();
+               frame_par.set(bitmap);
+
+               // if (!bitmap) {
+               //    frame_par.set(undefined);
+               //    return;
+               // }
+               // const canvas = frame_par.get() ?? createCanvas(bitmap.width, bitmap.height);
+               // const ctx = canvas.getContext("bitmaprenderer");
+               // ctx?.transferFromImageBitmap(bitmap);
+               // frame_par.set(canvas, true);
+               // bitmap.close();
             }
          },
          options,

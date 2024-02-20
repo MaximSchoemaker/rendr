@@ -6,7 +6,10 @@ import { mod, clamp, floorTo } from "../rendr/library/Utils";
 import { Action, Cache, Dependency, Parameter, ParameterNumberOptions, SetupCallback } from '../rendr/rendr';
 
 // @ts-ignore
-import setup from "../sketches/boids";
+// import setup from "../sketches/sketch";
+// import setup from "../sketches/langton";
+// import setup from "../sketches/boids";
+import setup from "../sketches/sort";
 
 type Component = (props?: any) => JSXElement
 
@@ -395,6 +398,7 @@ function View({ frame_par, rest_props }: ViewProps) {
 
     if (!ctx) return;
 
+    console.log("draw View");
     ctx.drawImage(canvas, 0, 0);
   });
 

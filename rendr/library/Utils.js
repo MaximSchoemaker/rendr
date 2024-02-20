@@ -24,12 +24,24 @@ export const map = (v, in_from, in_to, out_from, out_to) => {
     const f = (v - in_from) / (in_to - in_from);
     return out_from + f * (out_to - out_from);
 };
+export const lerp = (v, from, to) => {
+    return map(v, 0, 1, from, to);
+};
+export const sin = (t) => {
+    return Math.sin(t * Math.PI * 2);
+};
+export const sinn = (t) => {
+    return map(sin(t), -1, 1, 0, 1);
+};
+export const inv_sinn = (t) => {
+    return 1 - sinn(t);
+};
 export const cos = (t) => {
     return Math.cos(t * Math.PI * 2);
 };
 export const cosn = (t) => {
     return map(cos(t), -1, 1, 0, 1);
 };
-export const invCosn = (t) => {
+export const inv_cosn = (t) => {
     return 1 - cosn(t);
 };

@@ -32,14 +32,30 @@ export const map = (v: number, in_from: number, in_to: number, out_from: number,
    return out_from + f * (out_to - out_from);
 }
 
+export const lerp = (v: number, from: number, to: number) => {
+   return map(v, 0, 1, from, to);
+};
+
+export const sin = (t: number) => {
+   return Math.sin(t * Math.PI * 2);
+};
+
+export const sinn = (t: number) => {
+   return map(sin(t), -1, 1, 0, 1);
+};
+
+export const inv_sinn = (t: number) => {
+   return 1 - sinn(t);
+};
+
 export const cos = (t: number) => {
    return Math.cos(t * Math.PI * 2);
-}
+};
 
 export const cosn = (t: number) => {
    return map(cos(t), -1, 1, 0, 1);
-}
+};
 
-export const invCosn = (t: number) => {
+export const inv_cosn = (t: number) => {
    return 1 - cosn(t);
-}
+};
