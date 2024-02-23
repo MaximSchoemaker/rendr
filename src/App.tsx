@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack } from 'solid-js';
+import { createEffect, onCleanup, createSignal, JSXElement, For, Index, Show, untrack, createResource, Suspense, ErrorBoundary } from 'solid-js';
 import { createStore } from "solid-js/store";
 
 import styles from './App.module.css';
@@ -8,8 +8,8 @@ import { Action, Cache, Dependency, Parameter, ParameterNumberOptions, SetupCall
 // @ts-ignore
 // import setup from "../sketches/sketch";
 // import setup from "../sketches/langton";
-import setup from "../sketches/boids";
-// import setup from "../sketches/sort";
+// import setup from "../sketches/boids";
+import setup from "../sketches/sort";
 
 type Component = (props?: any) => JSXElement
 
@@ -42,11 +42,29 @@ export class UI {
 }
 
 const App = () => {
+  const url = new URL(window.location.href);
+  const params = new URLSearchParams(url.search);
+  const sketch_name = params.get("sketch");
+
+  const [setup] = createResource(sketch_name, (name) => import(`../sketches/${name}`));
+  createEffect(() => {
+    console.log(setup.error);
+    console.log(setup());
+  });
+
   return (
     <div class={styles.App}>
-      {/* <Sketch sketch_path="/sketches/sketch.js" /> */}
-      {/* <Sketch sketch_path="/sketches/boids.js" /> */}
-      <Sketch setup={setup} />
+      <Show when={!setup.loading && setup() !== undefined}>
+        <Sketch setup={setup()?.default} />
+      </Show>
+      <Show when={setup() === undefined}>
+        <div class={styles.Links}>
+          <a href="?sketch=sketch">sketch</a>
+          <a href="?sketch=boids">boids</a>
+          <a href="?sketch=langton">langton</a>
+          <a href="?sketch=sort">sort</a>
+        </div>
+      </Show>
     </div>
   );
 };

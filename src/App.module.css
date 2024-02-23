@@ -6,6 +6,21 @@
   /* background-color: black;  */
 }
 
+.Links {
+  flex: 1;
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  align-items: center;
+}
+
+
+@media (orientation: portrait) {
+  .Links {
+    flex-direction: column;
+  }
+}
+
 .Sketch {
   width: 100%;
   height: 100%;
