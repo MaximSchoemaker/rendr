@@ -46,7 +46,7 @@ const App = () => {
   const params = new URLSearchParams(url.search);
   const sketch_name = params.get("sketch");
 
-  const [setup] = createResource(sketch_name, (name) => import(`/sketches/${name}`));
+  const [setup] = createResource(sketch_name, (name) => import(`/sketches/${name}.js`));
   createEffect(() => {
     console.log(setup.error);
     console.log(setup());
