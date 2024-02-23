@@ -8,8 +8,8 @@ import { Action, Cache, Dependency, Parameter, ParameterNumberOptions, SetupCall
 // @ts-ignore
 // import setup from "../sketches/sketch";
 // import setup from "../sketches/langton";
-// import setup from "../sketches/boids";
-import setup from "../sketches/sort";
+import setup from "../sketches/boids";
+// import setup from "../sketches/sort";
 
 type Component = (props?: any) => JSXElement
 

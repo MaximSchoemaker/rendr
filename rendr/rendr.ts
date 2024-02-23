@@ -828,49 +828,49 @@ function constructSketch(name: string, main_worker_name: string, gen_worker_name
 
                return bitmap
             },
-            receive: async (index, bitmap, valid, invalidate_count) => {
-               if (!bitmap) {
-                  frame_cache.set(index, null);
-                  return;
-               }
+            // receive: async (index, bitmap, valid, invalidate_count) => {
+            //    if (!bitmap) {
+            //       frame_cache.set(index, null);
+            //       return;
+            //    }
 
-               // const canvas = canvases[index] ?? createCanvas(bitmap.width, bitmap.height);
-               // canvas ??= createCanvas(bitmap.width, bitmap.height);
-               canvas = createCanvas(bitmap.width, bitmap.height);
+            //    // const canvas = canvases[index] ?? createCanvas(bitmap.width, bitmap.height);
+            //    // canvas ??= createCanvas(bitmap.width, bitmap.height);
+            //    canvas = createCanvas(bitmap.width, bitmap.height);
 
-               const ctx = canvas.getContext("bitmaprenderer");
-               ctx?.transferFromImageBitmap(bitmap);
-               bitmap.close();
+            //    const ctx = canvas.getContext("bitmaprenderer");
+            //    ctx?.transferFromImageBitmap(bitmap);
+            //    bitmap.close();
 
-               // frame_cache.value.forEach((item, index) => {
-               //    if (item.value === canvas)
-               //       item.valid = false;
-               // });
-               // frame_cache.set(index, canvas, true);
-               // frame_cache.invalidSet(index, canvas, true);
+            //    // frame_cache.value.forEach((item, index) => {
+            //    //    if (item.value === canvas)
+            //    //       item.valid = false;
+            //    // });
+            //    // frame_cache.set(index, canvas, true);
+            //    // frame_cache.invalidSet(index, canvas, true);
 
-               if (frame_cache.invalidateCount(index) !== invalidate_count) return;
+            //    if (frame_cache.invalidateCount(index) !== invalidate_count) return;
 
-               if (valid) frame_cache.set(index, canvas, true);
-               else frame_cache.invalidSet(index, canvas, true);
+            //    if (valid) frame_cache.set(index, canvas, true);
+            //    else frame_cache.invalidSet(index, canvas, true);
 
-               if (typeof Image === "undefined") return;
+            //    if (typeof Image === "undefined") return;
 
-               const blob = await canvas.convertToBlob();
-               const url = URL.createObjectURL(blob);
-               const image = images[index] ?? new Image();
+            //    const blob = await canvas.convertToBlob();
+            //    const url = URL.createObjectURL(blob);
+            //    const image = images[index] ?? new Image();
 
-               image.onload = () => {
-                  // no longer need to read the blob so it's revoked
-                  URL.revokeObjectURL(url);
+            //    image.onload = () => {
+            //       // no longer need to read the blob so it's revoked
+            //       URL.revokeObjectURL(url);
 
-                  if (frame_cache.invalidateCount(index) !== invalidate_count) return;
+            //       if (frame_cache.invalidateCount(index) !== invalidate_count) return;
 
-                  if (valid) frame_cache.set(index, image, true);
-                  else frame_cache.invalidSet(index, image, true);
-               };
-               image.src = url;
-            }
+            //       if (valid) frame_cache.set(index, image, true);
+            //       else frame_cache.invalidSet(index, image, true);
+            //    };
+            //    image.src = url;
+            // }
          },
          options
       );

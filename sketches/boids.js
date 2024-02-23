@@ -1,6 +1,6 @@
 import rendr, { createParameter, createCache, createCanvas } from "../rendr/rendr.js";
 import { Draw2dContext } from "../rendr/library/Draw2d.js";
-import { n_arr, map, invCosn, mod } from "../rendr/library/Utils.js"
+import { n_arr, map, inv_cosn, mod } from "../rendr/library/Utils.js"
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
