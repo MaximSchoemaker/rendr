@@ -74,10 +74,10 @@ const sketch = rendr.createSketch(sketch => (tick_par) => {
    });
 
    const backbuffer = createCanvas(WIDTH, HEIGHT);
-   const frame_cache = sketch.draw(() => {
+   const frame_cache = sketch.animate(FRAMES, (_, t) => {
       const view = backbuffer;
 
-      const t = tick_par.get() / FRAMES;
+      // const t = tick_par.get() / FRAMES;
       const anim_f = inv_cosn(t);
       const look_back_f = inv_sinn(t);
       const tick = Math.floor(anim_f * FRAMES);
@@ -142,12 +142,12 @@ export default rendr.createSetup("/sketches/langton.js", createUI => {
          });
 
          ui.createViewContainer(ui => {
-            ui.createView(frame_cache);
-            // ui.createCacheView(tick_par, running_par, frame_cache);
+            // ui.createView(frame_cache);
+            ui.createCacheView(tick_par, running_par, frame_cache);
          });
 
          ui.createTimeline(FRAMES, tick_par, running_par, [
-            // frame_cache,
+            frame_cache,
             state_cache
          ]);
       });
