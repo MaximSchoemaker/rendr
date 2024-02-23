@@ -47,10 +47,6 @@ const App = () => {
   const sketch_name = params.get("sketch");
 
   const [setup] = createResource(sketch_name, (name) => import(`/sketches/${name}.js`));
-  createEffect(() => {
-    console.log(setup.error);
-    console.log(setup());
-  });
 
   return (
     <div class={styles.App}>
@@ -416,7 +412,6 @@ function View({ frame_par, rest_props }: ViewProps) {
 
     if (!ctx) return;
 
-    console.log("draw View");
     ctx.drawImage(canvas, 0, 0);
   });
 
