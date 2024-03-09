@@ -3,9 +3,9 @@ import { UI } from '../ui';
 import { n_arr } from './utils';
 
 export type Sketch = (render: Render, ui: UI) => void
-export function createSketch(create: Sketch, options: RenderSettings) {
+export function createSketch(create: Sketch, settings: RenderSettings) {
    return (render: Render, ui: UI) => {
-      render.setSettings(options);
+      render.setSettings(settings);
       create(render, ui);
    };
 }
@@ -153,10 +153,10 @@ export function createRender(): Render {
       update: (initial_value, create, settings) => {
          const parameter = createParameter(initial_value);
 
-         scheduler.scheduleTask(() => {
+         scheduler.schedule(createTask(() => {
             const new_value = create();
             parameter.set(() => new_value);
-         }, settings);
+         }, settings));
 
          return parameter;
       },
@@ -166,10 +166,10 @@ export function createRender(): Render {
          const ctx = canvas.getContext("2d")!;
          const size = Math.min(width, height);
 
-         scheduler.scheduleTask(() => {
+         scheduler.schedule(createTask(() => {
             ctx.clearRect(0, 0, width, height);
             create(ctx, { width, height, size })
-         }, settings);
+         }, settings));
 
          return canvas;
       },
@@ -177,7 +177,7 @@ export function createRender(): Render {
       construct: (initial_value, max_steps, create, settings) => {
          const parameter = createParameter(initial_value);
 
-         scheduler.scheduleTaskQueue(max_steps, {
+         scheduler.schedule(createTaskQueue(max_steps, {
             reset: () => {
                parameter.set(() => structuredClone(initial_value));
             },
@@ -186,7 +186,7 @@ export function createRender(): Render {
                const new_value = create(prev_value, { i, done });
                parameter.set(() => new_value);
             }
-         }, settings);
+         }, settings));
 
          return parameter;
       },
@@ -196,14 +196,14 @@ export function createRender(): Render {
          const ctx = canvas.getContext("2d")!;
          const size = Math.min(width, height);
 
-         scheduler.scheduleTaskQueue(max_steps, {
+         scheduler.schedule(createTaskQueue(max_steps, {
             reset: () => {
                ctx.clearRect(0, 0, width, height);
             },
             execute: ({ i, done }) => {
                create(ctx, { width, height, size, i, max_steps, done });
             }
-         }, settings);
+         }, settings));
 
          return canvas;
       },
@@ -211,7 +211,7 @@ export function createRender(): Render {
       simulate: (initial_value, max_steps, create, settings) => {
          const cache = createCache<typeof initial_value>();
 
-         scheduler.scheduleTaskCache(max_steps, {
+         scheduler.schedule(createTaskCache(max_steps, {
             reset: (index) => {
                cache.set(index, undefined);
             },
@@ -224,14 +224,14 @@ export function createRender(): Render {
                const new_value = create(prev_value, { i, done });
                cache.set(i, new_value);
             }
-         }, settings);
+         }, settings));
 
          return cache;
       },
 
       mountSketch: (sketch: Sketch, ui: UI) => {
          const render = mountSketch(sketch, ui);
-         scheduler.scheduleScheduler(render.scheduler);
+         scheduler.schedule(render.scheduler);
       },
 
       execute: (max_time) => {
@@ -253,10 +253,7 @@ type SchedulerSettings = {
 
 type Scheduler = {
    execute: (max_time: number) => void;
-   scheduleTask: (execute: TaskExecute, settings?: TaskSettings) => void;
-   scheduleTaskQueue: (max_time: number, callbacks: TaskQueueCallbacks, settings?: TaskSettings) => void;
-   scheduleTaskCache: (max_time: number, callbacks: TaskCacheCallbacks, settings?: TaskSettings) => void;
-   scheduleScheduler: (scheduler: Scheduler) => void;
+   schedule: (task: Task) => void;
    isDone: () => boolean;
    settings: SchedulerSettings;
 }
@@ -294,20 +291,8 @@ function createScheduler(): Scheduler {
             task.execute(task_max_time);
          }
       },
-      scheduleTask(execute, settings) {
-         const task = createTask(execute, settings);
+      schedule(task) {
          schedule.push(task);
-      },
-      scheduleTaskQueue(max_steps, callbacks, settings) {
-         const taskQueue = createTaskQueue(max_steps, callbacks, settings);
-         schedule.push(taskQueue);
-      },
-      scheduleTaskCache(max_steps, callbacks, settings) {
-         const taskQueue = createTaskCache(max_steps, callbacks, settings);
-         schedule.push(taskQueue);
-      },
-      scheduleScheduler(scheduler) {
-         schedule.push(scheduler);
       },
       isDone,
    }
