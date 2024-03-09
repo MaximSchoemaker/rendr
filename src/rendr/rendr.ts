@@ -245,20 +245,17 @@ function createScheduler(): Scheduler {
    const schedule: Task[] = [];
    let i = 0;
 
-   const isDone = () => {
-      return schedule.every(task => task.isDone());
-   }
-
    return {
       settings: {
          sync: false,
       },
+
       execute(max_time) {
 
          let start_time = performance.now();
          const timeLeft = () => max_time - (performance.now() - start_time);
 
-         while (timeLeft() > 0 && !isDone()) {
+         while (timeLeft() > 0 && !this.isDone()) {
             let task_count = schedule.reduce((count, task) => count + (task.isDone() ? 0 : 1), 0);
             if (task_count == 0) return;
 
@@ -274,10 +271,14 @@ function createScheduler(): Scheduler {
             task.execute(task_max_time);
          }
       },
+
       schedule(task) {
          schedule.push(task);
       },
-      isDone,
+
+      isDone() {
+         return schedule.every(task => task.isDone());
+      },
    }
 }
 
@@ -294,18 +295,12 @@ type TaskSettings = {
 function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
    let is_done = false;
 
-   const track = createReaction(invalidate);
-
-   function invalidate() {
-      is_done = false;
-   }
+   const track = createReaction(() => is_done = false);
 
    return {
       settings,
       execute: () => {
-         track(() => {
-            execute();
-         });
+         track(() => execute());
          is_done = true;
       },
       isDone: () => {
@@ -324,12 +319,10 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
    let is_done = false;
    const done = () => is_done = true;
 
-   const track = createReaction(invalidate);
-
-   function invalidate() {
+   const track = createReaction(() => {
       is_done = false;
       i = 0;
-   }
+   });
 
    return {
       settings,

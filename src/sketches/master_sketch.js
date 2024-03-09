@@ -13,7 +13,7 @@ export default createSketch((render, ui) => {
 
    const sketches = [
       // test_ui,
-      // test_draw,
+      test_draw,
 
       test_update_draw,
       test_construct_draw,
