@@ -33,7 +33,7 @@ const App: Component = () => {
       const max_execution_time = max_time - draw_time;
 
       const start_time = performance.now();
-      render.execute(max_execution_time);
+      render.scheduler.execute(max_execution_time);
       const execution_time = performance.now() - start_time;
 
       set_avg_execution_time(avg_execution_time => lerp(0.1, avg_execution_time, execution_time));

@@ -3,9 +3,9 @@ import { UI } from '../ui';
 import { n_arr } from './utils';
 
 export type Sketch = (render: Render, ui: UI) => void
-export function createSketch(create: Sketch, settings: RenderSettings) {
+export function createSketch(create: Sketch, settings: SchedulerSettings) {
    return (render: Render, ui: UI) => {
-      render.setSettings(settings);
+      render.scheduler.settings = { ...render.scheduler.settings, ...settings };
       create(render, ui);
    };
 }
@@ -135,21 +135,15 @@ export type Render = {
 
    mountSketch: (sketch: Sketch, ui: UI) => void;
 
-   execute: (max_time: number) => void,
-
-   setSettings: (settings: RenderSettings) => void,
-
    scheduler: Scheduler,
-}
-
-type RenderSettings = {
-   sync?: boolean;
 }
 
 export function createRender(): Render {
    const scheduler = createScheduler();
 
    return {
+      scheduler,
+
       update: (initial_value, create, settings) => {
          const parameter = createParameter(initial_value);
 
@@ -233,17 +227,6 @@ export function createRender(): Render {
          const render = mountSketch(sketch, ui);
          scheduler.schedule(render.scheduler);
       },
-
-      execute: (max_time) => {
-         scheduler.execute(max_time);
-      },
-
-      scheduler,
-
-      setSettings: (settings = {}) => {
-         const { sync = false } = settings;
-         scheduler.settings = { sync };
-      }
    }
 }
 
@@ -319,7 +302,7 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
 
    return {
       settings,
-      execute: (max_time) => {
+      execute: () => {
          track(() => {
             execute();
          });
@@ -362,8 +345,8 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
             const run_time = time - start_time;
             if (run_time > max_time) return;
          }
-         is_done = true;
 
+         is_done = true;
       },
       isDone: () => {
          return is_done;
@@ -386,7 +369,9 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
    return {
       settings,
       execute: (max_time: number) => {
+
          const start_time = performance.now();
+
          for (let i = 0; i < max_steps && !is_done; i++) {
             if (valid[i]) continue;
 
@@ -398,6 +383,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
             const run_time = time - start_time;
             if (run_time > max_time) return;
          }
+
          is_done = true;
       },
       isDone: () => {
