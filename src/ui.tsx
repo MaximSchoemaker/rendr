@@ -1,21 +1,25 @@
-import { type Component, For, JSX, onMount } from 'solid-js';
-import { createAnimationLoop } from './rendr/rendr';
+import { type Component, For, JSX, onMount, onCleanup } from 'solid-js';
+import { Render, Task, createAnimationLoop } from './rendr/rendr';
+import { floorTo } from './rendr/utils';
 
 export type UI = {
-   createContainer: (create: (ui: UI) => void) => void
-   createRow: (create: (ui: UI) => void) => void
-   createColumn: (create: (ui: UI) => void) => void
+   createContainer: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
+   createRow: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
+   createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createView: (canvas: ViewProps["canvas"]) => void
+   createPerformance: (render: Render) => void
 }
 
 export function createUI(create: (ui: UI) => void) {
-   const elements: JSX.Element[] = [];
+   let elements: JSX.Element[] = [];
+   // onCleanup(() => elements = []);
 
    create({
-      createContainer: (create) => elements.push(<Container create={create} />),
-      createRow: (create) => elements.push(<Row create={create} />),
-      createColumn: (create) => elements.push(<Column create={create} />),
-      createView: (canvas) => elements.push(<View canvas={canvas} />)
+      createContainer: (create, style) => elements.push(<Container create={create} style={style} />),
+      createRow: (create, style) => elements.push(<Row create={create} style={style} />),
+      createColumn: (create, style) => elements.push(<Column create={create} style={style} />),
+      createView: (canvas) => elements.push(<View canvas={canvas} />),
+      createPerformance: (render) => elements.push(<Performance render={render} />),
    });
 
    return elements;
@@ -39,7 +43,7 @@ export const Container: Component<ContainerProps> = (props) => {
          "max-height": "100%",
          "min-width": "0",
          "min-height": "0",
-         "flex": "0 1 auto",
+         "flex": "0 1 100%",
          ...props.style
       }}>
          <For each={elements}>
@@ -80,16 +84,17 @@ export const View: Component<ViewProps> = (props) => {
    //    });
    // });
 
+   //@ts-ignore
    props.canvas.style = `
       display: block;
       background-color: black;
-      width: min-content;
-      height: min-content;
+      width: fit-content;
+      height: fit-content;
       max-width: 100%;
       max-height: 100%;
       min-width: 0;
       min-height: 0;
-      // flex: 1 1 auto;
+      flex: 0 1 100%;
       // aspect-ratio: 1 / 1;
       // object-fit: contain; 
    `;
@@ -98,16 +103,16 @@ export const View: Component<ViewProps> = (props) => {
 
    return (
       <div style={{
-         // "display": "flex",
-         "flex": "0 1 100%",
-         // width: "1px",
-         // height: "1px",
+         "display": "flex",
+         "align-items": "center",
+         "justify-content": "center",
+         "width": "100%",
+         "height": "100%",
          "max-width": "100%",
          "max-height": "100%",
          "min-width": "0",
          "min-height": "0",
-         "aspect-ratio": "1 / 1",
-         "background-color": "black",
+         "flex": "1 1 0",
       }}>
          {props.canvas}
       </div>
@@ -127,4 +132,73 @@ export const View: Component<ViewProps> = (props) => {
    //       // "flex": "0 1 1",
    //    }}
    // />
+}
+
+type PerformanceProps = {
+   render: Render
+}
+
+export const Performance: Component<PerformanceProps> = (props) => {
+
+   const tasks = props.render.scheduler.tasks;
+
+   return (
+      <>
+         <div style={{
+            "flex": "0 1 0",
+            "display": "flex",
+            "gap": tasks.length < 20 ? "5px" : "0px",
+            "width": "100%",
+         }}>
+            <For each={tasks}>{task =>
+               <TaskPerformance task={task} />
+            }</For>
+         </div>
+         {/* <div style={{
+            "flex": "0 1 0",
+            "display": "flex",
+            "gap": "5px",
+            "max-width": "100%",
+         }}>
+            <TaskPerformance task={props.render.scheduler} />
+         </div> */}
+      </>
+   );
+}
+
+type TaskPerformanceProps = {
+   task: Task
+}
+
+export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
+
+   const width = 100;
+   const height = 1;
+   let el: HTMLCanvasElement;
+
+   let prev_progress = -1;
+   createAnimationLoop(() => {
+      const ctx = el.getContext("2d");
+      if (!ctx) return;
+
+      const progress = floorTo(props.task.progress(), width);
+      if (progress === prev_progress) return;
+      prev_progress = progress;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "rgb(0, 255, 128)";
+      ctx.beginPath();
+      ctx.rect(0, 0, progress * width, height);
+      ctx.fill();
+   });
+
+   return <canvas ref={ref => el = ref} width={width} height={height} style={{
+      "flex": "1",
+      // "width": "auto",
+      "height": "15px",
+      "min-width": "0",
+      "min-height": "0",
+      "image-rendering": "pixelated",
+      "background-color": "black",
+   }} />
 }

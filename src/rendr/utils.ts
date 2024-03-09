@@ -24,7 +24,7 @@ export const clamp = (val: number, min = 0, max = 1) => {
 }
 
 export const floorTo = (val: number, step: number) => {
-   return Math.floor(val / step) * step;
+   return Math.floor(val * step) / step;
 }
 
 export const map = (v: number, in_from: number, in_to: number, out_from: number, out_to: number) => {

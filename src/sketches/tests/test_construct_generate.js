@@ -9,7 +9,7 @@ const FRAMES = 500;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
-export default createSketch((sketch, ui) => {
+export default createSketch((render, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -17,7 +17,7 @@ export default createSketch((sketch, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const state = sketch.construct([], COUNT, (value, { done }) => {
+   const state = render.construct([], COUNT, (value, { done }) => {
       tick_par.get();
 
       value.push({ x: Math.random(), y: Math.random() });
@@ -27,7 +27,7 @@ export default createSketch((sketch, ui) => {
       return value;
    }, { sync: true });
 
-   const view = sketch.generate(WIDTH, HEIGHT, COUNT, (ctx, { width, height, size, i }) => {
+   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, { width, height, size, i }) => {
       // console.log(i);
 
       const points = state.get();
@@ -63,5 +63,8 @@ export default createSketch((sketch, ui) => {
 
    });
 
-   ui.createView(view);
+   ui.createColumn(ui => {
+      ui.createView(view);
+      ui.createPerformance(render);
+   });
 });

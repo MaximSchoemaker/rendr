@@ -12,7 +12,7 @@ import test_simulate_generate from './tests/test_simulate_generate';
 export default createSketch((render, ui) => {
 
    const sketches = [
-      // test_ui,
+      test_ui,
       test_draw,
 
       test_update_draw,
@@ -24,7 +24,15 @@ export default createSketch((render, ui) => {
       test_simulate_generate,
    ]
 
-   sketches.forEach(sketch => {
-      render.mountSketch(sketch, ui);
-   });
+   ui.createColumn(ui => {
+
+      ui.createRow(ui => {
+         sketches.forEach(sketch => {
+            render.mountSketch(sketch, ui);
+         });
+      });
+
+      ui.createPerformance(render);
+   }, { "flex-basis": "auto" });
+
 });

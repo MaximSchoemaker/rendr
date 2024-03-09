@@ -6,7 +6,7 @@ const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
 const FRAMES = 100;
 
-export default createSketch((sketch, ui) => {
+export default createSketch((render, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -18,30 +18,36 @@ export default createSketch((sketch, ui) => {
    const rows = 16;
 
    ui.createColumn(ui => {
-      for (let j = 0; j < cols; j++) {
-         ui.createRow(ui => {
-            for (let i = 0; i < rows; i++) {
 
-               const view = sketch.draw(WIDTH, HEIGHT, (ctx, props) => {
-                  const { width, height, size } = props;
+      ui.createColumn(ui => {
+         for (let j = 0; j < cols; j++) {
+            ui.createRow(ui => {
+               for (let i = 0; i < rows; i++) {
 
-                  const tick = tick_par.get();
-                  const f = (i + j) / (rows + cols);
-                  const t = mod(f + tick / FRAMES);
+                  const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+                     const { width, height, size } = props;
 
-                  const x = cosn(t);
-                  const y = lerp(sinn(t * 3), 0.4, 0.6);
-                  const r = 0.125;
+                     const tick = tick_par.get();
+                     const f = (i + j) / (rows + cols);
+                     const t = mod(f + tick / FRAMES);
 
-                  ctx.fillStyle = "orange";
-                  ctx.beginPath();
-                  ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
-                  ctx.fill();
-               });
+                     const x = cosn(t);
+                     const y = lerp(sinn(t * 3), 0.4, 0.6);
+                     const r = 0.125;
 
-               ui.createView(view);
-            }
-         })
-      }
+                     ctx.fillStyle = "orange";
+                     ctx.beginPath();
+                     ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+                     ctx.fill();
+                  });
+
+                  ui.createView(view);
+               }
+            })
+         }
+      }, { "aspect-ratio": "1 / 1" });
+
+      ui.createPerformance(render);
+
    });
 });

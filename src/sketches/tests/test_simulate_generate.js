@@ -41,5 +41,8 @@ export default createSketch((render, ui) => {
       ctx.fill();
    });
 
-   ui.createView(view);
+   ui.createColumn(ui => {
+      ui.createView(view);
+      ui.createPerformance(render);
+   });
 });

@@ -234,18 +234,17 @@ type SchedulerSettings = {
    sync?: boolean;
 }
 
-type Scheduler = {
-   execute: (max_time: number) => void;
-   schedule: (task: Task) => void;
-   isDone: () => boolean;
+type Scheduler = Task & {
+   tasks: Task[];
    settings: SchedulerSettings;
+   schedule: (task: Task) => void;
 }
 
-function createScheduler(): Scheduler {
-   const schedule: Task[] = [];
+function createScheduler() {
    let i = 0;
 
-   return {
+   const scheduler: Scheduler = {
+      tasks: [],
       settings: {
          sync: false,
       },
@@ -256,14 +255,14 @@ function createScheduler(): Scheduler {
          const timeLeft = () => max_time - (performance.now() - start_time);
 
          while (timeLeft() > 0 && !this.isDone()) {
-            let task_count = schedule.reduce((count, task) => count + (task.isDone() ? 0 : 1), 0);
+            let task_count = this.tasks.reduce((count, task) => count + (task.isDone() ? 0 : 1), 0);
             if (task_count == 0) return;
 
-            const task = schedule[i];
+            const task = this.tasks[i];
             const sync = task.settings.sync ?? this.settings.sync;
-            if (!sync) i = (i + 1) % schedule.length;
+            if (!sync) i = (i + 1) % this.tasks.length;
             if (task.isDone()) {
-               if (sync) i = (i + 1) % schedule.length;
+               if (sync) i = (i + 1) % this.tasks.length;
                continue;
             }
 
@@ -273,19 +272,30 @@ function createScheduler(): Scheduler {
       },
 
       schedule(task) {
-         schedule.push(task);
+         this.tasks.push(task);
       },
 
       isDone() {
-         return schedule.every(task => task.isDone());
+         return this.tasks.every(task => task.isDone());
       },
+
+      progress() {
+         const total_progress = this.tasks.reduce((tot, task) => tot + task.progress(), 0);
+         const progress = total_progress / this.tasks.length;
+         return progress;
+      }
    }
+
+   onCleanup(() => { scheduler.tasks = []; });
+
+   return scheduler;
 }
 
-type Task = {
+export type Task = {
    settings: TaskSettings;
    execute: (max_time: number) => void;
    isDone: () => boolean;
+   progress: () => number;
 }
 type TaskExecute = () => void
 type TaskSettings = {
@@ -305,6 +315,9 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
       },
       isDone: () => {
          return is_done;
+      },
+      progress: () => {
+         return is_done ? 1 : 0;
       }
    }
 }
@@ -343,6 +356,9 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       },
       isDone: () => {
          return is_done;
+      },
+      progress: () => {
+         return is_done ? 1 : i / max_steps;
       }
    }
 }
@@ -357,12 +373,20 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
    const done = () => is_done = true;
 
    const valid = new Array(max_steps).fill(false);
-   const tracks = n_arr(max_steps, i => createReaction(() => valid[i] = false));
+   let valid_count = 0;
+
+   const tracks = n_arr(max_steps, i => createReaction(() => {
+      if (valid[i]) {
+         valid[i] = false
+         valid_count--;
+      }
+   }));
 
    return {
       settings,
       execute: (max_time: number) => {
 
+         is_done = false;
          const start_time = performance.now();
 
          for (let i = 0; i < max_steps && !is_done; i++) {
@@ -370,7 +394,9 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
 
             callbacks.reset(i);
             tracks[i](() => callbacks.execute({ i, done }));
+
             valid[i] = true;
+            valid_count++;
 
             const time = performance.now();
             const run_time = time - start_time;
@@ -381,6 +407,9 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       },
       isDone: () => {
          return is_done;
+      },
+      progress: () => {
+         return is_done ? 1 : valid_count / max_steps;
       }
    }
 }

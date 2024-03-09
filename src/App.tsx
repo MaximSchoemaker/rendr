@@ -1,19 +1,13 @@
-import { useTransition, type Component, createSignal, untrack } from 'solid-js';
+import { type Component, createSignal, untrack } from 'solid-js';
 import styles from './App.module.css';
 
-import { Container, Row, Column, UI } from './ui';
-import { Render, createAnimationLoop, createLoop, createRender, mountSketch } from './rendr/rendr';
+import { Column, UI } from './ui';
+import { Render, createLoop, mountSketch } from './rendr/rendr';
 
+//@ts-ignore
 import master_sketch from './sketches/master_sketch';
 
-import test_ui from './sketches/tests/test_ui';
-import test_draw from './sketches/tests/test_draw';
-import test_update from './sketches/tests/test_update_draw';
-import test_construct from './sketches/tests/test_construct_draw';
-import test_generate from './sketches/tests/test_generate';
-import test_construct_generate from './sketches/tests/test_construct_generate';
-
-import { floorTo, lerp } from './rendr/utils';
+import { lerp } from './rendr/utils';
 
 const App: Component = () => {
   const max_time = 1000 / 60;
@@ -63,9 +57,9 @@ const App: Component = () => {
   return (
     <div class={styles.App}>
       <h2>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</h2>
-      <h2>execution time: {(floorTo(avg_execution_time(), 0.01)).toString().slice(0, 5).padEnd(5, "0")}</h2>
-      <h2>draw time: {(floorTo(avg_draw_time(), 0.01)).toString().slice(0, 5).padEnd(5, "0")}</h2>
-      <Row create={setup}
+      <h2>execution time: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}</h2>
+      <h2>draw time: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}</h2>
+      <Column create={setup}
         style={{
           "width": "calc(100% - 10px)",
           "height": "calc(100% - 10px)",
