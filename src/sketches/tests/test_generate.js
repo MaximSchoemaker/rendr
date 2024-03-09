@@ -24,7 +24,7 @@ export default createSketch((render, ui) => {
       const y = Math.random();
       const r = 0.003;
 
-      ctx.fillStyle = "orange";
+      ctx.fillStyle = "rgb(255, 128, 0)";
       ctx.beginPath();
       ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
       ctx.fill();

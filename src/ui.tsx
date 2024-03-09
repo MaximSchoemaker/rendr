@@ -146,7 +146,7 @@ export const Performance: Component<PerformanceProps> = (props) => {
          <div style={{
             "flex": "1",
             "display": "flex",
-            "gap": tasks.length < 20 ? "5px" : "0px",
+            "gap": tasks.length < 20 ? "2px" : "0px",
             "width": "100%",
             "min-height": "15px",
             "max-height": "15px",

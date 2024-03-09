@@ -15,9 +15,9 @@ export default createSketch((render, ui) => {
       test_ui,
       test_draw,
 
-      test_update_draw,
-      test_construct_draw,
-      test_simulate_draw,
+      // test_update_draw,
+      // test_construct_draw,
+      // test_simulate_draw,
 
       test_generate,
       test_construct_generate,
@@ -28,7 +28,10 @@ export default createSketch((render, ui) => {
    ui.createRow(ui => {
       sketches.forEach(sketch => {
          ui.createColumn(ui => {
-            let sketch_render = render.mountSketch(sketch, ui);
+            let sketch_render;
+            // ui.createColumn(ui => {
+            sketch_render = render.mountSketch(sketch, ui);
+            // });
             ui.createPerformance(sketch_render);
          });
       });

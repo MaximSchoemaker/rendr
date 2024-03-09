@@ -334,8 +334,8 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
    const done = () => is_done = true;
 
    const track = createReaction(() => {
-      is_done = false;
       i = 0;
+      is_done = false;
    });
 
    return {
@@ -343,9 +343,10 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       execute: (max_time: number) => {
 
          const start_time = performance.now();
-         if (i === 0) callbacks.reset();
+         for (; i < max_steps; i++) {
+            if (is_done) return;
 
-         for (; i < max_steps && !is_done; i++) {
+            if (i === 0) callbacks.reset();
             track(() => callbacks.execute({ i, done }));
 
             const time = performance.now();
@@ -377,6 +378,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
    let valid_count = 0;
 
    const tracks = n_arr(max_steps, i => createReaction(() => {
+      is_done = false;
       if (valid[i]) {
          valid[i] = false
          valid_count--;
@@ -387,10 +389,9 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       settings,
       execute: (max_time: number) => {
 
-         is_done = false;
          const start_time = performance.now();
-
-         for (let i = 0; i < max_steps && !is_done; i++) {
+         for (let i = 0; i < max_steps; i++) {
+            if (is_done) return;
             if (valid[i]) continue;
 
             callbacks.reset(i);
