@@ -42,8 +42,5 @@ export default createSketch((render, ui) => {
       // if (Math.random() < 0.000001) done();
    });
 
-   ui.createColumn(ui => {
-      ui.createView(view);
-      ui.createPerformance(render);
-   });
+   ui.createView(view);
 });

@@ -226,6 +226,7 @@ export function createRender(): Render {
       mountSketch: (sketch: Sketch, ui: UI) => {
          const render = mountSketch(sketch, ui);
          scheduler.schedule(render.scheduler);
+         return render;
       },
    }
 }

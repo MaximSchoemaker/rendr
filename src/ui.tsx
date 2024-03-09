@@ -37,8 +37,8 @@ export const Container: Component<ContainerProps> = (props) => {
 
    return (
       <div style={{
-         "width": "fit-content",
-         "height": "fit-content",
+         "width": "100%",
+         "height": "100%",
          "max-width": "100%",
          "max-height": "100%",
          "min-width": "0",
@@ -84,17 +84,16 @@ export const View: Component<ViewProps> = (props) => {
    //    });
    // });
 
-   //@ts-ignore
    props.canvas.style = `
       display: block;
       background-color: black;
-      width: fit-content;
-      height: fit-content;
+      width: max-content;
+      height: max-content;
       max-width: 100%;
       max-height: 100%;
       min-width: 0;
       min-height: 0;
-      flex: 0 1 100%;
+      flex: 0 1 auto;
       // aspect-ratio: 1 / 1;
       // object-fit: contain; 
    `;
@@ -145,10 +144,12 @@ export const Performance: Component<PerformanceProps> = (props) => {
    return (
       <>
          <div style={{
-            "flex": "0 1 0",
+            "flex": "1",
             "display": "flex",
             "gap": tasks.length < 20 ? "5px" : "0px",
             "width": "100%",
+            "min-height": "15px",
+            "max-height": "15px",
          }}>
             <For each={tasks}>{task =>
                <TaskPerformance task={task} />
@@ -194,8 +195,8 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
 
    return <canvas ref={ref => el = ref} width={width} height={height} style={{
       "flex": "1",
-      // "width": "auto",
-      "height": "15px",
+      "width": "100%",
+      "height": "100%",
       "min-width": "0",
       "min-height": "0",
       "image-rendering": "pixelated",

@@ -24,15 +24,13 @@ export default createSketch((render, ui) => {
       test_simulate_generate,
    ]
 
-   ui.createColumn(ui => {
 
-      ui.createRow(ui => {
-         sketches.forEach(sketch => {
-            render.mountSketch(sketch, ui);
+   ui.createRow(ui => {
+      sketches.forEach(sketch => {
+         ui.createColumn(ui => {
+            let sketch_render = render.mountSketch(sketch, ui);
+            ui.createPerformance(sketch_render);
          });
       });
-
-      ui.createPerformance(render);
-   }, { "flex-basis": "auto" });
-
+   });
 });
