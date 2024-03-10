@@ -1,5 +1,5 @@
-import { type Component, For, JSX, onMount, onCleanup } from 'solid-js';
-import { Render, Task, createAnimationLoop } from './rendr/rendr';
+import { type Component, For, JSX, onMount, onCleanup, createMemo } from 'solid-js';
+import { Cache, Parameter, Render, Task, createAnimationLoop } from './rendr/rendr';
 import { floorTo } from './rendr/utils';
 
 export type UI = {
@@ -7,6 +7,7 @@ export type UI = {
    createRow: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createView: (canvas: ViewProps["canvas"]) => void
+   createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"]) => void
    createPerformance: (render: Render) => void
 }
 
@@ -18,7 +19,10 @@ export function createUI(create: (ui: UI) => void) {
       createContainer: (create, style) => elements.push(<Container create={create} style={style} />),
       createRow: (create, style) => elements.push(<Row create={create} style={style} />),
       createColumn: (create, style) => elements.push(<Column create={create} style={style} />),
+
       createView: (canvas) => elements.push(<View canvas={canvas} />),
+      createCacheView: (cache, frame_par) => elements.push(<CacheView cache={cache} frame_par={frame_par} />),
+
       createPerformance: (render) => elements.push(<Performance render={render} />),
    });
 
@@ -72,18 +76,6 @@ type ViewProps = {
 
 export const View: Component<ViewProps> = (props) => {
 
-   // let view: HTMLCanvasElement;
-
-   // onMount(() => {
-   //    createAnimationLoop(() => {
-   //       const ctx = view.getContext("2d");
-   //       if (!ctx) return;
-
-   //       ctx.clearRect(0, 0, props.canvas.width, props.canvas.height);
-   //       ctx.drawImage(props.canvas, 0, 0);
-   //    });
-   // });
-
    props.canvas.style = `
       display: block;
       background-color: black;
@@ -99,38 +91,37 @@ export const View: Component<ViewProps> = (props) => {
    `;
 
    return props.canvas;
+}
 
-   return (
-      <div style={{
-         "display": "flex",
-         "align-items": "center",
-         "justify-content": "center",
-         "width": "100%",
-         "height": "100%",
-         "max-width": "100%",
-         "max-height": "100%",
-         "min-width": "0",
-         "min-height": "0",
-         "flex": "1 1 0",
-      }}>
-         {props.canvas}
-      </div>
-   );
+type CacheViewProps = {
+   cache: Cache<HTMLCanvasElement>
+   frame_par: Parameter<number>
+}
 
-   // return <canvas {...props.canvas}
-   //    // ref={view!}
-   //    width={props.canvas.width}
-   //    height={props.canvas.height}
-   //    style={{
-   //       "background-color": "black",
-   //       "max-width": "100%",
-   //       "max-height": "100%",
-   //       "min-width": 0,
-   //       "min-height": 0,
-   //       "display": "block",
-   //       // "flex": "0 1 1",
-   //    }}
-   // />
+export const CacheView: Component<CacheViewProps> = (props) => {
+
+   const canvas = createMemo(() => {
+      const canvas = props.cache.getLatest(props.frame_par.get())
+      if (canvas)
+         canvas.style = `
+      display: block;
+      background-color: black;
+      width: max-content;
+      height: max-content;
+      max-width: 100%;
+      max-height: 100%;
+      min-width: 0;
+      min-height: 0;
+      flex: 0 1 auto;
+      // aspect-ratio: 1 / 1;
+      // object-fit: contain; 
+   `;
+      return canvas;
+   });
+
+   return <>
+      {canvas()}
+   </>;
 }
 
 type PerformanceProps = {

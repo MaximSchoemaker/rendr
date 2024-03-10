@@ -56,9 +56,9 @@ const App: Component = () => {
 
   return (
     <div class={styles.App}>
-      <h2>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</h2>
+      {/* <h2>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</h2>
       <h2>execution time: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}</h2>
-      <h2>draw time: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}</h2>
+      <h2>draw time: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}</h2> */}
       <Column create={setup}
         style={{
           "width": "calc(100% - 10px)",

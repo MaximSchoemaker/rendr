@@ -28,7 +28,7 @@ export function createOffscreenCanvas(width: number, height: number) {
    return canvas;
 }
 
-type Parameter<T> = {
+export type Parameter<T> = {
    get: () => T,
    set: Setter<T>,
    signal: Accessor<T>,
@@ -44,7 +44,7 @@ export function createParameter<T>(initial_value: T): Parameter<T> {
    }
 }
 
-type Cache<T> = {
+export type Cache<T> = {
    count: number,
    values: Parameter<T | undefined>[],
    getParameter: (index: number) => Parameter<T | undefined>,
@@ -133,6 +133,17 @@ export type Render = {
       settings?: TaskSettings,
    ) => Cache<T>,
 
+   animate: (
+      width: number,
+      height: number,
+      max_steps: number,
+      create: (
+         view: CanvasRenderingContext2D,
+         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
+      ) => void,
+      settings?: TaskSettings,
+   ) => Cache<HTMLCanvasElement>,
+
    mountSketch: (sketch: Sketch, ui: UI) => void;
 
    scheduler: Scheduler,
@@ -217,6 +228,26 @@ export function createRender(): Render {
                if (prev_value === undefined) return;
                const new_value = create(prev_value, { i, done });
                cache.set(i, new_value);
+            }
+         }, settings));
+
+         return cache;
+      },
+
+      animate: (width, height, max_steps, create, settings) => {
+         const cache = createCache<HTMLCanvasElement>();
+         const size = Math.min(width, height);
+
+         scheduler.schedule(createTaskCache(max_steps, {
+            reset: (index) => {
+               cache.set(index, undefined);
+            },
+            execute: ({ i, done }) => {
+               const canvas = cache.get(i) ?? createCanvas(width, height);
+               const ctx = canvas.getContext("2d")!;
+               ctx.clearRect(0, 0, width, height);
+               create(ctx, { width, height, size, index: i, max_steps, done });
+               cache.set(i, canvas);
             }
          }, settings));
 
