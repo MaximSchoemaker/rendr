@@ -137,12 +137,20 @@ export const Status: Component<StatusProps> = (props) => {
          <div style={{
             // "flex": "1",
             "display": "flex",
+            "flex-direction": "column",
             "gap": tasks.length < 20 ? "2px" : "0px",
+            // "height": "0",
             "width": "100%",
+            // "outline": "1px solid orange",
+            // "outline-offset": "-1px",
+            "align-self": "flex-start",
          }}>
             <For each={tasks}>{task =>
                <div style={{
-                  "width": "100%"
+                  "display": "flex",
+                  "width": "100%",
+                  "height": "20px",
+                  "gap": "2px",
                }}>
                   <TaskProgress task={task} />
                   <TaskPerformance task={task} />
@@ -193,9 +201,11 @@ export const TaskProgress: Component<TaskProgressProps> = (props) => {
       "height": "100%",
       "min-width": "0",
       "min-height": "0",
+      // "max-height": "15px",
       "image-rendering": "pixelated",
       "background-color": "black",
-      "max-height": "15px",
+      // "outline": "1px solid black",
+      // "outline-offset": "-1px",
    }} />
 }
 
@@ -206,14 +216,12 @@ type TaskPerformanceProps = {
 
 export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
 
-   const width = 100;
-   const height = 20;
+   const size = 100;
+   const height = 12;
    let el: HTMLCanvasElement;
 
-   const size = 100;
    let buffer = new Array(size).fill(0);
    let head = 0;
-   const s = size / width;
    let last_run_time = 0;
    createAnimationLoop((delta) => {
       const ctx = el.getContext("2d");
@@ -224,29 +232,31 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
       last_run_time = run_time;
       head = (head + 1) % size;
 
-      ctx.clearRect(0, 0, width, height);
+      ctx.clearRect(0, 0, size, height);
       ctx.fillStyle = "rgb(255, 0, 128)";
 
       for (let i = 0; i < size; i++) {
          const index = (i + head) % size;
          const value = buffer[index];
-         const y = 1 - value;
+         if (value === 0) continue;
 
          ctx.beginPath();
-         ctx.rect(i, y * (height - s), s, s);
+         ctx.rect(i, height, 1, -Math.ceil(value * (height - 1)));
          ctx.fill();
       }
    });
 
-   return <canvas ref={ref => el = ref} width={width} height={height} style={{
+   return <canvas ref={ref => el = ref} width={size} height={height} style={{
       "flex": "1",
       "width": "100%",
-      "height": "100%",
+      // "height": "100%",
+      // "max-width": "100%",
+      // "height": height + "px",
       "min-width": "0",
       "min-height": "0",
       "image-rendering": "pixelated",
-      "background-color": "white",
-      // "max-width": "50px",
-      "max-height": height + "px",
+      // "background-color": "white",
+      "outline": "1px solid black",
+      "outline-offset": "-1px",
    }} />
 }
