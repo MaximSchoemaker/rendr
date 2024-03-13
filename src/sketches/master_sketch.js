@@ -13,29 +13,27 @@ import test_animate from './tests/test_animate';
 export default createSketch((render, ui) => {
 
    const sketches = [
-      // test_ui,
-      // test_draw,
+      test_ui,
+      test_draw,
 
-      // test_update_draw,
-      // test_construct_draw,
-      // test_simulate_draw,
+      test_update_draw,
+      test_construct_draw,
+      test_simulate_draw,
 
-      // test_generate,
-      // test_construct_generate,
-      // test_simulate_generate,
+      test_generate,
+      test_construct_generate,
+      test_simulate_generate,
 
       test_animate
    ]
 
 
    ui.createRow(ui => {
-      sketches.forEach(sketch => {
+      sketches.forEach((sketch, i) => {
          ui.createColumn(ui => {
             let sketch_render;
-            // ui.createColumn(ui => {
             sketch_render = render.mountSketch(sketch, ui);
-            // });
-            ui.createPerformance(sketch_render);
+            if (sketch != test_ui) ui.createStatus(sketch_render);
          });
       });
    });

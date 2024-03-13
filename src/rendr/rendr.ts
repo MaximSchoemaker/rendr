@@ -277,6 +277,7 @@ function createScheduler() {
 
    const scheduler: Scheduler = {
       tasks: [],
+      run_time: 0,
       settings: {
          sync: false,
       },
@@ -299,7 +300,10 @@ function createScheduler() {
             }
 
             const task_max_time = timeLeft() / (task_count);
+            const task_start_time = performance.now();
             task.execute(task_max_time);
+            const task_time = performance.now() - task_start_time;
+            task.run_time += task_time;
          }
       },
 
@@ -325,6 +329,7 @@ function createScheduler() {
 
 export type Task = {
    settings: TaskSettings;
+   run_time: number;
    execute: (max_time: number) => void;
    isDone: () => boolean;
    progress: () => number;
@@ -341,6 +346,7 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
 
    return {
       settings,
+      run_time: 0,
       execute: () => {
          track(() => execute());
          is_done = true;
@@ -371,6 +377,7 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
 
    return {
       settings,
+      run_time: 0,
       execute: (max_time: number) => {
 
          const start_time = performance.now();
@@ -418,6 +425,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
 
    return {
       settings,
+      run_time: 0,
       execute: (max_time: number) => {
 
          const start_time = performance.now();

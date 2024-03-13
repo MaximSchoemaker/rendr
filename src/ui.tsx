@@ -1,4 +1,4 @@
-import { type Component, For, JSX, onMount, onCleanup, createMemo } from 'solid-js';
+import { type Component, For, JSX, onMount, onCleanup, createMemo, createSignal } from 'solid-js';
 import { Cache, Parameter, Render, Task, createAnimationLoop } from './rendr/rendr';
 import { floorTo } from './rendr/utils';
 
@@ -8,7 +8,7 @@ export type UI = {
    createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createView: (canvas: ViewProps["canvas"]) => void
    createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"]) => void
-   createPerformance: (render: Render) => void
+   createStatus: (render: Render) => void
 }
 
 export function createUI(create: (ui: UI) => void) {
@@ -23,7 +23,7 @@ export function createUI(create: (ui: UI) => void) {
       createView: (canvas) => elements.push(<View canvas={canvas} />),
       createCacheView: (cache, frame_par) => elements.push(<CacheView cache={cache} frame_par={frame_par} />),
 
-      createPerformance: (render) => elements.push(<Performance render={render} />),
+      createStatus: (render) => elements.push(<Status render={render} />),
    });
 
    return elements;
@@ -124,26 +124,29 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    </>;
 }
 
-type PerformanceProps = {
+type StatusProps = {
    render: Render
 }
 
-export const Performance: Component<PerformanceProps> = (props) => {
+export const Status: Component<StatusProps> = (props) => {
 
    const tasks = props.render.scheduler.tasks;
 
    return (
       <>
          <div style={{
-            "flex": "1",
+            // "flex": "1",
             "display": "flex",
             "gap": tasks.length < 20 ? "2px" : "0px",
             "width": "100%",
-            "min-height": "15px",
-            "max-height": "15px",
          }}>
             <For each={tasks}>{task =>
-               <TaskPerformance task={task} />
+               <div style={{
+                  "width": "100%"
+               }}>
+                  <TaskProgress task={task} />
+                  <TaskPerformance task={task} />
+               </div>
             }</For>
          </div>
          {/* <div style={{
@@ -152,17 +155,17 @@ export const Performance: Component<PerformanceProps> = (props) => {
             "gap": "5px",
             "max-width": "100%",
          }}>
-            <TaskPerformance task={props.render.scheduler} />
+            <TaskProgress task={props.render.scheduler} />
          </div> */}
       </>
    );
 }
 
-type TaskPerformanceProps = {
+type TaskProgressProps = {
    task: Task
 }
 
-export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
+export const TaskProgress: Component<TaskProgressProps> = (props) => {
 
    const width = 100;
    const height = 1;
@@ -192,5 +195,58 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
       "min-height": "0",
       "image-rendering": "pixelated",
       "background-color": "black",
+      "max-height": "15px",
+   }} />
+}
+
+
+type TaskPerformanceProps = {
+   task: Task
+}
+
+export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
+
+   const width = 100;
+   const height = 20;
+   let el: HTMLCanvasElement;
+
+   const size = 100;
+   let buffer = new Array(size).fill(0);
+   let head = 0;
+   const s = size / width;
+   let last_run_time = 0;
+   createAnimationLoop((delta) => {
+      const ctx = el.getContext("2d");
+      if (!ctx) return;
+
+      const { run_time } = props.task;
+      buffer[head] = (run_time - last_run_time) / delta;
+      last_run_time = run_time;
+      head = (head + 1) % size;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "rgb(255, 0, 128)";
+
+      for (let i = 0; i < size; i++) {
+         const index = (i + head) % size;
+         const value = buffer[index];
+         const y = 1 - value;
+
+         ctx.beginPath();
+         ctx.rect(i, y * (height - s), s, s);
+         ctx.fill();
+      }
+   });
+
+   return <canvas ref={ref => el = ref} width={width} height={height} style={{
+      "flex": "1",
+      "width": "100%",
+      "height": "100%",
+      "min-width": "0",
+      "min-height": "0",
+      "image-rendering": "pixelated",
+      "background-color": "white",
+      // "max-width": "50px",
+      "max-height": height + "px",
    }} />
 }
