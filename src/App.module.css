@@ -1,292 +1,39 @@
 .App {
+  text-align: center;
   display: flex;
-  /* flex-direction: column; */
-  width: 100vw;
+  flex-direction: column;
+  max-width: 100dvw;
+  max-height: 100dvh;
+  width: 100dvw;
   height: 100dvh;
-  /* background-color: black;  */
 }
 
-.Links {
-  flex: 1;
-  display: flex;
-  gap: 7px;
-  justify-content: center;
-  align-items: center;
-}
-
-
-@media (orientation: portrait) {
-  .Links {
-    flex-direction: column;
-  }
-}
-
-.Sketch {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  overflow: hidden;
-}
-
-.Container {
-  flex: 1;
-  
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  position: relative;
-  border: 1px solid black;
-
-  container-type: size;
-}
-
-.ViewContainer {
-  flex: 1;
-  
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-evenly;
-  gap: 5px;
-  padding: 5px;
-  box-sizing: border-box;
-  flex-wrap: wrap;
-}
-
-@container (orientation: portrait) {
-  .ViewContainer {
-    flex-direction: column;
-  }
-}
-
-.Window {
-  padding: 5px;
-  background-color: black;
-}
-
-@media (orientation: landscape) {
-  .Window {
-    position: absolute;
-    top: 0;
-    right: 0;
-  
-    flex: 1;
-  }
-}
-
-.Timeline {
-  padding: 5px;
-  background-color: black;
-  --gap: 1px;
-}
-
-@media (orientation: portrait) {
-  .Timeline {
-    --gap: 0px;
-  }
-}
-
-/* @container (max-width: 860px) { */
-@container (orientation: portrait) {
-    .Timeline {
-    --gap: 0px;
-  }
-}
-
-.compressed {
-  --gap: 0px;
-}
-
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-
-  position: relative;
-}
-
-.cursorRow {
-  position: absolute;
-  display: flex;
-  inset: 0;
-  gap: var(--gap);
-}
-
-.cursor {
-  flex: 1;
-}
-
-.active {
-  outline: 4px solid #84F;
-  position: relative;
-  isolation: isolate;
-  
-  z-index: 1;
+.logo {
+  animation: logo-spin infinite 20s linear;
+  height: 40vmin;
   pointer-events: none;
 }
 
-@container (min-width: 500px) {
-  .Timeline:not(.compressed) .active::before {
-    z-index: -1;
-    content: '';
-    position: absolute;
-    inset: 0;
-    outline: 6px solid black;
-    outline-offset: -1px;
-  }
-}
-
-.Row {
-  height: 10px;
+.header {
+  background-color: #282c34;
+  min-height: 100vh;
   display: flex;
-  gap: var(--gap);
-}
-
-.frame {
-  flex: 1;
-  position: relative;
-  min-width: 0;
-}
-
-.frame:hover .flash {
-  opacity: 0.5;
-  animation-fill-mode: backwards;
-}
-
-.flash {
-  position: absolute;
-  inset: 0;
-  background-color: white;
-
-  animation-name: fade-out;
-  animation-duration: 0.5s;
-  animation-fill-mode: forwards;
-
-  /* animation-duration: 0.05s;
-  animation-timing-function: steps(1); */
-}
-
-.frame:hover .frameTooltip {
-  display: block;
-}
-
-.frameTooltip {
-  display: none;
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  transform: translate(-50%, -100%);
-  z-index: 1;
-
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
   color: white;
-  background-color: black;
-  border: 1px solid white;
-  user-select: none;
-  padding: 5px;
 }
 
+.link {
+  color: #b318f0;
+}
 
-@keyframes fade-out {
+@keyframes logo-spin {
   from {
-      opacity: 0.75;
+    transform: rotate(0deg);
   }
   to {
-    opacity: 0;
+    transform: rotate(360deg);
   }
-}
-
-.valid {
-  /* background-color: #0F4; */
-  background-color: #0F8;
-}
-.invalid {
-  background-color: #F80;
-}
-.pending {
-  background-color: white;
-}
-
-.View {
-  flex: 1;
-  align-self: center;
-
-  min-width: 0; 
-  min-height: 0;
-
-  max-width: min-content;
-  max-height: 100%;
-
-  display: block;
-  /* outline: 1px solid black; */
-  object-fit: contain;
-}
-
-
-@container (orientation: portrait) {
-  .View {    
-    max-width: 100%;
-    max-height: min-content;
-   }
-}
-
-.Parameter {
-  background-color: black;
-  color: #0f8;
-
-  display: flex;
-  align-items: center;
-
-  cursor: pointer;
-
-  --progress: .5;
-  background-image: linear-gradient(90deg, #084, 50%, transparent 50%);
-  background-size: 200%;
-  background-position: calc((1 - var(--progress)) * 100%);
-
-  border: 1px solid currentColor;
-  /* outline-offset: -0.5px; */
-  box-sizing: border-box;
-
-  padding: 1px;
-  padding-left: 5px;
-
-  font-size: 13px;
-}
-
-.Parameter:not(:first-child) {
-  margin-top: -1px;
-}
-
-.Parameter:focus-within {
-  outline: 2px solid #F80;
-  outline-offset: -2px;
-  background-image: linear-gradient(90deg, #840, 50%, transparent 50%);
-  color: #F80;
-}
-
-.parameterName {
-  flex: 1;
-  user-select: none;
-}
-.parameterSeparator {
-  padding: 0 3px;
-}
-
-.parameterInput {
-  width: 80px;
-  border: none;
-  color: currentColor;
-  background-color: transparent;
-  outline: none;
-  font-size: 1em;
-  font-family: monospace;
-  text-overflow: ellipsis;
 }

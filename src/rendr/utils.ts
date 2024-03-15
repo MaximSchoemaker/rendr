@@ -24,7 +24,7 @@ export const clamp = (val: number, min = 0, max = 1) => {
 }
 
 export const floorTo = (val: number, step: number) => {
-   return Math.floor(val / step) * step;
+   return Math.floor(val * step) / step;
 }
 
 export const map = (v: number, in_from: number, in_to: number, out_from: number, out_to: number) => {
@@ -34,6 +34,10 @@ export const map = (v: number, in_from: number, in_to: number, out_from: number,
 
 export const lerp = (v: number, from: number, to: number) => {
    return map(v, 0, 1, from, to);
+};
+
+export const tri = (t: number) => {
+   return 1 - Math.abs(1 - mod(t) * 2);
 };
 
 export const sin = (t: number) => {
@@ -59,3 +63,10 @@ export const cosn = (t: number) => {
 export const inv_cosn = (t: number) => {
    return 1 - cosn(t);
 };
+
+export const download_url = (url: string, name?: string) => {
+   const a = document.createElement('a')
+   a.href = url
+   a.download = name ?? ''
+   a.click()
+}
