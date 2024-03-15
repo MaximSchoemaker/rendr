@@ -76,7 +76,8 @@ export default createSketch((render, ui) => {
    }, { sync: false });
 
    const frame_cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, { index }) => {
-      const t = (0.1 + index / FRAMES) % 1;
+      const t = (index / FRAMES) % 1;
+      // const t = (0.1 + index / FRAMES) % 1;
 
       const lt = inv_cosn(t);
 

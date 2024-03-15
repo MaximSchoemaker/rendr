@@ -26,7 +26,7 @@ export default createSketch((render, ui) => {
       // test_construct_generate,
       // test_simulate_generate,
 
-      test_animate,
+      // test_animate,
 
       langton
    ]
@@ -41,7 +41,7 @@ export default createSketch((render, ui) => {
          });
       });
       ui.createRow(ui => {
-         // sketches_renders.forEach(render => render && ui.createStatus(render));
+         sketches_renders.forEach(render => render && ui.createStatus(render));
       }, { "height": "auto", "flex": "unset" });
    });
 });
