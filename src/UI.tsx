@@ -1,6 +1,8 @@
-import { type Component, For, JSX, onMount, onCleanup, createMemo, createSignal } from 'solid-js';
+import { type Component, For, JSX, onMount, onCleanup, createMemo, createSignal, Show, createEffect } from 'solid-js';
 import { Cache, Parameter, Render, Task, createAnimationLoop } from './rendr/rendr';
-import { floorTo } from './rendr/utils';
+import { download_url, floorTo } from './rendr/utils';
+import styles from './UI.module.css';
+import "./libs/video-builder";
 
 export type UI = {
    createContainer: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
@@ -72,56 +74,125 @@ export const Column: Component<ContainerProps> = (props) => <Row {...props} styl
 
 type ViewProps = {
    canvas: HTMLCanvasElement
+   style: JSX.CSSProperties
 }
 
 export const View: Component<ViewProps> = (props) => {
 
-   props.canvas.style = `
-      display: block;
-      background-color: black;
-      width: max-content;
-      height: max-content;
-      max-width: 100%;
-      max-height: 100%;
-      min-width: 0;
-      min-height: 0;
-      flex: 0 1 auto;
-      // aspect-ratio: 1 / 1;
-      // object-fit: contain; 
-   `;
+   const [recording, set_recording] = createSignal(false);
 
-   return props.canvas;
+   const { canvas } = props;
+   canvas.className = styles.ViewCanvas;
+   const aspect_ratio = canvas.width / canvas.height;
+
+   function onKeyDown(evt: KeyboardEvent) {
+      if (evt.key === "Enter") {
+         set_recording(true);
+         setTimeout(() => {
+            screenshot();
+            set_recording(false);
+         });
+      }
+   }
+
+   function screenshot(name = "screenshot") {
+      const image_blob_url = canvas.toDataURL("image/png", 1);
+
+      const { width, height } = canvas;
+      const date = new Date().toLocaleString();
+      const file_name = `${name} - ${date} - ${width}x${height}.png`;
+
+      download_url(image_blob_url, file_name);
+   }
+
+   return <div class={styles.ViewContainer} tabIndex={0} onKeyDown={onKeyDown} style={{
+      "aspect-ratio": aspect_ratio,
+      ...props.style,
+   }}>
+      <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
+      {props.canvas}
+   </div>;
 }
 
 type CacheViewProps = {
    cache: Cache<HTMLCanvasElement>
    frame_par: Parameter<number>
+   style: JSX.CSSProperties
 }
 
 export const CacheView: Component<CacheViewProps> = (props) => {
 
+   const [aspect_ratio, set_aspect_ratio] = createSignal(1);
+   const [recording, set_recording] = createSignal(false);
+
    const canvas = createMemo(() => {
       const canvas = props.cache.getLatest(props.frame_par.get())
-      if (canvas)
-         canvas.style = `
-      display: block;
-      background-color: black;
-      width: max-content;
-      height: max-content;
-      max-width: 100%;
-      max-height: 100%;
-      min-width: 0;
-      min-height: 0;
-      flex: 0 1 auto;
-      // aspect-ratio: 1 / 1;
-      // object-fit: contain; 
-   `;
+      if (!canvas) return null;
+
+      canvas.className = styles.ViewCanvas;
+      set_aspect_ratio(canvas.width / canvas.height);
+
       return canvas;
    });
 
-   return <>
+   function onKeyDown(evt: KeyboardEvent) {
+      if (evt.key === "Enter") {
+         set_recording(true);
+         setTimeout(() => {
+            record();
+            set_recording(false);
+         });
+      }
+   }
+
+   function record(name = "recording", quality = 1, fps = 60) {
+      const { cache } = props;
+
+      const first_frame = cache.get(0);
+      if (!first_frame) { console.warn("cache does not have a frame at index 0", cache); return; }
+
+      const { width, height } = first_frame;
+      const date = new Date().toLocaleString();
+      const file_name = `${name} - ${date} - Q${quality} - FPS_${fps} - ${width}x${height}.avi`;
+
+      console.log(
+         "🔴 %crecording...", "color: #00FF88", "\n",
+         "name:", name, "\n",
+         "quality:", quality, "\n",
+         "fps:", fps, "\n",
+         "file_name:", file_name,
+      );
+
+      const video_builder = new VideoBuilder({ w: width, h: height, fps, quality });
+
+      for (let i = 0; i < cache.count; i++) {
+         const frame = cache.get(i);
+         if (!frame) continue;
+         video_builder.addCanvasFrame(frame);
+      }
+
+      console.log(
+         "🔨 %cbuilding...", "color: #00FF88", "\n",
+         "frames:", video_builder.frameList.length
+      );
+
+      video_builder.finish((video_blob_url: string) => {
+         console.log(
+            "🎉 %cdone!", "color: #00FF88", "\n",
+            file_name, "\n",
+            video_blob_url
+         );
+         download_url(video_blob_url, file_name)
+      });
+   }
+
+   return <div class={styles.ViewContainer} tabIndex={0} onKeyDown={onKeyDown} style={{
+      "aspect-ratio": aspect_ratio(),
+      ...props.style,
+   }}>
+      <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
       {canvas()}
-   </>;
+   </div>;
 }
 
 type StatusProps = {
@@ -217,7 +288,7 @@ type TaskPerformanceProps = {
 export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
 
    const size = 100;
-   const height = 12;
+   const height = 10;
    let el: HTMLCanvasElement;
 
    let buffer = new Array(size).fill(0);
@@ -241,7 +312,7 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
          if (value === 0) continue;
 
          ctx.beginPath();
-         ctx.rect(i, height, 1, -Math.ceil(value * (height - 1)));
+         ctx.rect(i, height, 1, -Math.ceil(value * height));
          ctx.fill();
       }
    });
@@ -255,7 +326,7 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
       "min-width": "0",
       "min-height": "0",
       "image-rendering": "pixelated",
-      // "background-color": "white",
+      // "background-color": "black",
       "outline": "1px solid black",
       "outline-offset": "-1px",
    }} />

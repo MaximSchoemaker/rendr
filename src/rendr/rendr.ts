@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
-import { UI } from '../ui';
+import { UI } from '../UI';
 import { n_arr } from './utils';
 
 export type Sketch = (render: Render, ui: UI) => void

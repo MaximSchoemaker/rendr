@@ -14,15 +14,15 @@ export default createSketch((render, ui) => {
 
    const sketches = [
       // test_ui,
-      // test_draw,
+      test_draw,
 
       // test_update_draw,
       // test_construct_draw,
       // test_simulate_draw,
 
       // test_generate,
-      test_construct_generate,
-      test_simulate_generate,
+      // test_construct_generate,
+      // test_simulate_generate,
 
       test_animate
    ]
@@ -31,10 +31,13 @@ export default createSketch((render, ui) => {
 
    ui.createColumn(ui => {
       ui.createRow(ui => {
-         sketches_renders = sketches.map((sketch, i) => render.mountSketch(sketch, ui));
+         sketches_renders = sketches.map((sketch, i) => {
+            const sketch_render = render.mountSketch(sketch, ui)
+            if (sketch !== test_ui) return sketch_render;
+         });
       }, { "height": "auto", "flex": "unset" });
       ui.createRow(ui => {
-         sketches_renders.forEach(render => ui.createStatus(render));
+         sketches_renders.forEach(render => render && ui.createStatus(render));
       }, { "height": "auto", "flex": "unset" });
    });
 });

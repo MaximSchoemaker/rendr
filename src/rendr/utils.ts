@@ -59,3 +59,10 @@ export const cosn = (t: number) => {
 export const inv_cosn = (t: number) => {
    return 1 - cosn(t);
 };
+
+export const download_url = (url: string, name?: string) => {
+   const a = document.createElement('a')
+   a.href = url
+   a.download = name ?? ''
+   a.click()
+}

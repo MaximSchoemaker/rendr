@@ -20,7 +20,7 @@ export default createSketch((render, ui) => {
    const cache = render.simulate([], FRAMES, (points, { i }) => {
       for_n(COUNT / FRAMES, () => points.push({ x: Math.random(), y: Math.random() }));
       return points;
-   }, { sync: false });
+   }, { sync: true });
 
    const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
       const { width, height, size } = props;
