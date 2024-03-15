@@ -4,12 +4,19 @@ import { download_url, floorTo } from './rendr/utils';
 import styles from './UI.module.css';
 import "./libs/video-builder";
 
+declare class VideoBuilder {
+   constructor(config: { w: number, h: number, fps: number, quality: number })
+   addCanvasFrame(canvas: HTMLCanvasElement | OffscreenCanvas): void
+   finish(onFinish: (video_blob_url: string) => void): void
+   frameList: Blob[]
+}
+
 export type UI = {
    createContainer: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createRow: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
-   createView: (canvas: ViewProps["canvas"]) => void
-   createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"]) => void
+   createView: (canvas: ViewProps["canvas"], style?: JSX.CSSProperties) => void
+   createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"], style?: JSX.CSSProperties) => void
    createStatus: (render: Render) => void
 }
 
@@ -22,8 +29,8 @@ export function createUI(create: (ui: UI) => void) {
       createRow: (create, style) => elements.push(<Row create={create} style={style} />),
       createColumn: (create, style) => elements.push(<Column create={create} style={style} />),
 
-      createView: (canvas) => elements.push(<View canvas={canvas} />),
-      createCacheView: (cache, frame_par) => elements.push(<CacheView cache={cache} frame_par={frame_par} />),
+      createView: (canvas, style) => elements.push(<View canvas={canvas} style={style} />),
+      createCacheView: (cache, frame_par, style) => elements.push(<CacheView cache={cache} frame_par={frame_par} style={style} />),
 
       createStatus: (render) => elements.push(<Status render={render} />),
    });
@@ -74,7 +81,7 @@ export const Column: Component<ContainerProps> = (props) => <Row {...props} styl
 
 type ViewProps = {
    canvas: HTMLCanvasElement
-   style: JSX.CSSProperties
+   style?: JSX.CSSProperties
 }
 
 export const View: Component<ViewProps> = (props) => {
@@ -117,7 +124,7 @@ export const View: Component<ViewProps> = (props) => {
 type CacheViewProps = {
    cache: Cache<HTMLCanvasElement>
    frame_par: Parameter<number>
-   style: JSX.CSSProperties
+   style?: JSX.CSSProperties
 }
 
 export const CacheView: Component<CacheViewProps> = (props) => {
