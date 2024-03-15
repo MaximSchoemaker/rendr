@@ -50,8 +50,8 @@ export const Container: Component<ContainerProps> = (props) => {
 
    return (
       <div style={{
-         "width": "100%",
-         "height": "100%",
+         // "width": "100%",
+         // "height": "100%",
          "max-width": "100%",
          "max-height": "100%",
          "min-width": "0",
@@ -98,7 +98,7 @@ export const View: Component<ViewProps> = (props) => {
          setTimeout(() => {
             screenshot();
             set_recording(false);
-         });
+         }, 5);
       }
    }
 
@@ -133,7 +133,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    const [recording, set_recording] = createSignal(false);
 
    const canvas = createMemo(() => {
-      const canvas = props.cache.getLatest(props.frame_par.get())
+      const canvas = props.cache.getLatest(props.frame_par.get(), { dont_throw: true })
       if (!canvas) return null;
 
       canvas.className = styles.ViewCanvas;
@@ -148,14 +148,14 @@ export const CacheView: Component<CacheViewProps> = (props) => {
          setTimeout(() => {
             record();
             set_recording(false);
-         });
+         }, 5);
       }
    }
 
    function record(name = "recording", quality = 1, fps = 60) {
       const { cache } = props;
 
-      const first_frame = cache.get(0);
+      const first_frame = cache.get(0, { dont_throw: true });
       if (!first_frame) { console.warn("cache does not have a frame at index 0", cache); return; }
 
       const { width, height } = first_frame;
@@ -173,7 +173,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
       const video_builder = new VideoBuilder({ w: width, h: height, fps, quality });
 
       for (let i = 0; i < cache.count; i++) {
-         const frame = cache.get(i);
+         const frame = cache.get(i, { dont_throw: true });
          if (!frame) continue;
          video_builder.addCanvasFrame(frame);
       }

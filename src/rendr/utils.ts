@@ -36,6 +36,10 @@ export const lerp = (v: number, from: number, to: number) => {
    return map(v, 0, 1, from, to);
 };
 
+export const tri = (t: number) => {
+   return 1 - Math.abs(1 - mod(t) * 2);
+};
+
 export const sin = (t: number) => {
    return Math.sin(t * Math.PI * 2);
 };

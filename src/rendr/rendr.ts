@@ -1,6 +1,6 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
 import { UI } from '../UI';
-import { n_arr } from './utils';
+import { mod, n_arr } from './utils';
 
 export type Sketch = (render: Render, ui: UI) => void
 export function createSketch(create: Sketch, settings: SchedulerSettings) {
@@ -28,8 +28,10 @@ export function createOffscreenCanvas(width: number, height: number) {
    return canvas;
 }
 
+type getSettings = { dont_throw?: boolean, dont_track?: boolean }
+
 export type Parameter<T> = {
-   get: () => T,
+   get: (settings?: getSettings) => T,
    set: Setter<T>,
    signal: Accessor<T>,
 }
@@ -38,7 +40,13 @@ export function createParameter<T>(initial_value: T): Parameter<T> {
    const [parameter, set_parameter] = createSignal<T>(initial_value, { equals: false });
    // const deferred_parameter = createDeferred(parameter, { timeoutMs: 1000 });
    return {
-      get: () => parameter(),
+      get: (settings) => {
+         const value = !settings?.dont_track
+            ? parameter()
+            : untrack(parameter);
+         if (!settings?.dont_throw && value === undefined) throw new Error("parameter undefined");
+         return value;
+      },
       set: set_parameter,
       signal: parameter,
    }
@@ -48,8 +56,8 @@ export type Cache<T> = {
    count: number,
    values: Parameter<T | undefined>[],
    getParameter: (index: number) => Parameter<T | undefined>,
-   get: (index: number) => T | undefined,
-   getLatest: (index: number) => T | undefined,
+   get: (index: number, settings?: getSettings) => T | undefined,
+   getLatest: (index: number, settings?: getSettings) => T | undefined,
    set: (index: number, value: T | undefined) => void,
    valid: (index: number) => boolean,
 }
@@ -65,22 +73,21 @@ export function createCache<T>(): Cache<T> {
          }
          return this.values[index]
       },
-      get(index) {
-         return this.getParameter(index).get();
+      get(index, settings) {
+         return this.getParameter(index).get(settings);
       },
-      getLatest(index) {
-         let value;
-         do {
-            value = this.get(index);
-            index--;
-         } while (value === undefined && index >= 0)
-         return value;
+      getLatest(index, settings) {
+         this.count = Math.max(index + 1, this.count);
+         for (let n = 0; n < this.count; n++) {
+            const i = mod(index - n, this.count);
+            if (this.valid(i)) return this.get(i, settings);
+         }
       },
       set(index, value) {
          this.getParameter(index).set(() => value);
       },
       valid(index) {
-         return this.get(index) === undefined;
+         return this.get(index, { dont_throw: true }) !== undefined;
       },
    }
 }
@@ -243,7 +250,7 @@ export function createRender(): Render {
                cache.set(index, undefined);
             },
             execute: ({ i, done }) => {
-               const canvas = cache.get(i) ?? createCanvas(width, height);
+               const canvas = cache.get(i, { dont_track: true, dont_throw: true }) ?? createCanvas(width, height);
                const ctx = canvas.getContext("2d")!;
                ctx.clearRect(0, 0, width, height);
                create(ctx, { width, height, size, index: i, max_steps, done });
@@ -348,8 +355,12 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
       settings,
       run_time: 0,
       execute: () => {
-         track(() => execute());
-         is_done = true;
+         try {
+            track(() => execute());
+            is_done = true;
+         } catch (err) {
+            // console.error(err);
+         }
       },
       isDone: () => {
          return is_done;
@@ -379,20 +390,23 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       settings,
       run_time: 0,
       execute: (max_time: number) => {
+         try {
+            const start_time = performance.now();
+            for (; i < max_steps; i++) {
+               if (is_done) return;
 
-         const start_time = performance.now();
-         for (; i < max_steps; i++) {
-            if (is_done) return;
+               if (i === 0) callbacks.reset();
+               track(() => callbacks.execute({ i, done }));
 
-            if (i === 0) callbacks.reset();
-            track(() => callbacks.execute({ i, done }));
+               const time = performance.now();
+               const run_time = time - start_time;
+               if (run_time > max_time) return;
+            }
 
-            const time = performance.now();
-            const run_time = time - start_time;
-            if (run_time > max_time) return;
+            is_done = true;
+         } catch (err) {
+            // console.error(err);
          }
-
-         is_done = true;
       },
       isDone: () => {
          return is_done;
@@ -420,6 +434,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       if (valid[i]) {
          valid[i] = false
          valid_count--;
+         callbacks.reset(i);
       }
    }));
 
@@ -427,15 +442,16 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       settings,
       run_time: 0,
       execute: (max_time: number) => {
-
          const start_time = performance.now();
          for (let i = 0; i < max_steps; i++) {
             if (is_done) return;
             if (valid[i]) continue;
 
-            callbacks.reset(i);
-            tracks[i](() => callbacks.execute({ i, done }));
-
+            try {
+               tracks[i](() => callbacks.execute({ i, done }));
+            } catch (err) {
+               // console.error(err);
+            }
             valid[i] = true;
             valid_count++;
 
@@ -444,7 +460,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
             if (run_time > max_time) return;
          }
 
-         is_done = true;
+         is_done = valid_count === max_steps;
       },
       isDone: () => {
          return is_done;

@@ -8,7 +8,10 @@ const FRAMES = 400;
 
 export default createSketch((render, ui) => {
 
+   const frame_par = createParameter(0);
+
    const cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+      // console.log(frame_par.get());
       const { width, height, size, index } = props;
       const t = mod(0.75 + index / FRAMES);
 
@@ -33,7 +36,6 @@ export default createSketch((render, ui) => {
       }
    });
 
-   const frame_par = createParameter(0);
    createAnimationLoop(() => {
       frame_par.set(frame => (frame + 1) % FRAMES)
    });

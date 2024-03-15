@@ -29,7 +29,8 @@
 }
 
 .ViewCanvas {
-  background-color: black;
+  background-color: black;  
+  /* background: repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 4% 4%; */
 
   width: max-content;
   height: max-content;
