@@ -31,11 +31,7 @@ export default createSketch((render, ui) => {
     const { width, height } = props;
 
     const positions = positions_par.get();
-    const t = tick / BUFFER_LENGTH;
-
-    ctx.beginPath();
-    const inital_pos = positions[0];
-    if (inital_pos) ctx.moveTo(inital_pos.x * width, inital_pos.y * height);
+    const t = mod(tick / BUFFER_LENGTH, 1);
 
     for (let i = 0; i < positions.length - 1; i++) {
       const pos = positions[i];
@@ -44,27 +40,30 @@ export default createSketch((render, ui) => {
       const f = (i + 1) / BUFFER_LENGTH;
       const radius = f;
 
-      const c = t + f;
-      const r = lerp(cosn(c + 0 / 3), 0, f);
-      const g = lerp(cosn(c + 1 / 3), 0, f);
-      const b = lerp(cosn(c + 2 / 3), 0, f);
+      const color_f = t + f;
+      const r = lerp(cosn(color_f + 0 / 3), 0, f);
+      const g = lerp(cosn(color_f + 1 / 3), 0, f);
+      const b = lerp(cosn(color_f + 2 / 3), 0, f);
       const a = 1;
 
-      ctx.strokeStyle = "red";
-      ctx.lineCap = "round";
+      {
+        ctx.strokeStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
+        ctx.lineCap = "round";
+        ctx.lineWidth = radius * 150;
 
-      ctx.lineWidth = radius * 150;
-      ctx.strokeStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
+        ctx.beginPath();
+        ctx.moveTo(pos.x * width, pos.y * height);
+        ctx.lineTo(next_pos.x * width, next_pos.y * height);
+        ctx.stroke();
+      }
 
-      ctx.beginPath();
-      ctx.moveTo(pos.x * width, pos.y * height);
-      ctx.lineTo(next_pos.x * width, next_pos.y * height);
-      ctx.stroke();
+      // {
+      //   ctx.fillStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
 
-      // ctx.beginPath();
-      // ctx.arc(x * width, y * height, r * 50, 0, Math.PI * 2);
-      // ctx.fillStyle = "red";
-      // ctx.fill();
+      //   ctx.beginPath();
+      //   ctx.arc(pos.x * width, pos.y * height, radius * 50, 0, Math.PI * 2);
+      //   ctx.fill();
+      // }
     }
   })
 
