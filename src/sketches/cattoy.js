@@ -1,9 +1,5 @@
-import {
-  createAnimationLoop,
-  createParameter,
-  createSketch,
-} from "../rendr/rendr";
-import { cosn, lerp, mod, sinn, sin, cos } from "../rendr/utils";
+import { createAnimationLoop, createParameter, createSketch } from "../rendr/rendr";
+import { lerp, mod, sinn, cosn } from "../rendr/utils";
 
 // const SCALE = 1;
 // const WIDTH = 1080 * SCALE;
@@ -11,7 +7,6 @@ import { cosn, lerp, mod, sinn, sin, cos } from "../rendr/utils";
 
 const WIDTH = window.innerWidth;
 const HEIGHT = window.innerHeight;
-const SIZE = Math.min(WIDTH, HEIGHT);
 
 const FRAMES = 1000;
 const BUFFER_LENGTH = 200;
@@ -42,22 +37,19 @@ export default createSketch((render, ui) => {
   });
 
   const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
-    const { width, height } = props;
+    const { width, height, size } = props;
 
-    const {
-      positions, camera_x, camera_y } = state.get();
-    const t = mod(frame_par.get() / FRAMES, 1);
+    const { positions } = state.get();
+    const t = frame_par.get() / FRAMES;
 
     for (let i = 0; i < positions.length - 1; i++) {
       const index = i;
       const next_index = i + 1;
-      const pos = positions[index];
-      const next_pos = positions[next_index];
 
       const f = (i + 1) / BUFFER_LENGTH;
       const radius = lerp(sinn(f + t * 2), 0.1, 1);
 
-      // const color_f = t + f;
+      // const color_f = t * Math.PI / 2 + f;
       // const r = lerp(cosn(color_f + 0 / 3), 0, f);
       // const g = lerp(cosn(color_f + 1 / 3), 0, f);
       // const b = lerp(cosn(color_f + 2 / 3), 0, f);
@@ -79,7 +71,7 @@ export default createSketch((render, ui) => {
       {
         ctx.strokeStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
         ctx.lineCap = "round";
-        ctx.lineWidth = radius * SIZE / 3;
+        ctx.lineWidth = radius * size / 3;
 
         ctx.beginPath();
         ctx.moveTo(getX(index) * width, getY(index) * height);
@@ -89,15 +81,15 @@ export default createSketch((render, ui) => {
 
       // {
       //   ctx.fillStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
-
+      // 
       //   ctx.beginPath();
-      //   ctx.arc(pos.x * width, pos.y * height, radius * 50, 0, Math.PI * 2);
+      //   ctx.arc(getX(index) * width, getY(index) * height, radius * SIZE / 6, 0, Math.PI * 2);
       //   ctx.fill();
       // }
     }
   })
 
-  createAnimationLoop(() => frame_par.set(frame => (frame + 1) % FRAMES));
+  createAnimationLoop(() => frame_par.set(frame => frame + 1));
 
   view.onmousemove = (e) => {
     const rect = view.getBoundingClientRect();
