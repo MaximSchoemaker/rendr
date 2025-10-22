@@ -95,7 +95,7 @@ export function createCache<T>(): Cache<T> {
 export type Render = {
    update: <T>(
       initial_value: T,
-      create: () => T,
+      create: (value: T) => T,
       settings?: TaskSettings,
    ) => Parameter<T>,
 
@@ -166,7 +166,8 @@ export function createRender(): Render {
          const parameter = createParameter(initial_value);
 
          scheduler.schedule(createTask(() => {
-            const new_value = create();
+            const value = untrack(parameter.signal);
+            const new_value = create(value);
             parameter.set(() => new_value);
          }, settings));
 
