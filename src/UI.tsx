@@ -251,7 +251,7 @@ export const Status: Component<StatusProps> = (props) => {
 
    const tasks = props.render.scheduler.tasks;
 
-   const [hidden, setHidden] = createSignal(false);
+   const [hidden, setHidden] = createSignal(true);
 
    function onKeyDown(evt: KeyboardEvent) {
       console.log(evt.key);
