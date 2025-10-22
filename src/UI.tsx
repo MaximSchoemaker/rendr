@@ -87,19 +87,37 @@ type ViewProps = {
 export const View: Component<ViewProps> = (props) => {
 
    const [recording, set_recording] = createSignal(false);
+   const [fullscreen, setFullscreen] = createSignal(false);
 
    const { canvas } = props;
    canvas.className = styles.ViewCanvas;
    const aspect_ratio = canvas.width / canvas.height;
 
    function onKeyDown(evt: KeyboardEvent) {
-      if (evt.key === "Enter") {
-         set_recording(true);
-         setTimeout(() => {
-            screenshot();
-            set_recording(false);
-         }, 5);
+      switch (evt.key) {
+         case "Enter":
+            onScreenshot();
+            break;
+         case "f":
+            onFullscreen();
+            break;
       }
+   }
+
+   function onScreenshot() {
+      set_recording(true);
+      setTimeout(() => {
+         screenshot();
+         set_recording(false);
+      }, 5);
+   }
+
+   function onFullscreen(value?: boolean) {
+      if (value === undefined) {
+         setFullscreen(fs => !fs);
+         return;
+      }
+      setFullscreen(value);
    }
 
    function screenshot(name = "screenshot") {
@@ -112,8 +130,10 @@ export const View: Component<ViewProps> = (props) => {
       download_url(image_blob_url, file_name);
    }
 
-   return <div class={styles.ViewContainer} tabIndex={0} onKeyDown={onKeyDown} style={{
-      "aspect-ratio": aspect_ratio,
+   const className = () => `${styles.ViewContainer} ${fullscreen() ? styles.fullscreen : ''}`;
+
+   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} style={{
+      "aspect-ratio": fullscreen() ? undefined : aspect_ratio,
       ...props.style,
    }}>
       <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
