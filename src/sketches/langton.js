@@ -30,7 +30,7 @@ const TURNS = [0.25, -0.25, -0.25, 0.25];
 
 export default createSketch((render, ui) => {
 
-   const steps_par = createParameter(200 / STATES_PER_FRAME, "steps_par");
+   const steps_par = createParameter(200 / STATES_PER_FRAME);
 
    const width = 99;
    const height = 99;

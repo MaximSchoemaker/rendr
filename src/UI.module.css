@@ -4,6 +4,7 @@
   --purple: rgb(128, 0, 255);
 }
 
+
 .recordIcon {
   position: absolute;
   top: 10px;
@@ -11,7 +12,7 @@
 }
 
 .ViewContainer {
-  position: relative;
+  /* position: relative; */
   display: flex;
   /* flex: 0 1 auto; */
   /* width: fit-content; */
@@ -22,14 +23,28 @@
   min-height: 0;
 }
 
+.ViewContainer.fullscreen {
+  position: fixed;
+  inset: 0;
+}
+
+.ViewContainer.fullscreen .ViewCanvas {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
 .ViewContainer:focus {
   border-radius: 2px;
   outline: 5px var(--purple) solid;
+  /* outline: 1px solid white; */
   outline-offset: 0px;
 }
 
 .ViewCanvas {
+  /* border: 1px solid white; */
   background-color: black;  
+  /* background-color: white; */
   /* background: repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 4% 4%; */
 
   width: max-content;

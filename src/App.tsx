@@ -61,6 +61,7 @@ const App: Component = () => {
       <h2>draw time: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}</h2> */}
       <Column create={setup}
         style={{
+          background: 'black',
           // "width": "calc(100% - 10px)",
           // "height": "calc(100% - 10px)",
           "max-width": "calc(100% - 10px)",

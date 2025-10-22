@@ -131,6 +131,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
 
    const [aspect_ratio, set_aspect_ratio] = createSignal(1);
    const [recording, set_recording] = createSignal(false);
+   const [fullscreen, setFullscreen] = createSignal(false);
 
    const canvas = createMemo(() => {
       const canvas = props.cache.getLatest(props.frame_par.get(), { dont_throw: true })
@@ -143,13 +144,30 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    });
 
    function onKeyDown(evt: KeyboardEvent) {
-      if (evt.key === "Enter") {
-         set_recording(true);
-         setTimeout(() => {
-            record();
-            set_recording(false);
-         }, 5);
+      switch (evt.key) {
+         case "Enter":
+            onRecord();
+            break;
+         case "f":
+            onFullscreen();
+            break;
       }
+   }
+
+   function onRecord() {
+      set_recording(true);
+      setTimeout(() => {
+         record();
+         set_recording(false);
+      }, 5);
+   }
+
+   function onFullscreen(value?: boolean) {
+      if (value === undefined) {
+         setFullscreen(fs => !fs);
+         return;
+      }
+      setFullscreen(value);
    }
 
    function record(name = "recording", quality = 1, fps = 60) {
@@ -193,8 +211,11 @@ export const CacheView: Component<CacheViewProps> = (props) => {
       });
    }
 
-   return <div class={styles.ViewContainer} tabIndex={0} onKeyDown={onKeyDown} style={{
-      "aspect-ratio": aspect_ratio(),
+
+   const className = () => `${styles.ViewContainer} ${fullscreen() ? styles.fullscreen : ''}`;
+
+   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} style={{
+      "aspect-ratio": fullscreen() ? undefined : aspect_ratio(),
       ...props.style,
    }}>
       <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
@@ -210,8 +231,21 @@ export const Status: Component<StatusProps> = (props) => {
 
    const tasks = props.render.scheduler.tasks;
 
+   const [hidden, setHidden] = createSignal(false);
+
+   function onKeyDown(evt: KeyboardEvent) {
+      console.log(evt.key);
+      switch (evt.key) {
+         case "h":
+            setHidden(h => !h);
+      }
+   }
+
+   window.addEventListener("keydown", onKeyDown);
+   onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+
    return (
-      <>
+      <Show when={!hidden()}>
          <div style={{
             // "flex": "1",
             "display": "flex",
@@ -235,15 +269,7 @@ export const Status: Component<StatusProps> = (props) => {
                </div>
             }</For>
          </div>
-         {/* <div style={{
-            "flex": "0 1 0",
-            "display": "flex",
-            "gap": "5px",
-            "max-width": "100%",
-         }}>
-            <TaskProgress task={props.render.scheduler} />
-         </div> */}
-      </>
+      </Show>
    );
 }
 
@@ -281,9 +307,9 @@ export const TaskProgress: Component<TaskProgressProps> = (props) => {
       "min-height": "0",
       // "max-height": "15px",
       "image-rendering": "pixelated",
-      "background-color": "black",
-      // "outline": "1px solid black",
-      // "outline-offset": "-1px",
+      // "background-color": "black",
+      "outline": "1px solid white",
+      "outline-offset": "-1px",
    }} />
 }
 
@@ -334,7 +360,7 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
       "min-height": "0",
       "image-rendering": "pixelated",
       // "background-color": "black",
-      "outline": "1px solid black",
+      "outline": "1px solid white",
       "outline-offset": "-1px",
    }} />
 }

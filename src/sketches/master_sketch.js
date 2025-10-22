@@ -14,37 +14,37 @@ import langton from "./langton";
 import cattoy from "./cattoy";
 
 export default createSketch((render, ui) => {
-  const sketches = [
-    // test_ui,
-    // test_draw,
+   const sketches = [
+      // test_ui,
+      // test_draw,
 
-    // test_update_draw,
-    // test_construct_draw,
-    // test_simulate_draw,
+      // test_update_draw,
+      // test_construct_draw,
+      // test_simulate_draw,
 
-    // test_generate,
-    // test_construct_generate,
-    // test_simulate_generate,
+      // test_generate,
+      // test_construct_generate,
+      // test_simulate_generate,
 
-    // test_animate,
-    // langton,
-    cattoy
-  ];
+      // test_animate,
+      // langton,
+      cattoy
+   ];
 
-  let sketches_renders;
+   let sketches_renders;
 
-  ui.createColumn((ui) => {
-    ui.createRow((ui) => {
-      sketches_renders = sketches.map((sketch, i) => {
-        const sketch_render = render.mountSketch(sketch, ui);
-        if (sketch !== test_ui) return sketch_render;
+   ui.createColumn((ui) => {
+      ui.createRow((ui) => {
+         sketches_renders = sketches.map((sketch, i) => {
+            const sketch_render = render.mountSketch(sketch, ui);
+            if (sketch !== test_ui) return sketch_render;
+         });
       });
-    });
-    ui.createRow(
-      (ui) => {
-        sketches_renders.forEach((render) => render && ui.createStatus(render));
-      },
-      { height: "auto", flex: "unset" }
-    );
-  });
+      ui.createRow(
+         (ui) => {
+            sketches_renders.forEach((render) => render && ui.createStatus(render));
+         },
+         { height: "auto", flex: "unset" }
+      );
+   });
 });

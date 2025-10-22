@@ -449,7 +449,13 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
             if (valid[i]) continue;
 
             try {
-               tracks[i](() => callbacks.execute({ i, done }));
+               tracks[i](() => {
+                  try {
+                     callbacks.execute({ i, done })
+                  } catch (err) {
+                     // console.error(err);
+                  }
+               });
             } catch (err) {
                // console.error(err);
             }
