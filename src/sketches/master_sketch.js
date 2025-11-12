@@ -8,10 +8,12 @@ import test_generate from "./tests/test_generate";
 import test_construct_generate from "./tests/test_construct_generate";
 import test_simulate_draw from "./tests/test_simulate_draw";
 import test_simulate_generate from "./tests/test_simulate_generate";
-
 import test_animate from "./tests/test_animate";
-import langton from "./langton";
-import cattoy from "./cattoy";
+
+import langton from "./personal/langton";
+import cattoy from "./personal/cattoy";
+import funsies from "./personal/funsies";
+import funsies2 from "./personal/funsies2";
 
 export default createSketch((render, ui) => {
    const sketches = [
@@ -28,23 +30,25 @@ export default createSketch((render, ui) => {
 
       // test_animate,
       // langton,
-      cattoy
+      // cattoy
+      funsies,
+      funsies2,
    ];
 
    let sketches_renders;
 
-   ui.createColumn((ui) => {
-      ui.createRow((ui) => {
+   ui.createColumn(ui => {
+      ui.createColumn(ui => {
          sketches_renders = sketches.map((sketch, i) => {
             const sketch_render = render.mountSketch(sketch, ui);
             if (sketch !== test_ui) return sketch_render;
          });
       });
       ui.createRow(
-         (ui) => {
+         ui => {
             sketches_renders.forEach((render) => render && ui.createStatus(render));
          },
-         { height: "auto", flex: "unset" }
+         { flex: "0 1 auto" }
       );
    });
 });

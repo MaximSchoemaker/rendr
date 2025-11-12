@@ -1,5 +1,5 @@
-import { createAnimationLoop, createParameter, createSketch } from "../rendr/rendr";
-import { lerp, mod, sinn, cosn } from "../rendr/utils";
+import { createAnimationLoop, createParameter, createSketch } from "../../rendr/rendr";
+import { lerp, mod, sinn, cosn } from "../../rendr/utils";
 
 // const SCALE = 1;
 // const WIDTH = 1080 * SCALE;

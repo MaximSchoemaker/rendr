@@ -1,4 +1,4 @@
-import rendr, { createParameter, createCache, createCanvas } from "../rendr/rendr.js";
+import rendr, { createParameter, createCache, createCanvas } from "../../rendr/rendr.js";
 import { Draw2dContext } from "../rendr/library/Draw2d.js";
 import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp } from "../rendr/library/Utils.js"
 

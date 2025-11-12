@@ -1,9 +1,3 @@
-:root {
-  --orange: rgb(255, 128, 0);
-  --green: rgb(0, 255, 128);
-  --purple: rgb(128, 0, 255);
-}
-
 
 .recordIcon {
   position: absolute;
@@ -12,6 +6,7 @@
 }
 
 .ViewContainer {
+  /* border: 1px solid var(--canvas-foreground-color); */
   /* position: relative; */
   display: flex;
   /* flex: 0 1 auto; */
@@ -37,15 +32,15 @@
 
 .ViewContainer:focus {
   border-radius: 2px;
-  outline: 5px var(--purple) solid;
-  /* outline: 1px solid white; */
+  border-color: transparent;
+  outline: 5px var(--accent-color-2) solid;
+  /* outline: 1px solid var(--foreground-color); */
   outline-offset: 0px;
 }
 
 .ViewCanvas {
-  /* border: 1px solid white; */
-  background-color: black;  
-  /* background-color: white; */
+  background-color: var(--canvas-background-color); 
+  /* background-color: var(--foreground-color); */
   /* background: repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 4% 4%; */
 
   width: max-content;

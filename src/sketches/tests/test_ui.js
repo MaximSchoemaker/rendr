@@ -44,7 +44,7 @@ export default createSketch((render, ui) => {
          })
       }
    }, {
-      "flex": "0 1 1",
-      "height": "auto"
+      flex: "0 1 1",
+      height: "auto"
    });
 });

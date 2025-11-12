@@ -251,7 +251,7 @@ export const Status: Component<StatusProps> = (props) => {
 
    const tasks = props.render.scheduler.tasks;
 
-   const [hidden, setHidden] = createSignal(true);
+   const [hidden, setHidden] = createSignal(false);
 
    function onKeyDown(evt: KeyboardEvent) {
       console.log(evt.key);
@@ -327,9 +327,9 @@ export const TaskProgress: Component<TaskProgressProps> = (props) => {
       "min-height": "0",
       // "max-height": "15px",
       "image-rendering": "pixelated",
-      // "background-color": "black",
-      "outline": "1px solid white",
-      "outline-offset": "-1px",
+      // "background-color": "var(--background-color)",
+      "border": "1px solid var(--foreground-color)",
+      // "outline-offset": "-1px",
    }} />
 }
 
@@ -373,14 +373,14 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
    return <canvas ref={ref => el = ref} width={size} height={height} style={{
       "flex": "1",
       "width": "100%",
-      // "height": "100%",
+      "height": "100%",
       // "max-width": "100%",
       // "height": height + "px",
       "min-width": "0",
       "min-height": "0",
       "image-rendering": "pixelated",
-      // "background-color": "black",
-      "outline": "1px solid white",
-      "outline-offset": "-1px",
+      // "background-color": "var(--background-color)",
+      "border": "1px solid var(--foreground-color)",
+      // "outline-offset": "-1px",
    }} />
 }

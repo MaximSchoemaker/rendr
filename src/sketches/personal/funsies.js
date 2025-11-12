@@ -1,5 +1,5 @@
-import { createAnimationLoop, createParameter, createSketch } from '../rendr/rendr';
-import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n } from "../rendr/utils"
+import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n } from "../../rendr/utils"
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
@@ -14,13 +14,9 @@ const LOOP = 1;
 // const FRAMES = 400;
 // const LOOP = 2;
 
+const SIZE = Math.min(WIDTH, HEIGHT);
+
 export default createSketch((render, ui) => {
-
-   const tick_par = createParameter(0);
-
-   createAnimationLoop(() => {
-      tick_par.set(tick => tick + 1);
-   });
 
    const COUNT = 20;
 
@@ -69,8 +65,8 @@ export default createSketch((render, ui) => {
    }
 
    const PAD = 0.15;
-   const posX = (v) => map(v, 0, 1, PAD, 1 - PAD) * WIDTH;
-   const posY = (v) => map(v, 0, 1, PAD, 1 - PAD) * WIDTH + (HEIGHT - WIDTH) / 2;
+   const posX = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - WIDTH) / 2;
+   const posY = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - HEIGHT) / 2;
 
    const frame_par = createParameter(0);
    createAnimationLoop(() => {

@@ -1,5 +1,5 @@
-import { createAnimationLoop, createParameter, createSketch } from '../rendr/rendr';
-import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri } from "../rendr/utils"
+import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri } from "../../rendr/utils"
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
