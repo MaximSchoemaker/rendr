@@ -1,13 +1,15 @@
-import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { createAnimationLoop, createLoop, createParameter, createSketch } from '../../rendr/rendr';
 import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n } from "../../rendr/utils"
 
+const FPS = 120;
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 400;
+const FRAMES = 400 * FPS / 60;
 const LOOP = 1;
 
 // ... record settings ...
+// const FPS = 60;
 // const SCALE = 1;
 // const WIDTH = 1080 * SCALE;
 // const HEIGHT = 1920 * SCALE;
@@ -85,9 +87,9 @@ export default createSketch((render, ui) => {
    }
 
    const frame_par = createParameter(0);
-   createAnimationLoop(() => {
+   createLoop(() => {
       frame_par.set(frame => (frame + 1) % FRAMES)
-   });
+   }, 1000 / FPS);
 
    ui.createCacheView(frame_cache, frame_par);
 });
