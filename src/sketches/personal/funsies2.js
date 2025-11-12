@@ -1,18 +1,18 @@
 import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
 import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n } from "../../rendr/utils"
 
-// const SCALE = 1;
-// const WIDTH = 1080 * SCALE;
-// const HEIGHT = 1080 * SCALE;
-// const FRAMES = 800;
-// const LOOP = 1;
-
-// ... record settings ...
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
-const HEIGHT = 1920 * SCALE;
-const FRAMES = 800;
-const LOOP = 2;
+const HEIGHT = 1080 * SCALE;
+const FRAMES = 400;
+const LOOP = 1;
+
+// ... record settings ...
+// const SCALE = 1;
+// const WIDTH = 1080 * SCALE;
+// const HEIGHT = 1920 * SCALE;
+// const FRAMES = 400;
+// const LOOP = 2;
 
 const SIZE = Math.min(WIDTH, HEIGHT);
 const PAD = 0.15;

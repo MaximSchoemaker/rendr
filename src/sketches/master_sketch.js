@@ -31,14 +31,14 @@ export default createSketch((render, ui) => {
       // test_animate,
       // langton,
       // cattoy
-      funsies,
+      // funsies,
       funsies2,
    ];
 
    let sketches_renders;
 
    ui.createColumn(ui => {
-      ui.createColumn(ui => {
+      ui.createRow(ui => {
          sketches_renders = sketches.map((sketch, i) => {
             const sketch_render = render.mountSketch(sketch, ui);
             if (sketch !== test_ui) return sketch_render;
