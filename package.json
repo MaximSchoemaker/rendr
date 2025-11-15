@@ -16,6 +16,7 @@
     "vite-plugin-solid": "^2.8.2"
   },
   "dependencies": {
+    "mediabunny": "^1.25.0",
     "solid-js": "^1.8.11"
   }
 }

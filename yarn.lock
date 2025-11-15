@@ -609,6 +609,23 @@
   dependencies:
     "@babel/types" "^7.20.7"
 
+"@types/dom-mediacapture-transform@^0.1.11":
+  version "0.1.11"
+  resolved "https://registry.yarnpkg.com/@types/dom-mediacapture-transform/-/dom-mediacapture-transform-0.1.11.tgz#4157f81498e7c01fdb76ac45506b6889fe1f162b"
+  integrity sha512-Y2p+nGf1bF2XMttBnsVPHUWzRRZzqUoJAKmiP10b5umnO6DDrWI0BrGDJy1pOHoOULVmGSfFNkQrAlC5dcj6nQ==
+  dependencies:
+    "@types/dom-webcodecs" "*"
+
+"@types/dom-webcodecs@*":
+  version "0.1.17"
+  resolved "https://registry.yarnpkg.com/@types/dom-webcodecs/-/dom-webcodecs-0.1.17.tgz#c99201b7ab42158edd89c4667f41b47417caf585"
+  integrity sha512-IwKW5uKL0Zrv5ccUJpjIlqf7ppk2v29l/ZLQxLlwHxljBfnDD9Gxm+hzMkGM0AOAL/21H0pp7cTUYLiiVUGchA==
+
+"@types/dom-webcodecs@0.1.13":
+  version "0.1.13"
+  resolved "https://registry.yarnpkg.com/@types/dom-webcodecs/-/dom-webcodecs-0.1.13.tgz#d8be5da4f01b20721307b08ad2cca903ccf4f47f"
+  integrity sha512-O5hkiFIcjjszPIYyUSyvScyvrBoV3NOEEZx/pMlsu44TKzWNkLVBBxnxJz42in5n3QIolYOcBYFCPZZ0h8SkwQ==
+
 "@types/estree@1.0.5":
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/@types/estree/-/estree-1.0.5.tgz#a6ce3e556e00fd9895dd872dd172ad0d4bd687f4"
@@ -787,6 +804,14 @@ lru-cache@^5.1.1:
   integrity sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==
   dependencies:
     yallist "^3.0.2"
+
+mediabunny@^1.25.0:
+  version "1.25.0"
+  resolved "https://registry.yarnpkg.com/mediabunny/-/mediabunny-1.25.0.tgz#50225ff1a02f7c3a271fcbbc1a8b20a3a5d3d036"
+  integrity sha512-ozaqk6zS2Vbf3+3+OoxKfnCVeZRcv5PO8DgQtBrM5vpWIbpEK+kMVV6pgfo4mC3XtMwvQEMbhj3zEf0LNklh9w==
+  dependencies:
+    "@types/dom-mediacapture-transform" "^0.1.11"
+    "@types/dom-webcodecs" "0.1.13"
 
 merge-anything@^5.1.7:
   version "5.1.7"

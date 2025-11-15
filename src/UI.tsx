@@ -17,6 +17,7 @@ export type UI = {
    createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createView: (canvas: ViewProps["canvas"], style?: JSX.CSSProperties) => void
    createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"], style?: JSX.CSSProperties) => void
+   createVideo: (video: HTMLVideoElement, style?: JSX.CSSProperties) => void
    createStatus: (render: Render) => void
 }
 
@@ -31,6 +32,7 @@ export function createUI(create: (ui: UI) => void) {
 
       createView: (canvas, style) => elements.push(<View canvas={canvas} style={style} />),
       createCacheView: (cache, frame_par, style) => elements.push(<CacheView cache={cache} frame_par={frame_par} style={style} />),
+      createVideo: (video, style) => elements.push(video),
 
       createStatus: (render) => elements.push(<Status render={render} />),
    });
@@ -254,7 +256,6 @@ export const Status: Component<StatusProps> = (props) => {
    const [hidden, setHidden] = createSignal(false);
 
    function onKeyDown(evt: KeyboardEvent) {
-      console.log(evt.key);
       switch (evt.key) {
          case "h":
             setHidden(h => !h);

@@ -9,26 +9,24 @@ const FRAMES = 400 * FPS / 60;
 const LOOP = 1;
 
 // ... record settings ...
-// const FPS = 60;
-// const SCALE = 1;
-// const WIDTH = 1080 * SCALE;
-// const HEIGHT = 1920 * SCALE;
-// const FRAMES = 400;
-// const LOOP = 2;
+const RECORD_FPS = 120;
+const RECORD_SCALE = 1;
+const RECORD_WIDTH = 1080 * RECORD_SCALE;
+const RECORD_HEIGHT = 1080 * RECORD_SCALE;
+const RECORD_FRAMES = 400 * FPS / 60;
+const RECORD_LOOP = 1;
 
 const SIZE = Math.min(WIDTH, HEIGHT);
 const PAD = 0.15;
-
 const posX = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - WIDTH) / 2;
 const posY = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - HEIGHT) / 2;
 
 export default createSketch((render, ui) => {
 
    const COUNT = 400;
-
-   const frame_cache = render.animate(WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => {
+   function animation(ctx, props, frames) {
       const { width, height, index } = props;
-      const t = (index / FRAMES) % 1;
+      const t = (index / frames) % 1;
 
       // ctx.fillStyle = 'black';
       // ctx.rect(0, 0, width, height);
@@ -38,17 +36,18 @@ export default createSketch((render, ui) => {
          const f = i / COUNT;
          const scene_t = mod(f + t * 2);
          const scene_f = sinn(f);
-         scene(ctx, scene_t, scene_f, t, 500, 0, 3);
+         scene(ctx, scene_t, scene_f, t, 500, 3);
       });
       for_n(COUNT, i => {
          const f = i / COUNT;
          const scene_t = mod(f + t * 2);
          const scene_f = sinn(f);
-         scene(ctx, scene_t, scene_f, t, 255, 0, 0);
+         scene(ctx, scene_t, scene_f, t, 255, 0);
       });
-   });
+   }
 
-   function scene(ctx, t, f, global_t, color_mult, color_offset, radius_offset) {
+   const WRAPS = 10;
+   function scene(ctx, t, f, global_t, color_mult, radius_offset) {
       const x1 = sinn(t);
       const y1 = 1;
 
@@ -65,13 +64,12 @@ export default createSketch((render, ui) => {
       const g = lerp(color_f, 0, g2_f);
       const b = lerp(color_f, 1, 0);
 
-      const getC = (v) => clamp(v * color_mult + color_offset, 0, 255);
+      const getC = (v) => clamp(v * color_mult, 0, 255);
       const color = `rgb(${getC(r)}, ${getC(g)}, ${getC(b)})`
 
-      const wraps = 10;
       // const count_2_t = 1;
       const count_2_t = sinn(global_t);
-      const count_2 = count_2_t * wraps + 1;
+      const count_2 = count_2_t * WRAPS + 1;
 
       for (let i = 0; i < count_2; i++) {
          const f_2 = i / count_2;
@@ -87,9 +85,11 @@ export default createSketch((render, ui) => {
    }
 
    const frame_par = createParameter(0);
-   createLoop(() => {
-      frame_par.set(frame => (frame + 1) % FRAMES)
-   }, 1000 / FPS);
+   createLoop(() => frame_par.set(frame => (frame + 1) % FRAMES), 1000 / FPS);
 
-   ui.createCacheView(frame_cache, frame_par);
+   const frames_cache = render.animate(WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => animation(ctx, props, FRAMES));
+   ui.createCacheView(frames_cache, frame_par);
+
+   const video = render.video(RECORD_FPS, RECORD_WIDTH, RECORD_HEIGHT, RECORD_FRAMES * RECORD_LOOP, (ctx, props) => animation(ctx, props, RECORD_FRAMES));
+   ui.createVideo(video);
 });

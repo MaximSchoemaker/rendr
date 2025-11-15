@@ -30,15 +30,15 @@ export default createSketch((render, ui) => {
 
       // test_animate,
       // langton,
-      // cattoy
+      cattoy
       // funsies,
-      funsies2,
+      // funsies2,
    ];
 
    let sketches_renders;
 
    ui.createColumn(ui => {
-      ui.createRow(ui => {
+      ui.createColumn(ui => {
          sketches_renders = sketches.map((sketch, i) => {
             const sketch_render = render.mountSketch(sketch, ui);
             if (sketch !== test_ui) return sketch_render;

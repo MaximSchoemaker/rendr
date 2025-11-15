@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
 import { UI } from '../UI';
 import { mod, n_arr } from './utils';
+import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_VERY_HIGH } from 'mediabunny';
 
 export type Sketch = (render: Render, ui: UI) => void
 export function createSketch(create: Sketch, settings: SchedulerSettings) {
@@ -125,7 +126,7 @@ export type Render = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, size: number, i: number, max_steps: number, done: () => void }
+         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
       ) => void,
       settings?: TaskSettings,
    ) => HTMLCanvasElement,
@@ -151,6 +152,18 @@ export type Render = {
       settings?: TaskSettings,
    ) => Cache<HTMLCanvasElement>,
 
+   video: (
+      fps: number,
+      width: number,
+      height: number,
+      max_steps: number,
+      create: (
+         view: CanvasRenderingContext2D,
+         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
+      ) => void,
+      settings?: TaskSettings,
+   ) => HTMLVideoElement,
+
    mountSketch: (sketch: Sketch, ui: UI) => void;
 
    scheduler: Scheduler,
@@ -168,7 +181,7 @@ export function createRender(): Render {
          scheduler.schedule(createTask(() => {
             const value = untrack(parameter.signal);
             const new_value = create(value);
-            parameter.set(() => new_value);
+            parameter.set(() => new_value ?? value);
          }, settings));
 
          return parameter;
@@ -234,8 +247,8 @@ export function createRender(): Render {
                   : cache.get(i - 1)
                );
                if (prev_value === undefined) return;
-               const new_value = create(prev_value, { i, done });
-               cache.set(i, new_value);
+               const new_value = create(prev_value, { index: i, done });
+               cache.set(i, new_value ?? prev_value);
             }
          }, settings));
 
@@ -261,6 +274,119 @@ export function createRender(): Render {
 
          return cache;
       },
+
+      video: (fps, width, height, max_steps, create, settings) => {
+         const video = document.createElement('video');
+
+         const canvas = createCanvas(width, height);
+         const ctx = canvas.getContext("2d")!;
+
+         const output = new Output({
+            format: new Mp4OutputFormat(),
+            target: new BufferTarget(), // Writing to memory
+         });
+
+         // Add a video track backed by a canvas element
+         const canvasSource = new CanvasSource(canvas, {
+            codec: 'avc',
+            bitrate: QUALITY_VERY_HIGH,
+         });
+
+         output.addVideoTrack(canvasSource);
+         output.start().catch(err => console.error("Error starting output:", err));
+
+         const size = Math.min(width, height);
+         scheduler.schedule(createTaskQueue(max_steps, {
+            reset: () => {
+               // TODO: reset video recording
+            },
+            execute: ({ i, done }) => {
+               if (output.state !== 'started') throw new Error("Output not started. Output state: " + output.state);
+
+               ctx.clearRect(0, 0, width, height);
+               create(ctx, { width, height, size, index: i, max_steps, done });
+
+               canvasSource.add(i / fps)
+                  .catch(err => console.error("Error adding frame:", err));
+            },
+            done: () => {
+               console.log("finalizing video...");
+               output.finalize().then(() => {
+                  console.log("video finalized");
+
+                  const buffer = output.target.buffer; // Final MP4 file
+                  if (!buffer) throw new Error("No video buffer generated");
+                  const blob = new Blob([buffer], { type: 'video/mp4' });
+                  const url = URL.createObjectURL(blob);
+                  video.src = url;
+               });
+            }
+         }, settings));
+
+
+
+         video.autoplay = true;
+         video.loop = true;
+         video.muted = true;
+         video.controls = true;
+         video.width = width;
+         video.height = height;
+
+         return video;
+      },
+
+      // video: (width, height, max_steps, create, settings) => {
+      //    // const cache = createCache<HTMLCanvasElement>();
+      //    const canvas = createCanvas(width, height);
+      //    const ctx = canvas.getContext("2d")!;
+      //    // const chunks: BlobPart[] = [];
+      //    const stream = canvas.captureStream(0);
+      //    const track = stream.getTracks()[0] as CanvasCaptureMediaStreamTrack
+      //    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+      //    const video = document.createElement('video');
+
+      //    // recorder to video
+      //    const chunks: BlobPart[] = [];
+      //    recorder.ondataavailable = (e) => {
+      //       console.log(recorder.state);
+      //       if (e.data.size > 0) {
+      //          chunks.push(e.data);
+      //       }
+
+      //       if (recorder.state === "inactive") {
+      //          const blob = new Blob(chunks, { type: 'video/webm' });
+      //          const url = URL.createObjectURL(blob);
+      //          video.src = url;
+      //       }
+      //    }
+      //    recorder.start();
+
+      //    const size = Math.min(width, height);
+
+      //    scheduler.schedule(createTaskCache(max_steps, {
+      //       reset: (index) => {
+      //          // cache.set(index, undefined);
+      //          // TODO: reset video recording
+      //       },
+      //       execute: ({ i, done }) => {
+      //          ctx.clearRect(0, 0, width, height);
+      //          create(ctx, { width, height, size, index: i, max_steps, done });
+      //          // cache.set(i, canvas);
+      //          track.requestFrame();
+
+      //          if (i === max_steps - 1) {
+      //             recorder.stop();
+      //          }
+      //       }
+      //    }, settings));
+
+      //    video.autoplay = true;
+      //    video.loop = true;
+      //    video.muted = true;
+      //    video.controls = true;
+
+      //    return video;
+      // },
 
       mountSketch: (sketch: Sketch, ui: UI) => {
          const render = mountSketch(sketch, ui);
@@ -375,6 +501,7 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
 type TaskQueueCallbacks = {
    reset: () => void;
    execute: (props: { i: number, done: () => void }) => void;
+   done?: () => void;
 }
 
 function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, settings = {} as TaskSettings): Task {
@@ -397,7 +524,16 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
                if (is_done) return;
 
                if (i === 0) callbacks.reset();
-               track(() => callbacks.execute({ i, done }));
+               let failed = false;
+               track(() => {
+                  try {
+                     callbacks.execute({ i, done })
+                  } catch (err) {
+                     failed = true;
+                     console.error(err);
+                  }
+               });
+               if (failed) return;
 
                const time = performance.now();
                const run_time = time - start_time;
@@ -405,8 +541,9 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
             }
 
             is_done = true;
+            callbacks.done?.();
          } catch (err) {
-            // console.error(err);
+            console.error(err);
          }
       },
       isDone: () => {
@@ -448,17 +585,18 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
             if (is_done) return;
             if (valid[i]) continue;
 
-            try {
-               tracks[i](() => {
-                  try {
-                     callbacks.execute({ i, done })
-                  } catch (err) {
-                     // console.error(err);
-                  }
-               });
-            } catch (err) {
-               // console.error(err);
-            }
+
+            let failed = false;
+            tracks[i](() => {
+               try {
+                  callbacks.execute({ i, done })
+               } catch (err) {
+                  failed = true;
+                  console.error(err);
+               }
+            });
+            if (failed) continue;
+
             valid[i] = true;
             valid_count++;
 
