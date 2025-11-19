@@ -1,18 +1,17 @@
 import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
-import { cosn, lerp, mod, sinn, sin } from '../../rendr/utils';
+import { cosn, lerp, mod, sinn, sin, getLayout } from '../../rendr/utils';
 
-const SCALE = 1;
-const WIDTH = 1080 * SCALE;
-const HEIGHT = 1080 * SCALE;
+const ANIMATION = true;
+const VIDEO = true;
+
 const FRAMES = 400;
 
 export default createSketch((render, ui) => {
 
-   const frame_par = createParameter(0);
+   function scene(ctx, props, layout) {
+      const { index } = props;
+      const { screenX, screenY, size } = layout;
 
-   const cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
-      // console.log(frame_par.get());
-      const { width, height, size, index } = props;
       const t = mod(0.75 + index / FRAMES);
 
       const count = 1000;
@@ -31,14 +30,36 @@ export default createSketch((render, ui) => {
          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
          ctx.globalAlpha = mod(f - t)
          ctx.beginPath();
-         ctx.arc(x * width, y * height, radius * size, 0, Math.PI * 2);
+         ctx.arc(screenX(x), screenY(y), radius * size, 0, Math.PI * 2);
          ctx.fill();
       }
-   });
+   }
 
-   createAnimationLoop(() => {
-      frame_par.set(frame => (frame + 1) % FRAMES)
-   });
+   if (ANIMATION) {
+      const WIDTH = 1080;
+      const HEIGHT = 1080;
+      const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
 
-   ui.createCacheView(cache, frame_par);
+      const cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) =>
+         scene(ctx, props, LAYOUT)
+      );
+
+      const frame_par = createParameter(0);
+      createAnimationLoop(() => frame_par.set(frame => (frame + 1) % FRAMES));
+      ui.createCacheView(cache, frame_par);
+   }
+
+   if (VIDEO) {
+      const FPS = 60;
+      const WIDTH = 1080;
+      const HEIGHT = 1920;
+      const LOOP = 2;
+      const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
+
+      const video = render.video(FPS, WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) =>
+         scene(ctx, props, LAYOUT)
+      );
+      ui.createVideo(video);
+   }
+
 });

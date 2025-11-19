@@ -14,6 +14,7 @@ import langton from "./personal/langton";
 import cattoy from "./personal/cattoy";
 import funsies from "./personal/funsies";
 import funsies2 from "./personal/funsies2";
+import witness from "./personal/witness";
 
 export default createSketch((render, ui) => {
    const sketches = [
@@ -28,26 +29,23 @@ export default createSketch((render, ui) => {
       // test_construct_generate,
       // test_simulate_generate,
 
-      // test_animate,
+      test_animate,
+
       // langton,
-      cattoy
+      // cattoy,
       // funsies,
       // funsies2,
+      // witness,
    ];
 
-   let sketches_renders;
+   let renders;
 
    ui.createColumn(ui => {
-      ui.createColumn(ui => {
-         sketches_renders = sketches.map((sketch, i) => {
-            const sketch_render = render.mountSketch(sketch, ui);
-            if (sketch !== test_ui) return sketch_render;
-         });
+      ui.createRow(ui => {
+         renders = sketches.map(sketch => render.mountSketch(sketch, ui));
       });
-      ui.createRow(
-         ui => {
-            sketches_renders.forEach((render) => render && ui.createStatus(render));
-         },
+      ui.createRow(ui =>
+         renders.forEach(render => ui.createStatus(render)),
          { flex: "0 1 auto" }
       );
    });

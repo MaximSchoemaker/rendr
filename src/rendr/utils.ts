@@ -70,3 +70,42 @@ export const download_url = (url: string, name?: string) => {
    a.download = name ?? ''
    a.click()
 }
+
+export type LayoutType = "stretch" | "fit" | "fill"
+export const getLayout = (type: LayoutType, width: number, height: number, padding = 0, x_range = 1, y_range = 1) => {
+   const max_size = Math.max(width, height);
+   const min_size = Math.min(width, height);
+
+   switch (type) {
+      case "stretch": {
+         const size = min_size;
+         return {
+            size,
+            min_size,
+            max_size,
+            screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * width,
+            screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * height,
+         }
+      }
+      case "fit": {
+         const size = Math.min(width, height);
+         return {
+            size,
+            min_size,
+            max_size,
+            screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * size - (size - width) / 2,
+            screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * size - (size - height) / 2,
+         }
+      }
+      case "fill": {
+         const size = Math.max(width, height);
+         return {
+            size,
+            min_size,
+            max_size,
+            screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * size - (size - width) / 2,
+            screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * size - (size - height) / 2,
+         }
+      }
+   }
+}

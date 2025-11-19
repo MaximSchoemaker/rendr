@@ -52,13 +52,11 @@ export const Container: Component<ContainerProps> = (props) => {
 
    return (
       <div style={{
-         // "width": "100%",
-         // "height": "100%",
          "max-width": "100%",
          "max-height": "100%",
          "min-width": "0",
          "min-height": "0",
-         "flex": "0 1 100%",
+         "flex": "1",
          ...props.style
       }}>
          <For each={elements}>
@@ -277,6 +275,8 @@ export const Status: Component<StatusProps> = (props) => {
             // "outline": "1px solid orange",
             // "outline-offset": "-1px",
             "align-self": "flex-start",
+            "max-height": "25vh",
+            "overflow-y": "auto",
          }}>
             <For each={tasks}>{task =>
                <div style={{
@@ -329,8 +329,8 @@ export const TaskProgress: Component<TaskProgressProps> = (props) => {
       // "max-height": "15px",
       "image-rendering": "pixelated",
       // "background-color": "var(--background-color)",
-      "border": "1px solid var(--foreground-color)",
-      // "outline-offset": "-1px",
+      "outline": "1px solid var(--foreground-color)",
+      "outline-offset": "-1px",
    }} />
 }
 
@@ -381,7 +381,7 @@ export const TaskPerformance: Component<TaskPerformanceProps> = (props) => {
       "min-height": "0",
       "image-rendering": "pixelated",
       // "background-color": "var(--background-color)",
-      "border": "1px solid var(--foreground-color)",
-      // "outline-offset": "-1px",
+      "outline": "1px solid var(--foreground-color)",
+      "outline-offset": "-1px",
    }} />
 }

@@ -1,7 +1,18 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
 import { UI } from '../UI';
-import { mod, n_arr } from './utils';
+import { Layout, map, mod, n_arr } from './utils';
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_VERY_HIGH } from 'mediabunny';
+import { b } from 'vite/dist/node/types.d-jgA8ss1A';
+
+export class ParameterUndefinedError extends Error {
+   constructor() {
+      super(
+         `Parameter is undefied`,
+      );
+      this.name = 'ParameterUndefinedError';
+   }
+}
+
 
 export type Sketch = (render: Render, ui: UI) => void
 export function createSketch(create: Sketch, settings: SchedulerSettings) {
@@ -45,7 +56,7 @@ export function createParameter<T>(initial_value: T): Parameter<T> {
          const value = !settings?.dont_track
             ? parameter()
             : untrack(parameter);
-         if (!settings?.dont_throw && value === undefined) throw new Error("parameter undefined");
+         if (!settings?.dont_throw && value === undefined) throw new ParameterUndefinedError();
          return value;
       },
       set: set_parameter,
@@ -100,33 +111,22 @@ export type Render = {
       settings?: TaskSettings,
    ) => Parameter<T>,
 
-   draw: (
-      width: number,
-      height: number,
-      create: (
-         view: CanvasRenderingContext2D,
-         props: { width: number, height: number, size: number }
-      ) => void,
-      settings?: TaskSettings,
-   ) => HTMLCanvasElement,
-
    construct: <T>(
       initial_value: T,
       max_steps: number,
       create: (
          value: T,
-         props: { i: number, done: () => void }
+         props: { index: number, done: () => void }
       ) => T,
       settings?: TaskSettings,
    ) => Parameter<T>,
 
-   generate: (
+   draw: (
       width: number,
       height: number,
-      max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
+         props: { width: number, height: number, }
       ) => void,
       settings?: TaskSettings,
    ) => HTMLCanvasElement,
@@ -136,10 +136,21 @@ export type Render = {
       max_steps: number,
       create: (
          value: T,
-         props: { i: number, done: () => void }
+         props: { index: number, done: () => void }
       ) => T,
       settings?: TaskSettings,
    ) => Cache<T>,
+
+   generate: (
+      width: number,
+      height: number,
+      max_steps: number,
+      create: (
+         view: CanvasRenderingContext2D,
+         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
+      ) => void,
+      settings?: TaskSettings,
+   ) => HTMLCanvasElement,
 
    animate: (
       width: number,
@@ -147,7 +158,7 @@ export type Render = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
+         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
       ) => void,
       settings?: TaskSettings,
    ) => Cache<HTMLCanvasElement>,
@@ -159,7 +170,7 @@ export type Render = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, size: number, index: number, max_steps: number, done: () => void }
+         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
       ) => void,
       settings?: TaskSettings,
    ) => HTMLVideoElement,
@@ -190,11 +201,10 @@ export function createRender(): Render {
       draw: (width, height, create, settings) => {
          const canvas = createCanvas(width, height);
          const ctx = canvas.getContext("2d")!;
-         const size = Math.min(width, height);
 
          scheduler.schedule(createTask(() => {
             ctx.clearRect(0, 0, width, height);
-            create(ctx, { width, height, size })
+            create(ctx, { width, height })
          }, settings));
 
          return canvas;
@@ -207,10 +217,10 @@ export function createRender(): Render {
             reset: () => {
                parameter.set(() => structuredClone(initial_value));
             },
-            execute: ({ i, done }) => {
+            execute: ({ index, done }) => {
                const prev_value = untrack(parameter.signal);
-               const new_value = create(prev_value, { i, done });
-               parameter.set(() => new_value);
+               const new_value = create(prev_value, { index, done });
+               parameter.set(() => new_value ?? prev_value);
             }
          }, settings));
 
@@ -226,8 +236,8 @@ export function createRender(): Render {
             reset: () => {
                ctx.clearRect(0, 0, width, height);
             },
-            execute: ({ i, done }) => {
-               create(ctx, { width, height, size, i, max_steps, done });
+            execute: ({ index, done }) => {
+               create(ctx, { width, height, index, max_steps, done });
             }
          }, settings));
 
@@ -241,14 +251,14 @@ export function createRender(): Render {
             reset: (index) => {
                cache.set(index, undefined);
             },
-            execute: ({ i, done }) => {
-               const prev_value = structuredClone(i == 0
+            execute: ({ index, done }) => {
+               const prev_value = structuredClone(index == 0
                   ? initial_value
-                  : cache.get(i - 1)
+                  : cache.get(index - 1)
                );
                if (prev_value === undefined) return;
-               const new_value = create(prev_value, { index: i, done });
-               cache.set(i, new_value ?? prev_value);
+               const new_value = create(prev_value, { index, done });
+               cache.set(index, new_value ?? prev_value);
             }
          }, settings));
 
@@ -257,18 +267,17 @@ export function createRender(): Render {
 
       animate: (width, height, max_steps, create, settings) => {
          const cache = createCache<HTMLCanvasElement>();
-         const size = Math.min(width, height);
 
          scheduler.schedule(createTaskCache(max_steps, {
             reset: (index) => {
                cache.set(index, undefined);
             },
-            execute: ({ i, done }) => {
-               const canvas = cache.get(i, { dont_track: true, dont_throw: true }) ?? createCanvas(width, height);
+            execute: ({ index, done }) => {
+               const canvas = cache.get(index, { dont_track: true, dont_throw: true }) ?? createCanvas(width, height);
                const ctx = canvas.getContext("2d")!;
                ctx.clearRect(0, 0, width, height);
-               create(ctx, { width, height, size, index: i, max_steps, done });
-               cache.set(i, canvas);
+               create(ctx, { width, height, index, max_steps, done });
+               cache.set(index, canvas);
             }
          }, settings));
 
@@ -295,18 +304,17 @@ export function createRender(): Render {
          output.addVideoTrack(canvasSource);
          output.start().catch(err => console.error("Error starting output:", err));
 
-         const size = Math.min(width, height);
          scheduler.schedule(createTaskQueue(max_steps, {
             reset: () => {
                // TODO: reset video recording
             },
-            execute: ({ i, done }) => {
+            execute: ({ index, done }) => {
                if (output.state !== 'started') throw new Error("Output not started. Output state: " + output.state);
 
                ctx.clearRect(0, 0, width, height);
-               create(ctx, { width, height, size, index: i, max_steps, done });
+               create(ctx, { width, height, index, max_steps, done });
 
-               canvasSource.add(i / fps)
+               canvasSource.add(index / fps)
                   .catch(err => console.error("Error adding frame:", err));
             },
             done: () => {
@@ -368,13 +376,13 @@ export function createRender(): Render {
       //          // cache.set(index, undefined);
       //          // TODO: reset video recording
       //       },
-      //       execute: ({ i, done }) => {
+      //       execute: ({ index, done }) => {
       //          ctx.clearRect(0, 0, width, height);
-      //          create(ctx, { width, height, size, index: i, max_steps, done });
-      //          // cache.set(i, canvas);
+      //          create(ctx, { width, height, size, index: index, max_steps, done });
+      //          // cache.set(index, canvas);
       //          track.requestFrame();
 
-      //          if (i === max_steps - 1) {
+      //          if (index === max_steps - 1) {
       //             recorder.stop();
       //          }
       //       }
@@ -395,6 +403,8 @@ export function createRender(): Render {
       },
    }
 }
+
+
 
 type SchedulerSettings = {
    sync?: boolean;
@@ -461,6 +471,14 @@ function createScheduler() {
    return scheduler;
 }
 
+function handleTaskError(err: any) {
+   if (err instanceof ParameterUndefinedError) {
+      // Silently ignore parameter undefined errors in tasks
+      return;
+   }
+   throw err;
+}
+
 export type Task = {
    settings: TaskSettings;
    run_time: number;
@@ -486,7 +504,7 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
             track(() => execute());
             is_done = true;
          } catch (err) {
-            // console.error(err);
+            handleTaskError(err);
          }
       },
       isDone: () => {
@@ -500,17 +518,17 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
 
 type TaskQueueCallbacks = {
    reset: () => void;
-   execute: (props: { i: number, done: () => void }) => void;
+   execute: (props: { index: number, done: () => void }) => void;
    done?: () => void;
 }
 
 function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, settings = {} as TaskSettings): Task {
-   let i = 0;
+   let index = 0;
    let is_done = false;
    const done = () => is_done = true;
 
    const track = createReaction(() => {
-      i = 0;
+      index = 0;
       is_done = false;
    });
 
@@ -518,46 +536,42 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       settings,
       run_time: 0,
       execute: (max_time: number) => {
-         try {
-            const start_time = performance.now();
-            for (; i < max_steps; i++) {
-               if (is_done) return;
+         const start_time = performance.now();
+         for (; index < max_steps; index++) {
+            if (is_done) return;
 
-               if (i === 0) callbacks.reset();
-               let failed = false;
-               track(() => {
-                  try {
-                     callbacks.execute({ i, done })
-                  } catch (err) {
-                     failed = true;
-                     console.error(err);
-                  }
-               });
-               if (failed) return;
+            if (index === 0) callbacks.reset();
+            let failed = false;
+            track(() => {
+               try {
+                  callbacks.execute({ index, done })
+               } catch (err) {
+                  failed = true;
+                  handleTaskError(err);
+               }
+            });
+            if (failed) return;
 
-               const time = performance.now();
-               const run_time = time - start_time;
-               if (run_time > max_time) return;
-            }
-
-            is_done = true;
-            callbacks.done?.();
-         } catch (err) {
-            console.error(err);
+            const time = performance.now();
+            const run_time = time - start_time;
+            if (run_time > max_time) return;
          }
+
+         is_done = true;
+         callbacks.done?.();
       },
       isDone: () => {
          return is_done;
       },
       progress: () => {
-         return is_done ? 1 : i / max_steps;
+         return is_done ? 1 : index / max_steps;
       }
    }
 }
 
 type TaskCacheCallbacks = {
    reset: (index: number) => void;
-   execute: (props: { i: number, done: () => void }) => void;
+   execute: (props: { index: number, done: () => void }) => void;
 }
 
 function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, settings = {} as TaskSettings): Task {
@@ -581,23 +595,23 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       run_time: 0,
       execute: (max_time: number) => {
          const start_time = performance.now();
-         for (let i = 0; i < max_steps; i++) {
+         for (let index = 0; index < max_steps; index++) {
             if (is_done) return;
-            if (valid[i]) continue;
+            if (valid[index]) continue;
 
 
             let failed = false;
-            tracks[i](() => {
+            tracks[index](() => {
                try {
-                  callbacks.execute({ i, done })
+                  callbacks.execute({ index, done })
                } catch (err) {
                   failed = true;
-                  console.error(err);
+                  handleTaskError(err);
                }
             });
             if (failed) continue;
 
-            valid[i] = true;
+            valid[index] = true;
             valid_count++;
 
             const time = performance.now();

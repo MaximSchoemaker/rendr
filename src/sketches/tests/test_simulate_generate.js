@@ -17,27 +17,27 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const cache = render.simulate([], FRAMES, (points, { i }) => {
+   const cache = render.simulate([], FRAMES, (points) => {
       for_n(COUNT / FRAMES, () => points.push({ x: Math.random(), y: Math.random() }));
       return points;
    }, { sync: true });
 
    const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
-      const { width, height, size, i, done } = props;
+      const { width, height, index, done } = props;
 
       const tick = tick_par.get() % FRAMES;
       const points = cache.getLatest(tick);
 
-      if (i >= points.length) return done()
+      if (index >= points.length) return done()
 
-      const point = points[i];
+      const point = points[index];
 
       const { x, y } = point;
       const r = 0.003;
 
       ctx.fillStyle = "rgb(255, 128, 0)"
       ctx.beginPath();
-      ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+      ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
       ctx.fill();
    });
 

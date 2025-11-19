@@ -1,10 +1,9 @@
 import { createLoop, createParameter, createSketch } from '../../rendr/rendr';
-import { cosn, lerp, mod, sinn, n_arr } from '../../rendr/utils';
+import { n_arr } from '../../rendr/utils';
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
-const FRAMES = 500;
 
 const COUNT = 50_000;
 const TIMEOUT = 5000;
@@ -23,7 +22,7 @@ export default createSketch((render, ui) => {
    });
 
    const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
-      const { width, height, size } = props;
+      const { width, height } = props;
 
       const points = state.get();
 
@@ -33,7 +32,7 @@ export default createSketch((render, ui) => {
 
          ctx.fillStyle = "rgb(255, 128, 0)"
          ctx.beginPath();
-         ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+         ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
          ctx.fill();
       });
    });

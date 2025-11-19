@@ -27,11 +27,13 @@ export default createSketch((render, ui) => {
       return value;
    }, { sync: true });
 
-   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, { width, height, size, i }) => {
-      // console.log(i);
+   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
+      const { width, height, index } = props;
+
+      // console.log(index);
 
       const points = state.get();
-      const point = points[i];
+      const point = points[index];
       if (!point) return;
 
       const { x, y } = point;
@@ -39,7 +41,7 @@ export default createSketch((render, ui) => {
 
       ctx.fillStyle = "rgb(255, 128, 0)";
       ctx.beginPath();
-      ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+      ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
       ctx.fill();
 
       // ctx.fillStyle = "rebeccaPurple";
@@ -56,7 +58,7 @@ export default createSketch((render, ui) => {
       // ctx.rect(
       //    0,
       //    height * 0.05,
-      //    Math.ceil(width * (i / COUNT)),
+      //    Math.ceil(width * (index / COUNT)),
       //    height * 0.05
       // );
       // ctx.fill();

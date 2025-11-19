@@ -23,7 +23,7 @@ export default createSketch((render, ui) => {
             for (let i = 0; i < rows; i++) {
 
                const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
-                  const { width, height, size } = props;
+                  const { width, height } = props;
 
                   const tick = tick_par.get();
                   const f = (i + j) / (rows + cols);
@@ -35,7 +35,7 @@ export default createSketch((render, ui) => {
 
                   ctx.fillStyle = "rgb(255, 128, 0)";
                   ctx.beginPath();
-                  ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+                  ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
                   ctx.fill();
                });
 

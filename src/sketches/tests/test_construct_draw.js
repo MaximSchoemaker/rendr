@@ -27,7 +27,9 @@ export default createSketch((render, ui) => {
       return value;
    }, { sync: true });
 
-   const view = render.draw(WIDTH, HEIGHT, (ctx, { width, height, size }) => {
+   const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+      const { width, height } = props;
+
       const points = state.get();
       points.forEach(p => {
          const { x, y } = p;
@@ -35,7 +37,7 @@ export default createSketch((render, ui) => {
 
          ctx.fillStyle = "rgb(255, 128, 0)";
          ctx.beginPath();
-         ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+         ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
          ctx.fill();
       });
    });

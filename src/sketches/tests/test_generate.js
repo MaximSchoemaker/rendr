@@ -17,7 +17,9 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, { width, height, size, i, done }) => {
+   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
+      const { width, height, index, done } = props;
+
       tick_par.get();
 
       const x = Math.random();
@@ -26,7 +28,7 @@ export default createSketch((render, ui) => {
 
       ctx.fillStyle = "rgb(255, 128, 0)";
       ctx.beginPath();
-      ctx.arc(x * width, y * height, r * size, 0, Math.PI * 2);
+      ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
       ctx.fill();
 
       // ctx.fillStyle = "rebeccaPurple";
@@ -34,7 +36,7 @@ export default createSketch((render, ui) => {
       // ctx.rect(
       //    0,
       //    0,
-      //    Math.ceil(width * (i / COUNT)),
+      //    Math.ceil(width * (index / COUNT)),
       //    height * 0.05
       // );
       // ctx.fill();

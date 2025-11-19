@@ -1,31 +1,30 @@
 import { createAnimationLoop, createLoop, createParameter, createSketch } from '../../rendr/rendr';
-import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n } from "../../rendr/utils"
+import { map, inv_cosn, cosn, inv_sinn, sinn, n_arr, mod, sin, cos, lerp, clamp, tri, for_n, getLayout } from "../../rendr/utils"
 
 const FPS = 120;
-const SCALE = 1;
-const WIDTH = 1080 * SCALE;
-const HEIGHT = 1080 * SCALE;
+const WIDTH = 1080;
+const HEIGHT = 1080;
 const FRAMES = 400 * FPS / 60;
 const LOOP = 1;
 
 // ... record settings ...
-const RECORD_FPS = 120;
+const RECORD_FPS = 60;
 const RECORD_SCALE = 1;
 const RECORD_WIDTH = 1080 * RECORD_SCALE;
 const RECORD_HEIGHT = 1080 * RECORD_SCALE;
 const RECORD_FRAMES = 400 * FPS / 60;
 const RECORD_LOOP = 1;
 
-const SIZE = Math.min(WIDTH, HEIGHT);
+// layout
 const PAD = 0.15;
-const posX = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - WIDTH) / 2;
-const posY = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - HEIGHT) / 2;
+const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
 
 export default createSketch((render, ui) => {
 
    const COUNT = 400;
-   function animation(ctx, props, frames) {
-      const { width, height, index } = props;
+   function animation(ctx, frames, props, layout) {
+      const { index } = props;
+
       const t = (index / frames) % 1;
 
       // ctx.fillStyle = 'black';
@@ -36,18 +35,20 @@ export default createSketch((render, ui) => {
          const f = i / COUNT;
          const scene_t = mod(f + t * 2);
          const scene_f = sinn(f);
-         scene(ctx, scene_t, scene_f, t, 500, 3);
+         scene(ctx, scene_t, scene_f, t, 500, 3, layout);
       });
       for_n(COUNT, i => {
          const f = i / COUNT;
          const scene_t = mod(f + t * 2);
          const scene_f = sinn(f);
-         scene(ctx, scene_t, scene_f, t, 255, 0);
+         scene(ctx, scene_t, scene_f, t, 255, 0, layout);
       });
    }
 
    const WRAPS = 10;
-   function scene(ctx, t, f, global_t, color_mult, radius_offset) {
+   function scene(ctx, t, f, global_t, color_mult, radius_offset, layout) {
+      const { screenX, screenY } = layout;
+
       const x1 = sinn(t);
       const y1 = 1;
 
@@ -78,7 +79,7 @@ export default createSketch((render, ui) => {
          const y = lerp(t_f, y1, y2);
 
          ctx.beginPath();
-         ctx.arc(posX(x), posY(y), lineWidth / 2 + radius_offset, 0, Math.PI * 2);
+         ctx.arc(screenX(x), screenY(y), lineWidth / 2 + radius_offset, 0, Math.PI * 2);
          ctx.fillStyle = color;
          ctx.fill();
       }
@@ -87,9 +88,9 @@ export default createSketch((render, ui) => {
    const frame_par = createParameter(0);
    createLoop(() => frame_par.set(frame => (frame + 1) % FRAMES), 1000 / FPS);
 
-   const frames_cache = render.animate(WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => animation(ctx, props, FRAMES));
+   const frames_cache = render.animate(WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => animation(ctx, FRAMES, props, LAYOUT));
    ui.createCacheView(frames_cache, frame_par);
 
-   const video = render.video(RECORD_FPS, RECORD_WIDTH, RECORD_HEIGHT, RECORD_FRAMES * RECORD_LOOP, (ctx, props) => animation(ctx, props, RECORD_FRAMES));
+   const video = render.video(RECORD_FPS, RECORD_WIDTH, RECORD_HEIGHT, RECORD_FRAMES * RECORD_LOOP, (ctx, props) => animation(ctx, RECORD_FRAMES, props, LAYOUT));
    ui.createVideo(video);
 });

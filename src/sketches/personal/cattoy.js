@@ -1,25 +1,17 @@
 import { createLoop, createAnimationLoop, createParameter, createSketch } from "../../rendr/rendr";
-import { for_n, lerp, mod, sin, cos, sinn, cosn, tri, map } from "../../rendr/utils";
+import { for_n, lerp, mod, sin, cos, sinn, cosn, tri, map, getLayout } from "../../rendr/utils";
 
-const FPS = 60;
-const SCALE = 1;
-// const WIDTH = 1080 * SCALE;
-// const HEIGHT = 1920 * SCALE;
-const WIDTH = window.innerWidth;
-const HEIGHT = window.innerHeight;
+const ANIMATION = true;
+const REALTIME = true;
+const FRAMES = 1500;
 
-const FRAMES = 1500 * FPS / 60;
-
-const SIZE = Math.max(WIDTH, HEIGHT);
-const PAD = 0;
-const posX = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - WIDTH) / 2;
-const posY = (v) => map(v, 0, 1, PAD, 1 - PAD) * SIZE - (SIZE - HEIGHT) / 2;
+// update
+const OFFSSET_R = 1;
+const SMOOTHING = 0.15;
+const BUFFER_LENGTH = 200;
 
 export default createSketch((render, ui) => {
 
-  const OFFSSET_R = 1;
-  const SMOOTHING = 0.15;
-  const BUFFER_LENGTH = 200;
   function update(input_x, input_y, positions) {
     const prev_pos = positions.at(-1) || { x: input_x, y: input_y };
 
@@ -30,8 +22,8 @@ export default createSketch((render, ui) => {
     if (positions.length > BUFFER_LENGTH) positions.shift();
   }
 
-  function draw(ctx, t, positions, props) {
-    const { width, height, size } = props;
+  function draw(ctx, t, positions, layout) {
+    const { size, screenX, screenY } = layout;
 
     for (let i = 0; i < positions.length - 1; i++) {
       const index = i;
@@ -60,15 +52,21 @@ export default createSketch((render, ui) => {
         ctx.lineWidth = radius * size / 3;
 
         ctx.beginPath();
-        ctx.moveTo(posX(getX(index)), posY(getY(index)));
-        ctx.lineTo(posX(getX(next_index)), posY(getY(next_index)));
+        ctx.moveTo(screenX(getX(index)), screenY(getY(index)));
+        ctx.lineTo(screenX(getX(next_index)), screenY(getY(next_index)));
         ctx.stroke();
       }
     }
   }
 
   // ANIMATION
-  {
+  if (ANIMATION) {
+    const FPS = 60;
+    const WIDTH = 1080;
+    const HEIGHT = 1920;
+    const PAD = 0;
+    const LAYOUT = getLayout("fill", WIDTH, HEIGHT, PAD);
+
     const frame_par = createParameter(0);
     createLoop(() => frame_par.set(frame => (frame + 1) % FRAMES), 1000 / FPS);
 
@@ -89,61 +87,67 @@ export default createSketch((render, ui) => {
 
     const view_list = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
       const { index } = props;
-      const t = index / FRAMES;
 
+      const t = index / FRAMES;
       const positions = state.get(index);
-      draw(ctx, t, positions, props);
+
+      draw(ctx, t, positions, LAYOUT);
     });
 
     ui.createCacheView(view_list, frame_par);
 
-    // const video = render.video(FPS, WIDTH, HEIGHT, FRAMES, (ctx, props) => {
-    //   const { index } = props;
-    //   const t = index / FRAMES;
+    const video = render.video(FPS, WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+      const { index } = props;
 
-    //   const positions = state.get(index);
-    //   draw(ctx, t, positions, props);
-    // });
+      const t = index / FRAMES;
+      const positions = state.get(index);
 
-    // ui.createVideo(video);
+      draw(ctx, t, positions, LAYOUT);
+    });
+
+    ui.createVideo(video);
   }
 
   // REALTIME
-  // {
-  //   const mouse_x = createParameter(0.5);
-  //   const mouse_y = createParameter(0.5);
-  //   const frame_par = createParameter(0);
+  if (REALTIME) {
+    const WIDTH = window.innerWidth;
+    const HEIGHT = window.innerHeight;
+    const FPS = 120;
+    const REALTIME_FRAMES = FRAMES * FPS / 60;
+    const LAYOUT = getLayout("stretch", WIDTH, HEIGHT);
 
-  //   createAnimationLoop(() => frame_par.set(frame => (frame + 1) % FRAMES));
+    let mouse_x = 0.5;
+    let mouse_y = 0.5;
 
-  //   const state = render.update([], (positions) => {
-  //     frame_par.get();
-  //     const input_x = mouse_x.get();
-  //     const input_y = mouse_y.get();
+    const frame_par = createParameter(0);
 
-  //     update(input_x, input_y, positions)
-  //   });
+    // createLoop(() => frame_par.set(frame => (frame + 1) % REALTIME_FRAMES), 1000 / FPS);
+    createAnimationLoop(() => frame_par.set(frame => (frame + 1) % REALTIME_FRAMES));
 
-  //   const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
-  //     const t = frame_par.get() / FRAMES;
-  //     const positions = state.get();
+    const state = render.update([], (positions) => {
+      frame_par.get();
+      update(mouse_x, mouse_y, positions)
+    });
 
-  //     draw(ctx, t, positions, props);
-  //   })
+    const view = render.draw(WIDTH, HEIGHT, (ctx) => {
+      const t = frame_par.get() / REALTIME_FRAMES;
+      const positions = state.get();
+      draw(ctx, t, positions, LAYOUT);
+    })
 
-  //   view.onmousemove = (e) => {
-  //     const rect = view.getBoundingClientRect();
-  //     mouse_x.set(e.offsetX / rect.width);
-  //     mouse_y.set(e.offsetY / rect.height);
-  //   }
+    view.onmousemove = (e) => {
+      const rect = view.getBoundingClientRect();
+      mouse_x = e.offsetX / rect.width;
+      mouse_y = e.offsetY / rect.height;
+    }
 
-  //   view.ontouchmove = (e) => {
-  //     const rect = view.getBoundingClientRect();
-  //     const touch = e.touches[0];
-  //     mouse_x.set((touch.clientX - rect.x) / rect.width);
-  //     mouse_y.set((touch.clientY - rect.y) / rect.height);
-  //   }
+    view.ontouchmove = (e) => {
+      const rect = view.getBoundingClientRect();
+      const touch = e.touches[0];
+      mouse_x = (touch.clientX - rect.x) / rect.width;
+      mouse_y = (touch.clientY - rect.y) / rect.height;
+    }
 
-  //   ui.createView(view);
-  // }
+    ui.createView(view);
+  }
 });
