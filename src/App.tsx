@@ -55,7 +55,7 @@ const App: Component = () => {
   return (
     <div class={styles.App}>
       <div style={{
-        'width': '100%',
+        // 'width': '100%',
         display: 'flex',
         'flex-direction': 'row',
         'gap': '4px',
@@ -68,12 +68,7 @@ const App: Component = () => {
       <Column create={setup}
         style={{
           background: 'var(--background-color)',
-          // "width": "calc(100% - 10px)",
-          // "height": "calc(100% - 10px)",
-          "max-width": "calc(100% - 10px)",
-          "max-height": "calc(100% - 10px)",
           "flex": "1",
-          "padding": "5px",
         }} />
     </div>
   );

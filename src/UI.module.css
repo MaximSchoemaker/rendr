@@ -32,10 +32,10 @@
 }
 
 .ViewContainer:focus {
-  border-radius: 2px;
+  /* border-radius: 2px; */
   border-color: transparent;
-  outline: 5px var(--accent-color-2) solid;
-  outline-offset: 0px;
+  outline: 2px var(--accent-color-2) solid;
+  /* outline-offset: -1px; */
 }
 
 .ViewCanvas {

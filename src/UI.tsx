@@ -70,14 +70,16 @@ export const Container: Component<ContainerProps> = (props) => {
 
 export const Row: Component<ContainerProps> = (props) => <Container {...props} style={{
    "display": "flex",
-   "align-items": "center",
+   "align-items": "flex-start",
    "justify-content": "center",
-   "gap": "5px",
+   "gap": "4px",
    ...props.style,
 }} />
 
 export const Column: Component<ContainerProps> = (props) => <Row {...props} style={{
    "flex-direction": "column",
+   "align-items": "center",
+   "justify-content": "flex-start",
    ...props.style,
 }} />
 
@@ -88,7 +90,7 @@ type GridProps = ContainerProps & {
 
 export const Grid: Component<GridProps> = (props) => <Container {...props} style={{
    "display": "grid",
-   "gap": "5px",
+   "gap": "4px",
    "grid-template-columns": `repeat(${props.cols}, 1fr)`,
    "grid-template-rows": `repeat(${props.rows}, 1fr)`,
    ...props.style,
@@ -288,13 +290,14 @@ export const Status: Component<StatusProps> = (props) => {
             // "flex": "1",
             "display": "flex",
             "flex-direction": "column",
-            "gap": tasks.length < 20 ? "2px" : "0px",
+            "justify-content": "flex-end",
+            "gap": "2px",
             // "height": "0",
             "width": "100%",
             // "outline": "1px solid orange",
             // "outline-offset": "-1px",
             "align-self": "flex-start",
-            "max-height": "100%",
+            // "height": "32px",
             // "overflow-y": "auto",
             ...props.style,
          }}>
@@ -302,10 +305,10 @@ export const Status: Component<StatusProps> = (props) => {
                <div style={{
                   "display": "flex",
                   "width": "100%",
-                  "height": "20px",
+                  "height": "15px",
                   "min-height": "0px",
                   "min-width": "0px",
-                  "flex": "1 1 auto",
+                  "flex": "0 1 auto",
                   "gap": "2px",
                }}>
                   <TaskProgress task={task} />
