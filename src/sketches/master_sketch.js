@@ -38,12 +38,18 @@ export default createSketch((master_engine, ui) => {
       witness,
    ];
 
+   const props = {
+      ANIMATION: true,
+      // VIDEO: true,
+      // REALTIME: true,
+   }
+
    function layout1() {
       ui.createColumn(ui => {
          let engines;
          ui.createRow(ui => {
             engines = sketches.map(sketch =>
-               master_engine.mount(sketch, ui)
+               master_engine.mount(sketch, ui, props)
             );
          });
          ui.createRow(ui =>
@@ -60,7 +66,7 @@ export default createSketch((master_engine, ui) => {
             engines = sketches.map(sketch => {
                let engine;
                ui.createRow(ui => {
-                  engine = master_engine.mount(sketch, ui)
+                  engine = master_engine.mount(sketch, ui, props)
                });
                return engine;
             });
@@ -80,7 +86,7 @@ export default createSketch((master_engine, ui) => {
             ui.createColumn(ui => {
                let engine;
                ui.createRow(ui => {
-                  engine = master_engine.mount(sketch, ui);
+                  engine = master_engine.mount(sketch, ui, props);
                });
                ui.createStatus(engine, 8,
                   { "max-height": "25%" }

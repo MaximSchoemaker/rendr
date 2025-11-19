@@ -13,17 +13,17 @@ export class ParameterUndefinedError extends Error {
 }
 
 
-export type Sketch = (engine: Engine, ui: UI) => void
-export function createSketch(create: Sketch, settings: SchedulerSettings) {
-   return (engine: Engine, ui: UI) => {
+export type Sketch = (engine: Engine, ui: UI, props: any) => void
+export function createSketch(create: Sketch, settings: SchedulerSettings): Sketch {
+   return (engine, ui, props) => {
       engine.scheduler.settings = { ...engine.scheduler.settings, ...settings };
-      create(engine, ui);
+      create(engine, ui, props);
    };
 }
 
-export function mount(sketch: Sketch, ui: UI) {
+export function mount(sketch: Sketch, ui: UI, props?: any) {
    const engine = createEngine();
-   sketch(engine, ui);
+   sketch(engine, ui, props);
    return engine;
 }
 
@@ -174,7 +174,7 @@ export type Engine = {
       settings?: TaskSettings,
    ) => HTMLVideoElement,
 
-   mount: (sketch: Sketch, ui: UI) => Engine;
+   mount: (sketch: Sketch, ui: UI, props: any) => Engine;
 
    scheduler: Scheduler,
 }
@@ -395,8 +395,8 @@ export function createEngine(): Engine {
       //    return video;
       // },
 
-      mount: (sketch: Sketch, ui: UI) => {
-         const engine = mount(sketch, ui);
+      mount: (sketch: Sketch, ui: UI, props: any) => {
+         const engine = mount(sketch, ui, props);
          scheduler.schedule(engine.scheduler);
          return engine;
       },

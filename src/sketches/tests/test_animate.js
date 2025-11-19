@@ -1,14 +1,12 @@
 import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
 import { cosn, lerp, mod, sinn, sin, getLayout } from '../../rendr/utils';
 
-const ANIMATION = true;
-const VIDEO = true;
-
 const GLOBAL_FRAMES = 400;
 const GLOBAL_FPS = 60;
 const REFRESH_RATE = 120;
 
-export default createSketch((engine, ui) => {
+export default createSketch((engine, ui, props) => {
+   const { ANIMATION, VIDEO } = props;
 
    if (ANIMATION) {
       const WIDTH = 1080;
