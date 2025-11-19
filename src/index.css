@@ -1,28 +1,25 @@
 :root {
-  /* light mode */
-  /* --background-color: #eeeeee;
-  --foreground-color: #111111;
-  
-  --canvas-background-color: #000000;
-  --canvas-foreground-color: #ffffff;
-
-  --accent-color-1: rgb(0, 255, 128);
+    --accent-color-1: rgb(0, 255, 128);
   --accent-color-2: rgb(128, 0, 255);
   --accent-color-3: rgb(255, 0, 128);
-  --accent-color-4: rgb(255, 128, 0); */
+  --accent-color-4: rgb(255, 128, 0);  
+
+
+  /* light mode */
+  /* --background-color: #eee;
+  --midground-color: #333;
+  --foreground-color: #111;
+  
+  --canvas-background-color: #000;
+  --canvas-foreground-color: #fff; */
 
   /* dark mode */
-  --background-color: #111111;
-  --foreground-color: #eeeeee;
+  --background-color: #111;
+  --midground-color: #333;
+  --foreground-color: #eee;
   
-  --canvas-background-color: #000000;
-  --canvas-foreground-color: #ffffff;
-
-  --accent-color-1: rgb(0, 255, 128);
-  --accent-color-2: rgb(128, 0, 255);
-  --accent-color-3: rgb(255, 0, 128);
-  --accent-color-4: rgb(255, 128, 0);
-  
+  --canvas-background-color: #000;
+  --canvas-foreground-color: #fff;
 }
 
 body {

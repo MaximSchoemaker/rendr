@@ -109,3 +109,24 @@ export const getLayout = (type: LayoutType, width: number, height: number, paddi
       }
    }
 }
+
+export function fillGrid(item_count: number, width: number, height: number) {
+   let rows = 1;
+   let cols = 1;
+   while (rows * cols < item_count) {
+      if (height > width) {
+         if (cols <= rows) {
+            cols++;
+         } else {
+            rows++;
+         }
+      } else {
+         if (rows <= cols) {
+            rows++;
+         } else {
+            cols++;
+         }
+      }
+   }
+   return { rows, cols };
+}

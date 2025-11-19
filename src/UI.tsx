@@ -15,10 +15,11 @@ export type UI = {
    createContainer: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createRow: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createColumn: (create: (ui: UI) => void, style?: JSX.CSSProperties) => void
+   createGrid: (cols: number, rows: number, create: (ui: UI) => void, style?: JSX.CSSProperties) => void
    createView: (canvas: ViewProps["canvas"], style?: JSX.CSSProperties) => void
    createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"], style?: JSX.CSSProperties) => void
    createVideo: (video: HTMLVideoElement, style?: JSX.CSSProperties) => void
-   createStatus: (render: Render) => void
+   createStatus: (render: Render, max_tasks?: number, style?: JSX.CSSProperties) => void
 }
 
 export function createUI(create: (ui: UI) => void) {
@@ -29,12 +30,13 @@ export function createUI(create: (ui: UI) => void) {
       createContainer: (create, style) => elements.push(<Container create={create} style={style} />),
       createRow: (create, style) => elements.push(<Row create={create} style={style} />),
       createColumn: (create, style) => elements.push(<Column create={create} style={style} />),
+      createGrid: (cols, rows, create, style) => elements.push(<Grid cols={cols} rows={rows} create={create} style={style} />),
 
       createView: (canvas, style) => elements.push(<View canvas={canvas} style={style} />),
       createCacheView: (cache, frame_par, style) => elements.push(<CacheView cache={cache} frame_par={frame_par} style={style} />),
       createVideo: (video, style) => elements.push(video),
 
-      createStatus: (render) => elements.push(<Status render={render} />),
+      createStatus: (render, max_tasks, style) => elements.push(<Status render={render} max_tasks={max_tasks} style={style} />),
    });
 
    return elements;
@@ -76,6 +78,19 @@ export const Row: Component<ContainerProps> = (props) => <Container {...props} s
 
 export const Column: Component<ContainerProps> = (props) => <Row {...props} style={{
    "flex-direction": "column",
+   ...props.style,
+}} />
+
+type GridProps = ContainerProps & {
+   cols: number
+   rows: number
+}
+
+export const Grid: Component<GridProps> = (props) => <Container {...props} style={{
+   "display": "grid",
+   "gap": "5px",
+   "grid-template-columns": `repeat(${props.cols}, 1fr)`,
+   "grid-template-rows": `repeat(${props.rows}, 1fr)`,
    ...props.style,
 }} />
 
@@ -245,6 +260,8 @@ export const CacheView: Component<CacheViewProps> = (props) => {
 
 type StatusProps = {
    render: Render
+   max_tasks?: number
+   style?: JSX.CSSProperties
 }
 
 export const Status: Component<StatusProps> = (props) => {
@@ -263,6 +280,8 @@ export const Status: Component<StatusProps> = (props) => {
    window.addEventListener("keydown", onKeyDown);
    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
 
+   const show_task = () => tasks.slice(0, props.max_tasks)
+
    return (
       <Show when={!hidden()}>
          <div style={{
@@ -275,10 +294,11 @@ export const Status: Component<StatusProps> = (props) => {
             // "outline": "1px solid orange",
             // "outline-offset": "-1px",
             "align-self": "flex-start",
-            "max-height": "25vh",
+            "max-height": "100%",
             "overflow-y": "auto",
+            ...props.style,
          }}>
-            <For each={tasks}>{task =>
+            <For each={show_task()}>{task =>
                <div style={{
                   "display": "flex",
                   "width": "100%",

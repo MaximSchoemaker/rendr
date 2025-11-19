@@ -1,8 +1,7 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
 import { UI } from '../UI';
-import { Layout, map, mod, n_arr } from './utils';
+import { mod, n_arr } from './utils';
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_VERY_HIGH } from 'mediabunny';
-import { b } from 'vite/dist/node/types.d-jgA8ss1A';
 
 export class ParameterUndefinedError extends Error {
    constructor() {
@@ -175,7 +174,7 @@ export type Render = {
       settings?: TaskSettings,
    ) => HTMLVideoElement,
 
-   mountSketch: (sketch: Sketch, ui: UI) => void;
+   mountSketch: (sketch: Sketch, ui: UI) => Render;
 
    scheduler: Scheduler,
 }

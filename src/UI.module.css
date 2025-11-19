@@ -19,6 +19,7 @@
 }
 
 .ViewContainer.fullscreen {
+  z-index: 1;
   position: fixed;
   inset: 0;
 }

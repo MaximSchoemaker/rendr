@@ -17,34 +17,34 @@ export default createSketch((render, ui) => {
    const cols = 16;
    const rows = 16;
 
-   ui.createColumn(ui => {
+   ui.createGrid(cols, rows, ui => {
       for (let j = 0; j < cols; j++) {
-         ui.createRow(ui => {
-            for (let i = 0; i < rows; i++) {
+         for (let i = 0; i < rows; i++) {
 
-               const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
-                  const { width, height } = props;
+            const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+               const { width, height } = props;
 
-                  const tick = tick_par.get();
-                  const f = (i + j) / (rows + cols);
-                  const t = mod(f + tick / FRAMES);
+               const tick = tick_par.get();
+               const f = (i + j) / (rows + cols);
+               const t = mod(f + tick / FRAMES);
 
-                  const x = cosn(t);
-                  const y = lerp(sinn(t * 3), 0.4, 0.6);
-                  const r = 0.125;
+               const x = cosn(t);
+               const y = lerp(sinn(t * 3), 0.4, 0.6);
+               const r = 0.125;
 
-                  ctx.fillStyle = "rgb(255, 128, 0)";
-                  ctx.beginPath();
-                  ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
-                  ctx.fill();
-               });
+               ctx.fillStyle = "rgb(255, 128, 0)";
+               ctx.beginPath();
+               ctx.arc(x * width, y * height, r * width, 0, Math.PI * 2);
+               ctx.fill();
+            });
 
-               ui.createView(view);
-            }
-         })
+            ui.createView(view);
+         }
       }
    }, {
       flex: "0 1 1",
-      height: "auto"
+      height: "auto",
+      "aspect-ratio": 1,
+      "gap": "1%",
    });
 });
