@@ -9,7 +9,7 @@ const FRAMES = 10;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -17,12 +17,12 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const cache = render.simulate([], FRAMES, (points, { i }) => {
+   const cache = engine.simulate([], FRAMES, (points, { i }) => {
       for_n(COUNT / FRAMES, () => points.push({ x: Math.random(), y: Math.random() }));
       return points;
    }, { sync: true });
 
-   const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+   const view = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
       const { width, height } = props;
 
       const tick = tick_par.get() % FRAMES;

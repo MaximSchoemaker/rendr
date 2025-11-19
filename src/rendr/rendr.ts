@@ -13,18 +13,18 @@ export class ParameterUndefinedError extends Error {
 }
 
 
-export type Sketch = (render: Render, ui: UI) => void
+export type Sketch = (engine: Engine, ui: UI) => void
 export function createSketch(create: Sketch, settings: SchedulerSettings) {
-   return (render: Render, ui: UI) => {
-      render.scheduler.settings = { ...render.scheduler.settings, ...settings };
-      create(render, ui);
+   return (engine: Engine, ui: UI) => {
+      engine.scheduler.settings = { ...engine.scheduler.settings, ...settings };
+      create(engine, ui);
    };
 }
 
 export function mountSketch(sketch: Sketch, ui: UI) {
-   const render = createRender();
-   sketch(render, ui);
-   return render;
+   const engine = createEngine();
+   sketch(engine, ui);
+   return engine;
 }
 
 export function createCanvas(width: number, height: number) {
@@ -103,7 +103,7 @@ export function createCache<T>(): Cache<T> {
    }
 }
 
-export type Render = {
+export type Engine = {
    update: <T>(
       initial_value: T,
       create: (value: T) => T,
@@ -174,12 +174,12 @@ export type Render = {
       settings?: TaskSettings,
    ) => HTMLVideoElement,
 
-   mountSketch: (sketch: Sketch, ui: UI) => Render;
+   mountSketch: (sketch: Sketch, ui: UI) => Engine;
 
    scheduler: Scheduler,
 }
 
-export function createRender(): Render {
+export function createEngine(): Engine {
    const scheduler = createScheduler();
 
    return {
@@ -396,9 +396,9 @@ export function createRender(): Render {
       // },
 
       mountSketch: (sketch: Sketch, ui: UI) => {
-         const render = mountSketch(sketch, ui);
-         scheduler.schedule(render.scheduler);
-         return render;
+         const engine = mountSketch(sketch, ui);
+         scheduler.schedule(engine.scheduler);
+         return engine;
       },
    }
 }

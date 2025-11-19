@@ -6,7 +6,7 @@ const WIDTH = 1080 * SCALE;
 const HEIGHT = 1080 * SCALE;
 const FRAMES = 100;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -21,7 +21,7 @@ export default createSketch((render, ui) => {
       for (let j = 0; j < cols; j++) {
          for (let i = 0; i < rows; i++) {
 
-            const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+            const view = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
                const { width, height } = props;
 
                const tick = tick_par.get();

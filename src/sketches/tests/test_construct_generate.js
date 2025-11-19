@@ -9,7 +9,7 @@ const FRAMES = 500;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -17,7 +17,7 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const state = render.construct([], COUNT, (value, { done }) => {
+   const state = engine.construct([], COUNT, (value, { done }) => {
       tick_par.get();
 
       value.push({ x: Math.random(), y: Math.random() });
@@ -27,7 +27,7 @@ export default createSketch((render, ui) => {
       return value;
    }, { sync: true });
 
-   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
+   const view = engine.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
       const { width, height, index } = props;
 
       // console.log(index);

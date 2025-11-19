@@ -8,7 +8,7 @@ const GLOBAL_FRAMES = 400;
 const GLOBAL_FPS = 60;
 const REFRESH_RATE = 120;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    if (ANIMATION) {
       const WIDTH = 1080;
@@ -18,7 +18,7 @@ export default createSketch((render, ui) => {
       const FPS = REFRESH_RATE;
       const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
-      const cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+      const cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
          const { index } = props;
          const t = mod(0.75 + index / FRAMES);
          scene(ctx, t, LAYOUT)
@@ -38,7 +38,7 @@ export default createSketch((render, ui) => {
       const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
       const LOOP = 2;
 
-      const video = render.video(FPS, WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => {
+      const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOP, (ctx, props) => {
          const { index } = props;
          const t = mod(0.75 + index / FRAMES);
          scene(ctx, t, LAYOUT)

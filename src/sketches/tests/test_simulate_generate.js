@@ -1,5 +1,5 @@
-import { createLoop, createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
-import { cosn, lerp, mod, sinn, for_n } from '../../rendr/utils';
+import { createLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { for_n } from '../../rendr/utils';
 
 const SCALE = 1;
 const WIDTH = 1080 * SCALE;
@@ -9,7 +9,7 @@ const FRAMES = 10;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -17,12 +17,12 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const cache = render.simulate([], FRAMES, (points) => {
+   const cache = engine.simulate([], FRAMES, (points) => {
       for_n(COUNT / FRAMES, () => points.push({ x: Math.random(), y: Math.random() }));
       return points;
    }, { sync: true });
 
-   const view = render.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
+   const view = engine.generate(WIDTH, HEIGHT, COUNT, (ctx, props) => {
       const { width, height, index, done } = props;
 
       const tick = tick_par.get() % FRAMES;

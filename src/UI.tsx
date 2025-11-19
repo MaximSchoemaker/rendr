@@ -1,5 +1,5 @@
 import { type Component, For, JSX, onMount, onCleanup, createMemo, createSignal, Show, createEffect } from 'solid-js';
-import { Cache, Parameter, Render, Task, createAnimationLoop } from './rendr/rendr';
+import { Cache, Parameter, Engine, Task, createAnimationLoop } from './rendr/rendr';
 import { download_url, floorTo } from './rendr/utils';
 import styles from './UI.module.css';
 import "./libs/video-builder";
@@ -19,7 +19,7 @@ export type UI = {
    createView: (canvas: ViewProps["canvas"], style?: JSX.CSSProperties) => void
    createCacheView: (canvas: CacheViewProps["cache"], tick_par: CacheViewProps["frame_par"], style?: JSX.CSSProperties) => void
    createVideo: (video: HTMLVideoElement, style?: JSX.CSSProperties) => void
-   createStatus: (render: Render, max_tasks?: number, style?: JSX.CSSProperties) => void
+   createStatus: (engine: Engine, max_tasks?: number, style?: JSX.CSSProperties) => void
 }
 
 export function createUI(create: (ui: UI) => void) {
@@ -36,7 +36,7 @@ export function createUI(create: (ui: UI) => void) {
       createCacheView: (cache, frame_par, style) => elements.push(<CacheView cache={cache} frame_par={frame_par} style={style} />),
       createVideo: (video, style) => elements.push(video),
 
-      createStatus: (render, max_tasks, style) => elements.push(<Status render={render} max_tasks={max_tasks} style={style} />),
+      createStatus: (engine, max_tasks, style) => elements.push(<Status engine={engine} max_tasks={max_tasks} style={style} />),
    });
 
    return elements;
@@ -259,14 +259,14 @@ export const CacheView: Component<CacheViewProps> = (props) => {
 }
 
 type StatusProps = {
-   render: Render
+   engine: Engine
    max_tasks?: number
    style?: JSX.CSSProperties
 }
 
 export const Status: Component<StatusProps> = (props) => {
 
-   const tasks = props.render.scheduler.tasks;
+   const tasks = props.engine.scheduler.tasks;
 
    const [hidden, setHidden] = createSignal(false);
 
@@ -295,7 +295,7 @@ export const Status: Component<StatusProps> = (props) => {
             // "outline-offset": "-1px",
             "align-self": "flex-start",
             "max-height": "100%",
-            "overflow-y": "auto",
+            // "overflow-y": "auto",
             ...props.style,
          }}>
             <For each={show_task()}>{task =>
@@ -303,6 +303,9 @@ export const Status: Component<StatusProps> = (props) => {
                   "display": "flex",
                   "width": "100%",
                   "height": "20px",
+                  "min-height": "0px",
+                  "min-width": "0px",
+                  "flex": "1 1 auto",
                   "gap": "2px",
                }}>
                   <TaskProgress task={task} />

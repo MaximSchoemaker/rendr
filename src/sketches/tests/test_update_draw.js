@@ -8,7 +8,7 @@ const HEIGHT = 1080 * SCALE;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
 
@@ -16,12 +16,12 @@ export default createSketch((render, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const state = render.update([], () => {
+   const state = engine.update([], () => {
       tick_par.get();
       return n_arr(COUNT, () => ({ x: Math.random(), y: Math.random() }));
    });
 
-   const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+   const view = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
       const { width, height } = props;
 
       const points = state.get();

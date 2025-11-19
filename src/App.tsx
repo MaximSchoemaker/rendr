@@ -2,7 +2,7 @@ import { type Component, createSignal, untrack } from 'solid-js';
 import styles from './App.module.css';
 
 import { Column, UI } from './UI';
-import { Render, createLoop, mountSketch } from './rendr/rendr';
+import { Engine, createLoop, mountSketch } from './rendr/rendr';
 
 //@ts-ignore
 import master_sketch from './sketches/master_sketch';
@@ -21,13 +21,13 @@ const App: Component = () => {
     set_avg_fps(1000 / avg_time());
   }, 500);
 
-  const scheduleRender = (render: Render) => {
+  const scheduleEngine = (engine: Engine) => {
     const loop = createLoop(delta => {
       const draw_time = untrack(avg_draw_time);
       const max_execution_time = max_time - draw_time;
 
       const start_time = performance.now();
-      render.scheduler.execute(max_execution_time);
+      engine.scheduler.execute(max_execution_time);
       const execution_time = performance.now() - start_time;
 
       set_avg_execution_time(avg_execution_time => lerp(0.1, avg_execution_time, execution_time));
@@ -41,17 +41,8 @@ const App: Component = () => {
   }
 
   const setup = (ui: UI) => {
-    const render = mountSketch(master_sketch, ui);
-    scheduleRender(render);
-
-    // const render = createRender();
-    // test_ui(render, ui);
-    // test_draw(render, ui);
-    // test_update(render, ui);
-    // test_generate(render, ui);
-    // test_construct(render, ui);
-    // test_construct_generate(render, ui);
-    // scheduleRender(render);
+    const engine = mountSketch(master_sketch, ui);
+    scheduleEngine(engine);
   }
 
   return (

@@ -11,7 +11,7 @@ const ROWS = 5;
 const PAD = 0.25;
 const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD, COLS - 1, ROWS - 1);
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
     // const grid = n_arr(COLS, i => n_arr(ROWS, j => {
     //     return false;
@@ -27,7 +27,7 @@ export default createSketch((render, ui) => {
         { x: 0, y: -1 },
     ];
 
-    const state_par = render.construct({
+    const state_par = engine.construct({
         index: 0,
         nodes: [{ x: 0, y: 0, parent: null }]
     }, MAX_STEPS, (state, props) => {
@@ -51,7 +51,7 @@ export default createSketch((render, ui) => {
         if (next_node.x === target_x, next_direction.y === target_y) done();
     })
 
-    const view = render.draw(WIDTH, HEIGHT, (ctx, props) => {
+    const view = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
         const { screenX, screenY } = LAYOUT;
 
         const state = state_par.get();

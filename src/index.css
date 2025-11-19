@@ -7,16 +7,14 @@
 
   /* light mode */
   /* --background-color: #eee;
-  --midground-color: #333;
-  --foreground-color: #111;
+  --foreground-color: #333;
   
   --canvas-background-color: #000;
   --canvas-foreground-color: #fff; */
 
   /* dark mode */
   --background-color: #111;
-  --midground-color: #333;
-  --foreground-color: #eee;
+  --foreground-color: #333;
   
   --canvas-background-color: #000;
   --canvas-foreground-color: #fff;

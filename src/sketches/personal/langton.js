@@ -28,7 +28,7 @@ const TURNS = [0.25, -0.25, -0.25, 0.25];
 // const TURNS = [-0.25, -0.25, -0.25, 0.25, 0.25, 0.25, -0.25];  // LLLRRRL
 // const TURNS = [0.25, -0.25, 0.25, 0.25, 0.25, -0.25];
 
-export default createSketch((render, ui) => {
+export default createSketch((engine, ui) => {
 
    const steps_par = createParameter(200 / STATES_PER_FRAME);
 
@@ -47,7 +47,7 @@ export default createSketch((render, ui) => {
       field: n_arr(width, () => n_arr(height, null)),
    }
 
-   const state_cache = render.simulate(initialState, STATES, (state, frame, _, t) => {
+   const state_cache = engine.simulate(initialState, STATES, (state, frame, _, t) => {
       const steps = steps_par.get();
       let { ants, field } = state;
 
@@ -75,7 +75,7 @@ export default createSketch((render, ui) => {
       return { ants, field };
    }, { sync: false });
 
-   const frame_cache = render.animate(WIDTH, HEIGHT, FRAMES, (ctx, { index }) => {
+   const frame_cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, { index }) => {
       const t = (index / FRAMES) % 1;
       // const t = (0.1 + index / FRAMES) % 1;
 

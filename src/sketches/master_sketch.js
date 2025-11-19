@@ -1,4 +1,4 @@
-import { createParameter, createSketch, createRender } from "../rendr/rendr";
+import { createSketch } from "../rendr/rendr";
 
 import test_ui from "./tests/test_ui";
 import test_draw from "./tests/test_draw";
@@ -17,21 +17,21 @@ import funsies2 from "./personal/funsies2";
 import witness from "./personal/witness";
 import { fillGrid } from "../rendr/utils";
 
-export default createSketch((render, ui) => {
+export default createSketch((master_engine, ui) => {
    const sketches = [
       test_ui,
       test_draw,
 
-      // test_update_draw,
-      // test_construct_draw,
-      // test_simulate_draw,
+      test_update_draw,
+      test_construct_draw,
+      test_simulate_draw,
 
-      // test_generate,
-      // test_construct_generate,
-      // test_simulate_generate,
+      test_generate,
+      test_construct_generate,
+      test_simulate_generate,
 
       test_animate,
-      // langton,
+      langton,
       funsies,
       funsies2,
       cattoy,
@@ -40,18 +40,39 @@ export default createSketch((render, ui) => {
 
    function layout1() {
       ui.createColumn(ui => {
-         let renders;
+         let engines;
          ui.createRow(ui => {
-            renders = sketches.map(sketch => render.mountSketch(sketch, ui));
+            engines = sketches.map(sketch =>
+               master_engine.mountSketch(sketch, ui)
+            );
          });
          ui.createRow(ui =>
-            renders.forEach(render => ui.createStatus(render, 8)),
+            engines.forEach(engine => ui.createStatus(engine, 8)),
             { flex: "0 1 auto" }
          );
       });
    }
 
    function layout2() {
+      ui.createColumn(ui => {
+         let engines;
+         ui.createRow(ui => {
+            engines = sketches.map(sketch => {
+               let engine;
+               ui.createRow(ui => {
+                  engine = master_engine.mountSketch(sketch, ui)
+               });
+               return engine;
+            });
+         });
+         ui.createRow(ui =>
+            engines.forEach(engine => ui.createStatus(engine, 8)),
+            { flex: "0 1 auto" }
+         );
+      });
+   }
+
+   function layout3() {
       const { rows, cols } = fillGrid(sketches.length, window.innerWidth, window.innerHeight);
 
       ui.createGrid(rows, cols, ui => {
@@ -59,17 +80,24 @@ export default createSketch((render, ui) => {
             ui.createColumn(ui => {
                let engine;
                ui.createRow(ui => {
-                  engine = render.mountSketch(sketch, ui);
+                  engine = master_engine.mountSketch(sketch, ui);
                });
                ui.createStatus(engine, 8,
-                  { "max-height": "50%" }
+                  { "max-height": "25%" }
                );
-            }, { border: "1px solid var(--midground-color)", padding: "5px" });
+            },
+               {
+                  outline: "1px solid var(--foreground-color)",
+                  outlineOffset: "-1px",
+                  padding: "5px"
+               }
+            );
          });
       });
    }
 
    // layout1();
-   layout2();
+   // layout2();
+   layout3();
 });
 

@@ -35,7 +35,6 @@
   border-radius: 2px;
   border-color: transparent;
   outline: 5px var(--accent-color-2) solid;
-  /* outline: 1px solid var(--foreground-color); */
   outline-offset: 0px;
 }
 
@@ -51,4 +50,6 @@
   min-width: 0;
   min-height: 0;
   flex: 0 1 auto; 
+
+  /* outline: 1px solid var(--midground-color); */
 }
