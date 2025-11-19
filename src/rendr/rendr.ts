@@ -21,7 +21,7 @@ export function createSketch(create: Sketch, settings: SchedulerSettings) {
    };
 }
 
-export function mountSketch(sketch: Sketch, ui: UI) {
+export function mount(sketch: Sketch, ui: UI) {
    const engine = createEngine();
    sketch(engine, ui);
    return engine;
@@ -174,7 +174,7 @@ export type Engine = {
       settings?: TaskSettings,
    ) => HTMLVideoElement,
 
-   mountSketch: (sketch: Sketch, ui: UI) => Engine;
+   mount: (sketch: Sketch, ui: UI) => Engine;
 
    scheduler: Scheduler,
 }
@@ -395,8 +395,8 @@ export function createEngine(): Engine {
       //    return video;
       // },
 
-      mountSketch: (sketch: Sketch, ui: UI) => {
-         const engine = mountSketch(sketch, ui);
+      mount: (sketch: Sketch, ui: UI) => {
+         const engine = mount(sketch, ui);
          scheduler.schedule(engine.scheduler);
          return engine;
       },

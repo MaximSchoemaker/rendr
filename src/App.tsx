@@ -2,7 +2,7 @@ import { type Component, createSignal, untrack } from 'solid-js';
 import styles from './App.module.css';
 
 import { Column, UI } from './UI';
-import { Engine, createLoop, mountSketch } from './rendr/rendr';
+import { Engine, createLoop, mount } from './rendr/rendr';
 
 //@ts-ignore
 import master_sketch from './sketches/master_sketch';
@@ -41,7 +41,7 @@ const App: Component = () => {
   }
 
   const setup = (ui: UI) => {
-    const engine = mountSketch(master_sketch, ui);
+    const engine = mount(master_sketch, ui);
     scheduleEngine(engine);
   }
 
