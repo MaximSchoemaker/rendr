@@ -45,11 +45,26 @@ const App: Component = () => {
     scheduleEngine(engine);
   }
 
+  const hudStyle = {
+    flex: 1,
+    "border": "1px solid currentColor",
+    "padding-left": "2px",
+    "color": "var(--accent-color-2)",
+  }
+
   return (
     <div class={styles.App}>
-      {/* <h2>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</h2>
-      <h2>execution time: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}</h2>
-      <h2>draw time: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}</h2> */}
+      <div style={{
+        'width': '100%',
+        display: 'flex',
+        'flex-direction': 'row',
+        'gap': '4px',
+        'text-align': 'left',
+      }}>
+        <div style={hudStyle}>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</div>
+        <div style={hudStyle}>execution: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
+        <div style={hudStyle}>draw: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
+      </div>
       <Column create={setup}
         style={{
           background: 'var(--background-color)',

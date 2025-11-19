@@ -6,4 +6,7 @@
   max-height: 100dvh;
   width: 100dvw;
   height: 100dvh;
+
+  background-color: var(--background-color);
+  font-family: monospace;
 }
