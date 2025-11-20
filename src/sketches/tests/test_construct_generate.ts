@@ -9,6 +9,8 @@ const FRAMES = 500;
 const COUNT = 50_000;
 const TIMEOUT = 5000;
 
+type Points = { x: number; y: number; }[]
+
 export default createSketch((engine, ui) => {
 
    const tick_par = createParameter(0);
@@ -17,7 +19,7 @@ export default createSketch((engine, ui) => {
       tick_par.set(tick => tick + 1);
    }, TIMEOUT);
 
-   const state = engine.construct([], COUNT, (value, { done }) => {
+   const state = engine.construct<Points>([], COUNT, (value, { done }) => {
       tick_par.get();
 
       value.push({ x: Math.random(), y: Math.random() });

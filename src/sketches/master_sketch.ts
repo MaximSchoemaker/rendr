@@ -1,4 +1,4 @@
-import { createSketch } from "../rendr/rendr";
+import { createSketch, Engine } from "../rendr/rendr";
 
 import test_ui from "./tests/test_ui";
 import test_draw from "./tests/test_draw";
@@ -40,13 +40,13 @@ export default createSketch((master_engine, ui) => {
 
    const props = {
       ANIMATION: true,
-      // VIDEO: true,
-      // REALTIME: true,
+      VIDEO: false,
+      REALTIME: false,
    }
 
    function layout1() {
       ui.createColumn(ui => {
-         let engines;
+         let engines: Engine[];
          ui.createRow(ui => {
             engines = sketches.map(sketch =>
                master_engine.mount(sketch, ui, props)
@@ -61,10 +61,10 @@ export default createSketch((master_engine, ui) => {
 
    function layout2() {
       ui.createColumn(ui => {
-         let engines;
+         let engines: Engine[];
          ui.createRow(ui => {
             engines = sketches.map(sketch => {
-               let engine;
+               let engine: Engine;
                ui.createRow(ui => {
                   engine = master_engine.mount(sketch, ui, props)
                });
@@ -84,7 +84,7 @@ export default createSketch((master_engine, ui) => {
       ui.createGrid(rows, cols, ui => {
          sketches.forEach(sketch => {
             ui.createColumn(ui => {
-               let engine;
+               let engine: Engine;
                ui.createRow(ui => {
                   engine = master_engine.mount(sketch, ui, props);
                });
@@ -94,8 +94,8 @@ export default createSketch((master_engine, ui) => {
             },
                {
                   outline: "1px solid var(--foreground-color)",
-                  outlineOffset: "-1px",
-                  padding: "5px"
+                  "outline-offset": "-1px",
+                  padding: "4px",
                }
             );
          });

@@ -1,5 +1,5 @@
-import { createLoop, createAnimationLoop, createParameter, createSketch } from "../../rendr/rendr";
-import { for_n, lerp, sinn, cosn, getLayout, n_arr } from "../../rendr/utils";
+import { createLoop, createAnimationLoop, createParameter, createSketch, AnimateProps, VideoProps } from "../../rendr/rendr";
+import { for_n, lerp, sinn, cosn, getLayout, n_arr, Layout } from "../../rendr/utils";
 
 
 const GLOBAL_FRAMES = 1500;
@@ -11,7 +11,18 @@ const OFFSSET_R = 1;
 const SMOOTHING = 0.15;
 const BUFFER_LENGTH = 200;
 
-export default createSketch((engine, ui, props) => {
+type Props = {
+  ANIMATION: boolean,
+  VIDEO: boolean,
+  REALTIME: boolean,
+}
+
+type Position = {
+  x: number,
+  y: number,
+}
+
+export default createSketch<Props>((engine, ui, props) => {
   const { ANIMATION, VIDEO, REALTIME } = props;
 
   if (ANIMATION || VIDEO) {
@@ -22,13 +33,13 @@ export default createSketch((engine, ui, props) => {
     const FPS = 60;
     const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
-    function scene(t, positions) {
+    function scene(t: number, positions: Position[]) {
       const input_x = sinn(t * 8)
       const input_y = cosn(t * 10)
       update(input_x, input_y, positions)
     }
 
-    const initial_positions = [];
+    const initial_positions: Position[] = [];
     for_n(FRAMES, i => scene(i / FRAMES, initial_positions));
 
     const state = engine.simulate(initial_positions, FRAMES, (positions, props) => {
@@ -37,7 +48,7 @@ export default createSketch((engine, ui, props) => {
       scene(t, positions);
     });
 
-    function render(ctx, props) {
+    function render(ctx: CanvasRenderingContext2D, props: AnimateProps | VideoProps) {
       const { index } = props;
 
       const t = index / FRAMES;
@@ -103,8 +114,7 @@ export default createSketch((engine, ui, props) => {
   }
 });
 
-
-function update(input_x, input_y, positions) {
+function update(input_x: number, input_y: number, positions: Position[]) {
   const prev_pos = positions.at(-1) || { x: input_x, y: input_y };
 
   const x = lerp(SMOOTHING, prev_pos.x, input_x);
@@ -114,7 +124,7 @@ function update(input_x, input_y, positions) {
   if (positions.length > BUFFER_LENGTH) positions.shift();
 }
 
-function draw(ctx, t, positions, layout) {
+function draw(ctx: CanvasRenderingContext2D, t: number, positions: Position[], layout: Layout) {
   const { min_size, screenX, screenY } = layout;
 
   for (let i = 0; i < positions.length - 1; i++) {
@@ -131,12 +141,12 @@ function draw(ctx, t, positions, layout) {
 
     const a = 1;
 
-    const getOffsetX = (i) => (positions[i].x - 0.5) * 2 * OFFSSET_R * -1;
-    const getOffsetY = (i) => (positions[i].y - 0.5) * 2 * OFFSSET_R * -1;
+    const getOffsetX = (i: number) => (positions[i].x - 0.5) * 2 * OFFSSET_R * -1;
+    const getOffsetY = (i: number) => (positions[i].y - 0.5) * 2 * OFFSSET_R * -1;
 
     const pos_f = 1 - f
-    const getX = (i) => positions[i].x + pos_f * getOffsetX(i);
-    const getY = (i) => positions[i].y + pos_f * getOffsetY(i);
+    const getX = (i: number) => positions[i].x + pos_f * getOffsetX(i);
+    const getY = (i: number) => positions[i].y + pos_f * getOffsetY(i);
 
     {
       ctx.strokeStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;

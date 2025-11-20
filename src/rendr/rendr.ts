@@ -13,15 +13,15 @@ export class ParameterUndefinedError extends Error {
 }
 
 
-export type Sketch = (engine: Engine, ui: UI, props: any) => void
-export function createSketch(create: Sketch, settings: SchedulerSettings): Sketch {
+export type Sketch<T> = (engine: Engine, ui: UI, props: T) => void
+export function createSketch<T>(create: Sketch<T>, settings?: SchedulerSettings): Sketch<T> {
    return (engine, ui, props) => {
       engine.scheduler.settings = { ...engine.scheduler.settings, ...settings };
       create(engine, ui, props);
    };
 }
 
-export function mount(sketch: Sketch, ui: UI, props?: any) {
+export function mount<T>(sketch: Sketch<T>, ui: UI, props?: any) {
    const engine = createEngine();
    sketch(engine, ui, props);
    return engine;
@@ -39,10 +39,11 @@ export function createOffscreenCanvas(width: number, height: number) {
    return canvas;
 }
 
-type getSettings = { dont_throw?: boolean, dont_track?: boolean }
+type getSettings = { dont_track?: boolean }
 
 export type Parameter<T> = {
    get: (settings?: getSettings) => T,
+   getSafe: (settings?: getSettings) => T | undefined,
    set: Setter<T>,
    signal: Accessor<T>,
 }
@@ -51,11 +52,15 @@ export function createParameter<T>(initial_value: T): Parameter<T> {
    const [parameter, set_parameter] = createSignal<T>(initial_value, { equals: false });
    // const deferred_parameter = createDeferred(parameter, { timeoutMs: 1000 });
    return {
-      get: (settings) => {
+      get(settings) {
+         const value = this.getSafe(settings);
+         if (value === undefined) throw new ParameterUndefinedError();
+         return value;
+      },
+      getSafe(settings) {
          const value = !settings?.dont_track
             ? parameter()
             : untrack(parameter);
-         if (!settings?.dont_throw && value === undefined) throw new ParameterUndefinedError();
          return value;
       },
       set: set_parameter,
@@ -65,29 +70,36 @@ export function createParameter<T>(initial_value: T): Parameter<T> {
 
 export type Cache<T> = {
    count: number,
-   values: Parameter<T | undefined>[],
-   getParameter: (index: number) => Parameter<T | undefined>,
-   get: (index: number, settings?: getSettings) => T | undefined,
-   getLatest: (index: number, settings?: getSettings) => T | undefined,
-   set: (index: number, value: T | undefined) => void,
+   values: (Parameter<T> | undefined)[],
+   get: ((index: number, settings?: getSettings) => T)
+   getSafe: ((index: number, settings?: getSettings) => T | undefined)
+   getLatest: (index: number, settings?: getSettings) => T,
+   getLatestSafe: (index: number, settings?: getSettings) => T | undefined,
+   set: (index: number, value: T) => void,
+   delete(index: number): void,
    valid: (index: number) => boolean,
 }
 
 export function createCache<T>(): Cache<T> {
    return {
       count: 0,
-      values: [],
-      getParameter(index) {
-         if (!this.values[index]) {
-            this.values[index] = createParameter<T | undefined>(undefined);
-            this.count = Math.max(index + 1, this.count);
-         }
-         return this.values[index]
+      values: [] as (Parameter<T>)[],
+
+      get(index: number, settings?: getSettings) {
+         const parameter = this.values[index];
+         if (parameter) return parameter.get(settings);
+         throw new ParameterUndefinedError();
       },
-      get(index, settings) {
-         return this.getParameter(index).get(settings);
+      getSafe(index: number, settings?: getSettings) {
+         const parameter = this.values[index];
+         if (parameter) return parameter.getSafe(settings);
       },
-      getLatest(index, settings) {
+      getLatest(index: number, settings?: getSettings) {
+         const value = this.getLatestSafe(index, settings);
+         if (value === undefined) throw new ParameterUndefinedError();
+         return value;
+      },
+      getLatestSafe(index: number, settings?: getSettings) {
          this.count = Math.max(index + 1, this.count);
          for (let n = 0; n < this.count; n++) {
             const i = mod(index - n, this.count);
@@ -95,18 +107,35 @@ export function createCache<T>(): Cache<T> {
          }
       },
       set(index, value) {
-         this.getParameter(index).set(() => value);
+         const parameter = this.values[index];
+         if (!parameter) {
+            this.values[index] = createParameter(value);
+            this.count = Math.max(index + 1, this.count);
+         } else {
+            parameter.set(() => value);
+         }
+      },
+      delete(index) {
+         delete this.values[index];
       },
       valid(index) {
-         return this.get(index, { dont_throw: true }) !== undefined;
+         return this.getSafe(index) !== undefined;
       },
    }
 }
 
+export type ConstructProps = { index: number, done: () => void }
+export type SimulateProps = { index: number, done: () => void }
+
+export type DrawProps = { width: number, height: number }
+export type GenerateProps = { width: number, height: number, index: number, max_steps: number, done: () => void }
+export type AnimateProps = { width: number, height: number, index: number, max_steps: number, done: () => void }
+export type VideoProps = { width: number, height: number, index: number, max_steps: number, done: () => void }
+
 export type Engine = {
    update: <T>(
       initial_value: T,
-      create: (value: T) => T,
+      create: (value: T) => T | void,
       settings?: TaskSettings,
    ) => Parameter<T>,
 
@@ -115,30 +144,30 @@ export type Engine = {
       max_steps: number,
       create: (
          value: T,
-         props: { index: number, done: () => void }
-      ) => T,
+         props: ConstructProps
+      ) => T | void,
       settings?: TaskSettings,
    ) => Parameter<T>,
-
-   draw: (
-      width: number,
-      height: number,
-      create: (
-         view: CanvasRenderingContext2D,
-         props: { width: number, height: number, }
-      ) => void,
-      settings?: TaskSettings,
-   ) => HTMLCanvasElement,
 
    simulate: <T>(
       initial_value: T,
       max_steps: number,
       create: (
          value: T,
-         props: { index: number, done: () => void }
-      ) => T,
+         props: SimulateProps
+      ) => T | void,
       settings?: TaskSettings,
    ) => Cache<T>,
+
+   draw: (
+      width: number,
+      height: number,
+      create: (
+         view: CanvasRenderingContext2D,
+         props: DrawProps
+      ) => void,
+      settings?: TaskSettings,
+   ) => HTMLCanvasElement,
 
    generate: (
       width: number,
@@ -146,7 +175,7 @@ export type Engine = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
+         props: GenerateProps
       ) => void,
       settings?: TaskSettings,
    ) => HTMLCanvasElement,
@@ -157,7 +186,7 @@ export type Engine = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
+         props: AnimateProps
       ) => void,
       settings?: TaskSettings,
    ) => Cache<HTMLCanvasElement>,
@@ -169,12 +198,12 @@ export type Engine = {
       max_steps: number,
       create: (
          view: CanvasRenderingContext2D,
-         props: { width: number, height: number, index: number, max_steps: number, done: () => void }
+         props: VideoProps
       ) => void,
       settings?: TaskSettings,
    ) => HTMLVideoElement,
 
-   mount: (sketch: Sketch, ui: UI, props: any) => Engine;
+   mount: <T>(sketch: Sketch<T>, ui: UI, props: T) => Engine;
 
    scheduler: Scheduler,
 }
@@ -248,7 +277,7 @@ export function createEngine(): Engine {
 
          scheduler.schedule(createTaskCache(max_steps, {
             reset: (index) => {
-               cache.set(index, undefined);
+               cache.delete(index);
             },
             execute: ({ index, done }) => {
                const prev_value = structuredClone(index == 0
@@ -269,10 +298,10 @@ export function createEngine(): Engine {
 
          scheduler.schedule(createTaskCache(max_steps, {
             reset: (index) => {
-               cache.set(index, undefined);
+               cache.delete(index);
             },
             execute: ({ index, done }) => {
-               const canvas = cache.get(index, { dont_track: true, dont_throw: true }) ?? createCanvas(width, height);
+               const canvas = cache.getSafe(index, { dont_track: true }) ?? createCanvas(width, height);
                const ctx = canvas.getContext("2d")!;
                ctx.clearRect(0, 0, width, height);
                create(ctx, { width, height, index, max_steps, done });
@@ -395,7 +424,7 @@ export function createEngine(): Engine {
       //    return video;
       // },
 
-      mount: (sketch: Sketch, ui: UI, props: any) => {
+      mount: <T>(sketch: Sketch<T>, ui: UI, props: T) => {
          const engine = mount(sketch, ui, props);
          scheduler.schedule(engine.scheduler);
          return engine;

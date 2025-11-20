@@ -10,7 +10,7 @@ export function n_arr<T>(n: number, callback: T | ((index: number, f: number, ff
 //    return new Array(n).fill(null).map((_, i) => callback(i));
 // }
 
-export const for_n = (n: number, callback: (i: number) => {}) => {
+export const for_n = (n: number, callback: (i: number) => void) => {
    for (let i = 0; i < n; i++)
       callback(i);
 }
@@ -72,6 +72,14 @@ export const download_url = (url: string, name?: string) => {
 }
 
 export type LayoutType = "stretch" | "fit" | "fill"
+export type Layout = {
+   size: number,
+   min_size: number,
+   max_size: number,
+   screenX: (v: number) => number,
+   screenY: (v: number) => number,
+}
+
 export const getLayout = (type: LayoutType, width: number, height: number, padding = 0, x_range = 1, y_range = 1) => {
    const max_size = Math.max(width, height);
    const min_size = Math.min(width, height);

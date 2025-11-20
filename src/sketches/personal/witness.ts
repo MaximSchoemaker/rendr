@@ -11,6 +11,11 @@ const ROWS = 5;
 const PAD = 0.25;
 const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD, COLS - 1, ROWS - 1);
 
+type State = {
+    index: number;
+    nodes: { x: number; y: number; parent: { x: number; y: number; parent: any; } | null; }[];
+}
+
 export default createSketch((engine, ui) => {
 
     // const grid = n_arr(COLS, i => n_arr(ROWS, j => {
@@ -27,7 +32,7 @@ export default createSketch((engine, ui) => {
         { x: 0, y: -1 },
     ];
 
-    const state_par = engine.construct({
+    const state_par = engine.construct<State>({
         index: 0,
         nodes: [{ x: 0, y: 0, parent: null }]
     }, MAX_STEPS, (state, props) => {

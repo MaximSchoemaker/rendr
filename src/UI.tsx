@@ -171,7 +171,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    const [fullscreen, setFullscreen] = createSignal(false);
 
    const canvas = createMemo(() => {
-      const canvas = props.cache.getLatest(props.frame_par.get(), { dont_throw: true })
+      const canvas = props.cache.getLatestSafe(props.frame_par.getSafe() ?? 0)
       if (!canvas) return null;
 
       canvas.className = styles.ViewCanvas;
@@ -210,7 +210,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    function record(name = "recording", quality = 1, fps = 60) {
       const { cache } = props;
 
-      const first_frame = cache.get(0, { dont_throw: true });
+      const first_frame = cache.getSafe(0);
       if (!first_frame) { console.warn("cache does not have a frame at index 0", cache); return; }
 
       const { width, height } = first_frame;
@@ -228,7 +228,7 @@ export const CacheView: Component<CacheViewProps> = (props) => {
       const video_builder = new VideoBuilder({ w: width, h: height, fps, quality });
 
       for (let i = 0; i < cache.count; i++) {
-         const frame = cache.get(i, { dont_throw: true });
+         const frame = cache.getSafe(i);
          if (!frame) continue;
          video_builder.addCanvasFrame(frame);
       }

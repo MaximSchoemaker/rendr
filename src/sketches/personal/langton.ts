@@ -44,10 +44,10 @@ export default createSketch((engine, ui) => {
             // mult: i < n / 2 ? -1 : 1,
          }
       )),
-      field: n_arr(width, () => n_arr(height, null)),
+      field: n_arr(width, () => n_arr(height, null)) as (number | null)[][],
    }
 
-   const state_cache = engine.simulate(initialState, STATES, (state, frame, _, t) => {
+   const state_cache = engine.simulate(initialState, STATES, (state) => {
       const steps = steps_par.get();
       let { ants, field } = state;
 
@@ -93,7 +93,7 @@ export default createSketch((engine, ui) => {
       for (let x = 0; x < width; x++) {
          for (let y = 0; y < height; y++) {
 
-            const val = fields.reduce((tot, field, i) => tot + field[x][y], 0) / fields.length;
+            const val = fields.reduce((tot, field, i) => tot + (field[x][y] ?? 0), 0) / fields.length;
             if (val == 0) continue;
 
             const val_f = (val) / (TURNS.length - 1);

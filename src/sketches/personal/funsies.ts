@@ -1,11 +1,16 @@
 import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
-import { cosn, sinn, mod, lerp, tri, for_n, getLayout } from "../../rendr/utils"
+import { cosn, sinn, mod, lerp, tri, for_n, getLayout, Layout } from "../../rendr/utils"
 
 const GLOBAL_FRAMES = 400;
 const GLOBAL_FPS = 60;
 const REFRESH_RATE = 120;
 
-export default createSketch((engine, ui, props) => {
+type Props = {
+   ANIMATION: boolean,
+   VIDEO: boolean,
+}
+
+export default createSketch<Props>((engine, ui, props) => {
    const { ANIMATION, VIDEO } = props;
 
    if (ANIMATION) {
@@ -50,7 +55,7 @@ export default createSketch((engine, ui, props) => {
 });
 
 const COUNT = 20;
-function animation(ctx, t, layout) {
+function animation(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
    for_n(COUNT, i => {
       const f = i / COUNT;
       const scene_t = mod(f + t);
@@ -59,7 +64,7 @@ function animation(ctx, t, layout) {
    });
 }
 
-function scene(ctx, t, f, layout) {
+function scene(ctx: CanvasRenderingContext2D, t: number, f: number, layout: Layout) {
    const { screenX, screenY, size } = layout;
 
    const x1 = sinn(t);
