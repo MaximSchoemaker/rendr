@@ -4,22 +4,19 @@ import styles from './App.module.css';
 import { Column, UI } from './UI';
 import { Engine, createLoop, mount } from './rendr/rendr';
 
-//@ts-ignore
 import master_sketch from './sketches/master_sketch';
+import cattoy_sketch from './sketches/personal/cattoy';
 
 import { lerp } from './rendr/utils';
 
+const AVG_TIME_LERP = 0.01
+
 const App: Component = () => {
-  const max_time = 1000 / 60;
+  const max_time = 1000 / 30;
 
   const [avg_time, set_avg_time] = createSignal(max_time);
   const [avg_execution_time, set_avg_execution_time] = createSignal(max_time);
-  const [avg_fps, set_avg_fps] = createSignal(0);
   const avg_draw_time = () => avg_time() - avg_execution_time();
-
-  createLoop(() => {
-    set_avg_fps(1000 / avg_time());
-  }, 500);
 
   const scheduleEngine = (engine: Engine) => {
     const loop = createLoop(delta => {
@@ -30,8 +27,8 @@ const App: Component = () => {
       engine.scheduler.execute(max_execution_time);
       const execution_time = performance.now() - start_time;
 
-      set_avg_execution_time(avg_execution_time => lerp(0.1, avg_execution_time, execution_time));
-      set_avg_time(avg_time => lerp(0.1, avg_time, delta));
+      set_avg_execution_time(avg_execution_time => lerp(AVG_TIME_LERP, avg_execution_time, execution_time));
+      set_avg_time(avg_time => lerp(AVG_TIME_LERP, avg_time, delta));
     });
 
     addEventListener("keydown", evt => {
@@ -42,6 +39,7 @@ const App: Component = () => {
 
   const setup = (ui: UI) => {
     const engine = mount(master_sketch, ui);
+    // const engine = mount(cattoy_sketch, ui, { ANIMATION: true, VIDEO: true, REALTIME: true });
     scheduleEngine(engine);
   }
 
@@ -61,8 +59,8 @@ const App: Component = () => {
         'gap': '4px',
         'text-align': 'left',
       }}>
-        <div style={hudStyle}>fps: {Math.round(1000 / avg_time())} ({Math.round(avg_fps())})</div>
-        <div style={hudStyle}>execution: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
+        <div style={hudStyle}>fps: {Math.round(1000 / avg_time())}</div>
+        <div style={hudStyle}>exec: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
         <div style={hudStyle}>draw: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
       </div>
       <Column create={setup}

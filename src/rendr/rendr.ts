@@ -21,9 +21,9 @@ export function createSketch<T>(create: Sketch<T>, settings?: SchedulerSettings)
    };
 }
 
-export function mount<T>(sketch: Sketch<T>, ui: UI, props?: any) {
+export function mount<T>(sketch: Sketch<T>, ui: UI, props?: T) {
    const engine = createEngine();
-   sketch(engine, ui, props);
+   sketch(engine, ui, props ?? {} as T);
    return engine;
 }
 

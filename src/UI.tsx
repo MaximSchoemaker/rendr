@@ -121,6 +121,11 @@ export const View: Component<ViewProps> = (props) => {
       }
    }
 
+   function onDoubleClick(evt: MouseEvent) {
+      onFullscreen();
+   }
+
+
    function onScreenshot() {
       set_recording(true);
       setTimeout(() => {
@@ -149,7 +154,7 @@ export const View: Component<ViewProps> = (props) => {
 
    const className = () => `${styles.ViewContainer} ${fullscreen() ? styles.fullscreen : ''}`;
 
-   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} style={{
+   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} onDblClick={onDoubleClick} style={{
       "aspect-ratio": fullscreen() ? undefined : aspect_ratio,
       ...props.style,
    }}>
@@ -189,6 +194,10 @@ export const CacheView: Component<CacheViewProps> = (props) => {
             onFullscreen();
             break;
       }
+   }
+
+   function onDoubleClick(evt: MouseEvent) {
+      onFullscreen();
    }
 
    function onRecord() {
@@ -251,11 +260,13 @@ export const CacheView: Component<CacheViewProps> = (props) => {
 
    const className = () => `${styles.ViewContainer} ${fullscreen() ? styles.fullscreen : ''}`;
 
-   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} style={{
+   return <div class={className()} tabIndex={0} onKeyDown={onKeyDown} onDblClick={onDoubleClick} style={{
       "aspect-ratio": fullscreen() ? undefined : aspect_ratio(),
+      "position": fullscreen() ? undefined : "relative",
       ...props.style,
    }}>
       <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
+      <div style={{ inset: "0", "position": "absolute" }} ></div>
       {canvas()}
    </div>;
 }

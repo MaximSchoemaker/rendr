@@ -19,29 +19,29 @@ import { fillGrid } from "../rendr/utils";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
-      test_ui,
-      test_draw,
+      // test_ui,
+      // test_draw,
 
-      test_update_draw,
-      test_construct_draw,
-      test_simulate_draw,
+      // test_update_draw,
+      // test_construct_draw,
+      // test_simulate_draw,
 
-      test_generate,
-      test_construct_generate,
-      test_simulate_generate,
+      // test_generate,
+      // test_construct_generate,
+      // test_simulate_generate,
 
-      test_animate,
-      langton,
-      funsies,
-      funsies2,
+      // test_animate,
+      // langton,
+      // funsies,
+      // funsies2,
       cattoy,
-      witness,
+      // witness,
    ];
 
    const props = {
-      ANIMATION: true,
+      ANIMATION: false,
       VIDEO: false,
-      REALTIME: false,
+      REALTIME: true,
    }
 
    function layout1() {
