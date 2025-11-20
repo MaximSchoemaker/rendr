@@ -72,8 +72,8 @@ export default createSketch<Props>((engine, ui, props) => {
   }
 
   if (REALTIME) {
-    const WIDTH = window.innerWidth;
-    const HEIGHT = window.innerHeight;
+    const WIDTH = window.outerWidth;
+    const HEIGHT = window.outerHeight;
     const LAYOUT = getLayout("stretch", WIDTH, HEIGHT);
 
     const FPS = REFRESH_RATE;

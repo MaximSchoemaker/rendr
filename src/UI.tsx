@@ -137,9 +137,11 @@ export const View: Component<ViewProps> = (props) => {
    function onFullscreen(value?: boolean) {
       if (value === undefined) {
          setFullscreen(fs => !fs);
-         return;
+      } else {
+         setFullscreen(value);
       }
-      setFullscreen(value);
+      if (fullscreen()) window.document.body.requestFullscreen();
+      else document.exitFullscreen();
    }
 
    function screenshot(name = "screenshot") {
@@ -211,9 +213,11 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    function onFullscreen(value?: boolean) {
       if (value === undefined) {
          setFullscreen(fs => !fs);
-         return;
+      } else {
+         setFullscreen(value);
       }
-      setFullscreen(value);
+      if (fullscreen()) window.document.body.requestFullscreen();
+      else document.exitFullscreen();
    }
 
    function record(name = "recording", quality = 1, fps = 60) {
