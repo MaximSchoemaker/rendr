@@ -77,7 +77,7 @@ export default createSketch<Props>((engine, ui, props) => {
     const LAYOUT = getLayout("stretch", WIDTH, HEIGHT);
 
     const FPS = REFRESH_RATE;
-    const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
+    const FRAMES = 0.5 * GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
     let pointer_x = 0.5;
     let pointer_y = 0.5;
