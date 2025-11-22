@@ -178,7 +178,8 @@ export const CacheView: Component<CacheViewProps> = (props) => {
    const [fullscreen, setFullscreen] = createSignal(false);
 
    const canvas = createMemo(() => {
-      const canvas = props.cache.getLatestSafe(props.frame_par.getSafe() ?? 0)
+      const canvas = props.cache.getLatestSafe(Math.floor(props.frame_par.getSafe() ?? 0))
+      // const canvas = props.cache.getLatestSafe(props.cache.count)
       if (!canvas) return null;
 
       canvas.className = styles.ViewCanvas;

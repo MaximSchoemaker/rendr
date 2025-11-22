@@ -2,26 +2,27 @@ import { type Component, createSignal, untrack } from 'solid-js';
 import styles from './App.module.css';
 
 import { Column, UI } from './UI';
-import { Engine, createLoop, mount } from './rendr/rendr';
+import { Engine, createAnimationLoop, createLoop, mount } from './rendr/rendr';
 
 import master_sketch from './sketches/master_sketch';
 import cattoy_sketch from './sketches/personal/cattoy';
 
 import { lerp } from './rendr/utils';
 
-const AVG_TIME_LERP = 0.01
+const AVG_TIME_LERP = 0.01;
+const TARGET_FPS = 30;
 
 const App: Component = () => {
-  const max_time = 1000 / 30;
+  const target_time = 1000 / TARGET_FPS;
 
-  const [avg_time, set_avg_time] = createSignal(max_time);
-  const [avg_execution_time, set_avg_execution_time] = createSignal(max_time);
+  const [avg_time, set_avg_time] = createSignal(target_time);
+  const [avg_execution_time, set_avg_execution_time] = createSignal(0);
   const avg_draw_time = () => avg_time() - avg_execution_time();
 
   const scheduleEngine = (engine: Engine) => {
-    const loop = createLoop(delta => {
+    const loop = createAnimationLoop(delta => {
       const draw_time = untrack(avg_draw_time);
-      const max_execution_time = max_time - draw_time;
+      const max_execution_time = target_time - draw_time;
 
       const start_time = performance.now();
       engine.scheduler.execute(max_execution_time);

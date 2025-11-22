@@ -1,4 +1,5 @@
 import { createSketch, Engine } from "../rendr/rendr";
+import { fillGrid } from "../rendr/utils";
 
 import test_ui from "./tests/test_ui";
 import test_draw from "./tests/test_draw";
@@ -15,7 +16,7 @@ import cattoy from "./personal/cattoy";
 import funsies from "./personal/funsies";
 import funsies2 from "./personal/funsies2";
 import witness from "./personal/witness";
-import { fillGrid } from "../rendr/utils";
+import stepper from "./personal/stepper";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -30,18 +31,20 @@ export default createSketch((master_engine, ui) => {
       // test_construct_generate,
       // test_simulate_generate,
 
+      // witness,
+
       // test_animate,
       // langton,
       // funsies,
       // funsies2,
-      cattoy,
-      // witness,
+      // cattoy,
+      stepper
    ];
 
    const props = {
-      ANIMATION: false,
-      VIDEO: false,
-      REALTIME: true,
+      // REALTIME: true,
+      ANIMATION: true,
+      // VIDEO: true,
    }
 
    function layout1() {

@@ -163,7 +163,7 @@ export type Engine = {
       width: number,
       height: number,
       create: (
-         view: CanvasRenderingContext2D,
+         ctx: CanvasRenderingContext2D,
          props: DrawProps
       ) => void,
       settings?: TaskSettings,
@@ -174,7 +174,7 @@ export type Engine = {
       height: number,
       max_steps: number,
       create: (
-         view: CanvasRenderingContext2D,
+         ctx: CanvasRenderingContext2D,
          props: GenerateProps
       ) => void,
       settings?: TaskSettings,
@@ -185,7 +185,7 @@ export type Engine = {
       height: number,
       max_steps: number,
       create: (
-         view: CanvasRenderingContext2D,
+         ctx: CanvasRenderingContext2D,
          props: AnimateProps
       ) => void,
       settings?: TaskSettings,
@@ -197,7 +197,7 @@ export type Engine = {
       height: number,
       max_steps: number,
       create: (
-         view: CanvasRenderingContext2D,
+         ctx: CanvasRenderingContext2D,
          props: VideoProps
       ) => void,
       settings?: TaskSettings,
@@ -226,18 +226,6 @@ export function createEngine(): Engine {
          return parameter;
       },
 
-      draw: (width, height, create, settings) => {
-         const canvas = createCanvas(width, height);
-         const ctx = canvas.getContext("2d")!;
-
-         scheduler.schedule(createTask(() => {
-            ctx.clearRect(0, 0, width, height);
-            create(ctx, { width, height })
-         }, settings));
-
-         return canvas;
-      },
-
       construct: (initial_value, max_steps, create, settings) => {
          const parameter = createParameter(initial_value);
 
@@ -253,23 +241,6 @@ export function createEngine(): Engine {
          }, settings));
 
          return parameter;
-      },
-
-      generate: (width, height, max_steps, create, settings) => {
-         const canvas = createCanvas(width, height);
-         const ctx = canvas.getContext("2d")!;
-         const size = Math.min(width, height);
-
-         scheduler.schedule(createTaskQueue(max_steps, {
-            reset: () => {
-               ctx.clearRect(0, 0, width, height);
-            },
-            execute: ({ index, done }) => {
-               create(ctx, { width, height, index, max_steps, done });
-            }
-         }, settings));
-
-         return canvas;
       },
 
       simulate: (initial_value, max_steps, create, settings) => {
@@ -291,6 +262,34 @@ export function createEngine(): Engine {
          }, settings));
 
          return cache;
+      },
+
+      draw: (width, height, create, settings) => {
+         const canvas = createCanvas(width, height);
+         const ctx = canvas.getContext("2d")!;
+
+         scheduler.schedule(createTask(() => {
+            ctx.clearRect(0, 0, width, height);
+            create(ctx, { width, height })
+         }, settings));
+
+         return canvas;
+      },
+
+      generate: (width, height, max_steps, create, settings) => {
+         const canvas = createCanvas(width, height);
+         const ctx = canvas.getContext("2d")!;
+
+         scheduler.schedule(createTaskQueue(max_steps, {
+            reset: () => {
+               ctx.clearRect(0, 0, width, height);
+            },
+            execute: ({ index, done }) => {
+               create(ctx, { width, height, index, max_steps, done });
+            }
+         }, settings));
+
+         return canvas;
       },
 
       animate: (width, height, max_steps, create, settings) => {
@@ -445,7 +444,7 @@ type Scheduler = Task & {
 }
 
 function createScheduler() {
-   let i = 0;
+   let index = 0;
 
    const scheduler: Scheduler = {
       tasks: [],
@@ -463,11 +462,13 @@ function createScheduler() {
             let task_count = this.tasks.reduce((count, task) => count + (task.isDone() ? 0 : 1), 0);
             if (task_count == 0) return;
 
-            const task = this.tasks[i];
+            const task = this.tasks[index];
+            if (task.isErrored()) continue;
+
             const sync = task.settings.sync ?? this.settings.sync;
-            if (!sync) i = (i + 1) % this.tasks.length;
+            if (!sync) index = (index + 1) % this.tasks.length;
             if (task.isDone()) {
-               if (sync) i = (i + 1) % this.tasks.length;
+               if (sync) index = (index + 1) % this.tasks.length;
                continue;
             }
 
@@ -487,6 +488,10 @@ function createScheduler() {
          return this.tasks.every(task => task.isDone());
       },
 
+      isErrored() {
+         return false; // TODO: figure out if scheduler can meaningfully be errored?
+      },
+
       progress() {
          const total_progress = this.tasks.reduce((tot, task) => tot + task.progress(), 0);
          const progress = total_progress / this.tasks.length;
@@ -501,6 +506,7 @@ function createScheduler() {
 
 function handleTaskError(err: any) {
    if (err instanceof ParameterUndefinedError) {
+      console.warn("tried to get and undefined paramter");
       // Silently ignore parameter undefined errors in tasks
       return;
    }
@@ -512,6 +518,7 @@ export type Task = {
    run_time: number;
    execute: (max_time: number) => void;
    isDone: () => boolean;
+   isErrored: () => boolean;
    progress: () => number;
 }
 type TaskExecute = () => void
@@ -521,6 +528,7 @@ type TaskSettings = {
 
 function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
    let is_done = false;
+   let is_errored = false;
 
    const track = createReaction(() => is_done = false);
 
@@ -529,14 +537,23 @@ function createTask(execute: TaskExecute, settings = {} as TaskSettings): Task {
       run_time: 0,
       execute: () => {
          try {
-            track(() => execute());
-            is_done = true;
+            try {
+               track(() => execute());
+               is_done = true;
+            } catch (err) {
+               handleTaskError(err);
+            }
          } catch (err) {
-            handleTaskError(err);
+            console.error(err);
+            console.warn("❌ Errored task will stop executing :(");
+            is_errored = true;
          }
       },
       isDone: () => {
          return is_done;
+      },
+      isErrored: () => {
+         return is_errored;
       },
       progress: () => {
          return is_done ? 1 : 0;
@@ -553,6 +570,7 @@ type TaskQueueCallbacks = {
 function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, settings = {} as TaskSettings): Task {
    let index = 0;
    let is_done = false;
+   let is_errored = false;
    const done = () => is_done = true;
 
    const track = createReaction(() => {
@@ -564,32 +582,38 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       settings,
       run_time: 0,
       execute: (max_time: number) => {
-         const start_time = performance.now();
-         for (; index < max_steps; index++) {
-            if (is_done) return;
+         try {
+            const start_time = performance.now();
+            for (; index < max_steps; index++) {
+               if (is_done) return;
+               if (performance.now() - start_time > max_time) return;
 
-            if (index === 0) callbacks.reset();
-            let failed = false;
-            track(() => {
-               try {
-                  callbacks.execute({ index, done })
-               } catch (err) {
-                  failed = true;
-                  handleTaskError(err);
-               }
-            });
-            if (failed) return;
+               if (index === 0) callbacks.reset();
+               let failed = false;
+               track(() => {
+                  try {
+                     callbacks.execute({ index, done })
+                  } catch (err) {
+                     failed = true;
+                     handleTaskError(err);
+                  }
+               });
+               if (failed) return;
+            }
 
-            const time = performance.now();
-            const run_time = time - start_time;
-            if (run_time > max_time) return;
+            is_done = true;
+            callbacks.done?.();
+         } catch (err) {
+            console.error(err);
+            console.warn("❌ Errored task will stop executing :(");
+            is_errored = true;
          }
-
-         is_done = true;
-         callbacks.done?.();
       },
       isDone: () => {
          return is_done;
+      },
+      isErrored: () => {
+         return is_errored;
       },
       progress: () => {
          return is_done ? 1 : index / max_steps;
@@ -604,6 +628,7 @@ type TaskCacheCallbacks = {
 
 function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, settings = {} as TaskSettings): Task {
    let is_done = false;
+   let is_errored = false;
    const done = () => is_done = true;
 
    const valid = new Array(max_steps).fill(false);
@@ -622,35 +647,40 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       settings,
       run_time: 0,
       execute: (max_time: number) => {
-         const start_time = performance.now();
-         for (let index = 0; index < max_steps; index++) {
-            if (is_done) return;
-            if (valid[index]) continue;
+         try {
+            const start_time = performance.now();
+            for (let index = 0; index < max_steps; index++) {
+               if (is_done) return;
+               if (valid[index]) continue;
+               if (performance.now() - start_time > max_time) return;
 
+               let failed = false;
+               tracks[index](() => {
+                  try {
+                     callbacks.execute({ index, done })
+                  } catch (err) {
+                     failed = true;
+                     handleTaskError(err);
+                  }
+               });
+               if (failed) continue;
 
-            let failed = false;
-            tracks[index](() => {
-               try {
-                  callbacks.execute({ index, done })
-               } catch (err) {
-                  failed = true;
-                  handleTaskError(err);
-               }
-            });
-            if (failed) continue;
+               valid[index] = true;
+               valid_count++;
+            }
 
-            valid[index] = true;
-            valid_count++;
-
-            const time = performance.now();
-            const run_time = time - start_time;
-            if (run_time > max_time) return;
+            is_done = valid_count === max_steps;
+         } catch (err) {
+            console.error(err);
+            console.warn("❌ Errored task will stop executing :(");
+            is_errored = true;
          }
-
-         is_done = valid_count === max_steps;
       },
       isDone: () => {
          return is_done;
+      },
+      isErrored: () => {
+         return is_errored;
       },
       progress: () => {
          return is_done ? 1 : valid_count / max_steps;
