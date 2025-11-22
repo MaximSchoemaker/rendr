@@ -7,14 +7,14 @@ const FRAMES = 500 * FPS / 60;
 const PAD = 0.15;
 
 // ... portraid ...
-// const WIDTH = 1080;
-// const HEIGHT = 1920;
-// const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
+const WIDTH = 1080;
+const HEIGHT = 1920;
+const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
 
 // ... landscape  ...
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
+// const WIDTH = 1920;
+// const HEIGHT = 1080;
+// const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
 
 // ... video ...
 const LOOPS = 2;
