@@ -1,8 +1,8 @@
 import { createAnimationLoop, createParameter, createSketch } from "../../rendr/rendr";
 import { Layout, cos, getColor, getLayout, inv_cosn, map, mod, sin, sinn, step, tri } from "../../rendr/utils";
 
-const FRAMES = 500;
-const REFRESH_RATE = 60; // TODO: set to correct rate!
+const FPS = 60;
+const FRAMES = 500 * FPS / 60;
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
@@ -11,7 +11,6 @@ const PAD = 0.15;
 const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
 
 // ... video ...
-const FPS = 60;
 const LOOPS = 2;
 
 type Props = {
@@ -117,11 +116,11 @@ export default createSketch<Props>((engine, ui, props) => {
       }
    }
 
-   const tick_par = createParameter(0);
-   // createAnimationLoop((delta) => tick_par.set(t => mod(t + (delta / 1000) * REFRESH_RATE, FRAMES)));
-   createAnimationLoop(() => tick_par.set(t => mod(t + 1, FRAMES)));
 
    if (REALTIME) {
+      const tick_par = createParameter(0);
+      createAnimationLoop(() => tick_par.set(t => mod(t + 1, FRAMES)));
+
       const canvas = engine.draw(WIDTH, HEIGHT, (ctx) => {
          const index = tick_par.get();
          const t = mod(index / FRAMES);
@@ -131,6 +130,9 @@ export default createSketch<Props>((engine, ui, props) => {
    }
 
    if (ANIMATION) {
+      const tick_par = createParameter(0);
+      createAnimationLoop((delta) => tick_par.set(t => mod(t + (delta / 1000) * FPS, FRAMES)));
+
       const canvas_cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
          const { index } = props;
          const t = mod(index / FRAMES);
