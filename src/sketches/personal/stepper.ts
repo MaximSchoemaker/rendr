@@ -7,14 +7,14 @@ const FRAMES = 500 * FPS / 60;
 const PAD = 0.15;
 
 // ... portraid ...
-const WIDTH = 1080;
-const HEIGHT = 1920;
-const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
+// const WIDTH = 1080;
+// const HEIGHT = 1920;
+// const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
 
 // ... landscape  ...
-// const WIDTH = 1920;
-// const HEIGHT = 1080;
-// const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
+const WIDTH = 1920;
+const HEIGHT = 1080;
+const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
 
 // ... video ...
 const LOOPS = 2;
@@ -37,11 +37,17 @@ export default createSketch<Props>((engine, ui, props) => {
    const { REALTIME, ANIMATION, VIDEO } = props;
 
    function animation(ctx: CanvasRenderingContext2D, layout: Layout, t: number) {
-      const { width, height } = layout;
+      const { width, height, screenX, screenY } = layout;
 
       const gradient = ctx.createLinearGradient(0, 0, width, height);
       gradient.addColorStop(0, getColor(1, 0.4, 0.0));
       gradient.addColorStop(1, getColor(1, 0.1, 0.4));
+
+      // const gradient = ctx.createConicGradient(0.5 * Math.PI, screenX(0.5), screenY(0.5));
+      // gradient.addColorStop(0, getColor(0.5, 0.0, 1.0));
+      // gradient.addColorStop(0.5, getColor(1.0, 0.5, 0.0));
+      // gradient.addColorStop(1, getColor(0.5, 0.0, 1.0));
+
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
@@ -65,11 +71,14 @@ export default createSketch<Props>((engine, ui, props) => {
          return { x, y };
       }
 
-      const getGradient = (angle: number) => {
+      const getGradient = (angle: number, brightness = 1) => {
          const color_f = tri(angle);
          const r = map(color_f, 1.0, 1.0);
          const g = map(color_f, 0.0, 0.5);
          const b = map(color_f, 0.5, 0.0);
+         // const r = map(color_f, 0.5, 1.0) * brightness;
+         // const g = map(color_f, 0.0, 0.5) * brightness;
+         // const b = map(color_f, 1.0, 0.0) * brightness;
          return getColor(r, g, b);
       }
 
@@ -77,6 +86,11 @@ export default createSketch<Props>((engine, ui, props) => {
       draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: getColor(0, 0, 0) }));
       draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: getColor(0, 0, 0) }));
       draw(ctx, layout, 0.06, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle) }));
+
+      // draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: getColor(1, 1, 1, 0.1) }));
+      // draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: getColor(1, 1, 1, 0.25) }));
+      // draw(ctx, layout, 0.06, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle, 0) }));
+      // draw(ctx, layout, 0.005, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle, 1.1) }));
    }
 
    const COUNT = 1000;
