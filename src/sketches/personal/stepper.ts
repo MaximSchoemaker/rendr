@@ -139,7 +139,8 @@ export default createSketch<Props>((engine, ui, props) => {
 
    if (REALTIME) {
       const tick_par = createParameter(0);
-      createAnimationLoop(() => tick_par.set(t => mod(t + 1, FRAMES)));
+      // createAnimationLoop(() => tick_par.set(t => mod(t + 1, FRAMES)));
+      createAnimationLoop((delta) => tick_par.set(t => mod(t + (delta / 1000) * FPS, FRAMES)));
 
       const canvas = engine.draw(WIDTH, HEIGHT, (ctx) => {
          const index = tick_par.get();
