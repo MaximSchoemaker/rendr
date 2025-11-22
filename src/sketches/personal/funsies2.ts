@@ -1,4 +1,4 @@
-import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { createAnimationLoop, createAnimationLoopParameter, createParameter, createSketch } from '../../rendr/rendr';
 import { map, cosn, sinn, mod, lerp, clamp, tri, for_n, getLayout, Layout } from "../../rendr/utils"
 
 
@@ -7,14 +7,16 @@ const GLOBAL_FPS = 60;
 const REFRESH_RATE = 120;
 
 type Props = {
-   ANIMATION: boolean,
-   VIDEO: boolean,
+   REALTIME?: boolean,
+   ANIMATION?: boolean,
+   VIDEO?: boolean,
+   REFRESH_RATE?: number
 }
 
 export default createSketch<Props>((engine, ui, props) => {
-   const { ANIMATION, VIDEO } = props;
+   const { REALTIME, ANIMATION, VIDEO, REFRESH_RATE = 60 } = props;
 
-   if (ANIMATION) {
+   if (REALTIME || ANIMATION) {
       const WIDTH = 1080;
       const HEIGHT = 1080;
       const PAD = 0.15;
@@ -23,16 +25,25 @@ export default createSketch<Props>((engine, ui, props) => {
       const FPS = REFRESH_RATE;
       const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
-      const frame_cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
-         const { index } = props;
-         const t = (index / FRAMES) % 1;
-         animation(ctx, t, LAYOUT)
-      });
+      const frame_par = createAnimationLoopParameter(FRAMES, FPS);
 
-      const frame_par = createParameter(0);
-      createAnimationLoop(() => frame_par.set(frame => (frame + 1) % FRAMES));
+      if (REALTIME) {
+         const canvas = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
+            const frame = frame_par.get();
+            const t = mod(frame / FRAMES);
+            animation(ctx, t, LAYOUT)
+         });
+         ui.createView(canvas, frame_par);
+      }
 
-      ui.createCacheView(frame_cache, frame_par);
+      if (ANIMATION) {
+         const cahce = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+            const { index } = props;
+            const t = mod(index / FRAMES);
+            animation(ctx, t, LAYOUT)
+         });
+         ui.createCacheView(cahce, frame_par);
+      }
    }
 
    if (VIDEO) {

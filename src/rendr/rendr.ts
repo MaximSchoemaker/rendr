@@ -366,6 +366,9 @@ export function createEngine(): Engine {
          video.controls = true;
          video.width = width;
          video.height = height;
+         // video.style.width = width + 'px';
+         // video.style.height = height + 'px';
+         video.style.aspectRatio = `${width} / ${height}`
 
          return video;
       },
@@ -772,4 +775,10 @@ export function createLoop(callback: (delta: number) => void, interval = 0, runn
    onCleanup(() => ret.stop());
 
    return ret;
+}
+
+export const createAnimationLoopParameter = (frames: number, fps: number) => {
+   const frame_par = createParameter(0);
+   createAnimationLoop((delta) => frame_par.set(t => mod(t + (delta / 1000) * fps, frames)));
+   return frame_par;
 }

@@ -32,9 +32,9 @@ export default createSketch((master_engine, ui) => {
       // test_simulate_generate,
 
       // witness,
+      // langton,
 
       // test_animate,
-      // langton,
       // funsies,
       // funsies2,
       // cattoy,
@@ -45,6 +45,8 @@ export default createSketch((master_engine, ui) => {
       REALTIME: true,
       // ANIMATION: true,
       // VIDEO: true,
+
+      REFRESH_RATE: 120,
    }
 
    function layout1() {

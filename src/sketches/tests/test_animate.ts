@@ -1,19 +1,20 @@
-import { createAnimationLoop, createParameter, createSketch } from '../../rendr/rendr';
+import { createAnimationLoopParameter, createSketch } from '../../rendr/rendr';
 import { cosn, lerp, mod, sinn, sin, getLayout, Layout } from '../../rendr/utils';
 
 const GLOBAL_FRAMES = 400;
 const GLOBAL_FPS = 60;
-const REFRESH_RATE = 120;
 
 type Props = {
-   ANIMATION: boolean,
-   VIDEO: boolean,
+   REALTIME?: boolean,
+   ANIMATION?: boolean,
+   VIDEO?: boolean,
+   REFRESH_RATE?: number
 }
 
 export default createSketch((engine, ui, props: Props) => {
-   const { ANIMATION, VIDEO } = props;
+   const { REALTIME, ANIMATION, VIDEO, REFRESH_RATE = 60 } = props;
 
-   if (ANIMATION) {
+   if (ANIMATION || REALTIME) {
       const WIDTH = 1080;
       const HEIGHT = 1080;
       const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
@@ -21,15 +22,26 @@ export default createSketch((engine, ui, props: Props) => {
       const FPS = REFRESH_RATE;
       const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
-      const cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
-         const { index } = props;
-         const t = mod(0.75 + index / FRAMES);
-         scene(ctx, t, LAYOUT)
-      });
+      const frame_par = createAnimationLoopParameter(FRAMES, FPS);
 
-      const frame_par = createParameter(0);
-      createAnimationLoop(() => frame_par.set(frame => (frame + 1) % FRAMES));
-      ui.createCacheView(cache, frame_par);
+      if (REALTIME) {
+         const canvas = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
+            const frame = frame_par.get();
+            const t = mod(0.75 + frame / FRAMES);
+            scene(ctx, t, LAYOUT)
+         });
+         ui.createView(canvas);
+      }
+
+      if (ANIMATION) {
+         const cache = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+            const { index } = props;
+            const t = mod(0.75 + index / FRAMES);
+            scene(ctx, t, LAYOUT)
+         });
+         ui.createCacheView(cache, frame_par);
+      }
+
    }
 
    if (VIDEO) {
