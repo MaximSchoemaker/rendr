@@ -4,11 +4,17 @@ import { Layout, cos, getColor, getLayout, inv_cosn, map, mod, sin, sinn, step, 
 const FPS = 60;
 const FRAMES = 500 * FPS / 60;
 
+const PAD = 0.15;
+
+// ... portraid ...
 const WIDTH = 1080;
 const HEIGHT = 1920;
-
-const PAD = 0.15;
 const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
+
+// ... landscape  ...
+// const WIDTH = 1920;
+// const HEIGHT = 1080;
+// const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
 
 // ... video ...
 const LOOPS = 2;
