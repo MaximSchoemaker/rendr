@@ -42,8 +42,8 @@ export default createSketch((master_engine, ui) => {
    ];
 
    const props = {
-      REALTIME: true,
-      // ANIMATION: true,
+      // REALTIME: true,
+      ANIMATION: true,
       // VIDEO: true,
 
       REFRESH_RATE: 120,
@@ -69,10 +69,9 @@ export default createSketch((master_engine, ui) => {
          let engines: Engine[];
          ui.createRow(ui => {
             engines = sketches.map(sketch => {
-               let engine: Engine;
-               ui.createRow(ui => {
-                  engine = master_engine.mount(sketch, ui, props)
-               });
+               let engine: Engine | null = null;
+               ui.createRow(ui => engine = master_engine.mount(sketch, ui, props));
+               if (!engine) throw new Error("Engine failed to mount");
                return engine;
             });
          });
@@ -89,10 +88,9 @@ export default createSketch((master_engine, ui) => {
       ui.createGrid(rows, cols, ui => {
          sketches.forEach(sketch => {
             ui.createColumn(ui => {
-               let engine: Engine;
-               ui.createRow(ui => {
-                  engine = master_engine.mount(sketch, ui, props);
-               });
+               let engine: Engine | null = null;
+               ui.createRow(ui => engine = master_engine.mount(sketch, ui, props));
+               if (!engine) throw new Error("Engine failed to mount");
                ui.createStatus(engine, 8,
                   { "max-height": "25%" }
                );
