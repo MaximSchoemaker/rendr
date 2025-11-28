@@ -7,12 +7,14 @@ const GLOBAL_FPS = 60;
 // ... portraid ...
 // const WIDTH = 1080;
 // const HEIGHT = 1920;
-// const LAYOUT = getLayout('fill', WIDTH, HEIGHT);
 
-// ... landscape  ...
+// ... landscape ...
+// const WIDTH = 1920;
+// const HEIGHT = 1080;
+
+// ... fit screen ...
 const WIDTH = window.outerWidth;
 const HEIGHT = window.outerHeight;
-const LAYOUT = getLayout('fill', WIDTH, HEIGHT);
 
 // ... video ...
 const LOOPS = 2;
@@ -39,6 +41,7 @@ export default createSketch<Props>((engine, ui, props) => {
 
     const FPS = 60;
     const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
+    const LAYOUT = getLayout('fill', WIDTH, HEIGHT);
 
     const shapes_cache = engine.simulate<Shape[]>([], FRAMES, (_, props) => {
         const { index } = props;
