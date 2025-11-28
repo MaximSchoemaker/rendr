@@ -509,7 +509,7 @@ function createScheduler() {
 
 function handleTaskError(err: any) {
    if (err instanceof ParameterUndefinedError) {
-      console.warn("tried to get and undefined paramter");
+      console.warn("tried to get an undefined parameter");
       // Silently ignore parameter undefined errors in tasks
       return;
    }

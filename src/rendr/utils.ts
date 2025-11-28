@@ -89,6 +89,14 @@ export const getColor = (r: number, g: number = r, b: number = r, a: number = 1)
    return `rgb(${r_int}, ${g_int}, ${b_int}, ${a})`
 }
 
+export const lerpColor = (v: number, r1: number, g1: number, b1: number, r2: number, g2: number, b2: number) => {
+   return getColor(
+      lerp(v, r1, r2),
+      lerp(v, g1, g2),
+      lerp(v, b1, b2),
+   )
+}
+
 export const download_url = (url: string, name?: string) => {
    const a = document.createElement('a')
    a.href = url
@@ -105,15 +113,20 @@ export type Layout = {
    max_size: number,
    screenX: (v: number) => number,
    screenY: (v: number) => number,
+   screenSize: (v: number) => number,
 }
 
 export const getLayout = (type: LayoutType, width: number, height: number, padding = 0, x_range = 1, y_range = 1) => {
    const max_size = Math.max(width, height);
    const min_size = Math.min(width, height);
 
+   const min_range = Math.min(x_range, y_range);
+   const max_range = Math.max(x_range, y_range);
+
    switch (type) {
       case "stretch": {
          const size = min_size;
+         const range = min_range;
          return {
             width,
             height,
@@ -122,10 +135,12 @@ export const getLayout = (type: LayoutType, width: number, height: number, paddi
             max_size,
             screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * width,
             screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * height,
+            screenSize: (v: number) => map(v / range, 0, 1, 0, 1 - padding * 2) * size,
          }
       }
       case "fit": {
-         const size = Math.min(width, height);
+         const size = min_size
+         const range = min_range;
          return {
             width,
             height,
@@ -134,10 +149,12 @@ export const getLayout = (type: LayoutType, width: number, height: number, paddi
             max_size,
             screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * size - (size - width) / 2,
             screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * size - (size - height) / 2,
+            screenSize: (v: number) => map(v / range, 0, 1, 0, 1 - padding * 2) * size,
          }
       }
       case "fill": {
-         const size = Math.max(width, height);
+         const size = max_size;
+         const range = max_range;
          return {
             width,
             height,
@@ -146,6 +163,7 @@ export const getLayout = (type: LayoutType, width: number, height: number, paddi
             max_size,
             screenX: (v: number) => map(v / x_range, 0, 1, padding, 1 - padding) * size - (size - width) / 2,
             screenY: (v: number) => map(v / y_range, 0, 1, padding, 1 - padding) * size - (size - height) / 2,
+            screenSize: (v: number) => map(v / range, 0, 1, 0, 1 - padding * 2) * size,
          }
       }
    }
