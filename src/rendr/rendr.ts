@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction } from 'solid-js';
+import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction, createEffect } from 'solid-js';
 import { UI } from '../UI';
 import { mod, n_arr } from './utils';
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_VERY_HIGH } from 'mediabunny';
@@ -125,7 +125,7 @@ export function createCache<T>(): Cache<T> {
 }
 
 export type ConstructProps = { index: number, done: () => void }
-export type SimulateProps = { index: number, done: () => void }
+export type SimulateProps = { index: number, max_steps: number, done: () => void }
 
 export type DrawProps = { width: number, height: number }
 export type GenerateProps = { width: number, height: number, index: number, max_steps: number, done: () => void }
@@ -256,7 +256,7 @@ export function createEngine(): Engine {
                   : cache.get(index - 1)
                );
                if (prev_value === undefined) return;
-               const new_value = create(prev_value, { index, done });
+               const new_value = create(prev_value, { index, max_steps, done });
                cache.set(index, new_value ?? prev_value);
             }
          }, settings));
@@ -269,7 +269,7 @@ export function createEngine(): Engine {
          const ctx = canvas.getContext("2d")!;
 
          scheduler.schedule(createTask(() => {
-            ctx.clearRect(0, 0, width, height);
+            // ctx.clearRect(0, 0, width, height);
             create(ctx, { width, height })
          }, settings));
 
@@ -780,5 +780,22 @@ export function createLoop(callback: (delta: number) => void, interval = 0, runn
 export const createAnimationLoopParameter = (frames: number, fps: number) => {
    const frame_par = createParameter(0);
    createAnimationLoop((delta) => frame_par.set(t => mod(t + (delta / 1000) * fps, frames)));
+   return frame_par;
+}
+
+export const createAnimationTimeParameter = (frames: number, fps: number) => {
+   const time_par = createParameter(0);
+   createAnimationLoop((delta) => time_par.set(t => mod(t + (delta / 1000) * fps, frames)));
+   return time_par;
+}
+
+export const createAnimationFrameParameter = (frames: number, fps: number) => {
+   const time_par = createAnimationTimeParameter(frames, fps);
+   const frame_par = createParameter(0);
+   createEffect(() => {
+      const time = time_par.get();
+      const frame = Math.floor(time);
+      if (frame !== frame_par.get()) frame_par.set(frame);
+   });
    return frame_par;
 }
