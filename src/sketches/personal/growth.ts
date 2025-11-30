@@ -29,13 +29,13 @@ const AVOID_DIST_MIN = 0.015;
 const CONTRACT_FACTOR_MIN = 0.25;
 const AVOID_FACTOR_MIN = 0.25;
 
-const dist_mult = 5;
-const CONTRACT_DIST_MAX = CONTRACT_DIST_MIN * dist_mult;
-const AVOID_DIST_MAX = AVOID_DIST_MIN * dist_mult;
+const DIST_MULT = 5;
+const CONTRACT_DIST_MAX = CONTRACT_DIST_MIN * DIST_MULT;
+const AVOID_DIST_MAX = AVOID_DIST_MIN * DIST_MULT;
 
-const factor_mult = 1 / (dist_mult);
-const CONTRACT_FACTOR_MAX = CONTRACT_FACTOR_MIN * factor_mult;
-const AVOID_FACTOR_MAX = AVOID_FACTOR_MIN * factor_mult;
+const FACTOR_MULT = 1 / (DIST_MULT);
+const CONTRACT_FACTOR_MAX = CONTRACT_FACTOR_MIN * FACTOR_MULT;
+const AVOID_FACTOR_MAX = AVOID_FACTOR_MIN * FACTOR_MULT;
 
 // ... types ...
 type Node = {
@@ -89,7 +89,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const getColor = (f: number) => getGradient(f, 1, nodes_f);
 
             drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
-            drawCircles(ctx, nodes, getColor, LAYOUT);
+            // drawCircles(ctx, nodes, getColor, LAYOUT);
         });
 
         ui.createView(canvas);
@@ -334,7 +334,7 @@ function drawCircles(ctx: CanvasRenderingContext2D, nodes: Node[], getColor: (f:
 
         const node_f = nodeSig(node, f);
         const size_min = 0.005;
-        const size_max = 0.005 * dist_mult;
+        const size_max = 0.005 * (1 + (DIST_MULT - 1) * 0.75);
         const size = map(node_f, size_min, size_max);
 
         ctx.beginPath();

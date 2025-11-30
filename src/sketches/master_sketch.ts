@@ -47,7 +47,7 @@ export default createSketch((master_engine, ui) => {
 
    const props = {
       REALTIME: true,
-      ANIMATION: true,
+      // ANIMATION: true,
       // VIDEO: true,
 
       REFRESH_RATE: 120,
