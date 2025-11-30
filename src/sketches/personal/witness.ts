@@ -57,14 +57,12 @@ export default createSketch((engine, ui) => {
     })
 
     const view = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
-        const { screenX, screenY } = LAYOUT;
-
         const state = state_par.get();
         const { nodes } = state;
 
         ctx.beginPath();
-        ctx.moveTo(screenX(nodes[0].x), screenY(nodes[0].y));
-        nodes.map(node => ctx.lineTo(screenX(node.x), screenY(node.y)))
+        ctx.moveTo(LAYOUT.getX(nodes[0].x), LAYOUT.getY(nodes[0].y));
+        nodes.map(node => ctx.lineTo(LAYOUT.getX(node.x), LAYOUT.getY(node.y)))
 
         ctx.strokeStyle = "rgb(125, 0, 255)";
         ctx.lineWidth = 50;

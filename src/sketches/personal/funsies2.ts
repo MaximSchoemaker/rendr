@@ -84,15 +84,13 @@ function animation(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
 
 const WRAPS = 10;
 function scene(ctx: CanvasRenderingContext2D, t: number, f: number, global_t: number, color_mult: number, radius_offset: number, layout: Layout) {
-   const { screenX, screenY, size } = layout;
-
    const x1 = sinn(t);
    const y1 = 1;
 
    const x2 = cosn(t);
    const y2 = 0;
 
-   const lineWidth = 50 / 1080 * size;
+   const lineWidth = layout.getSize(50 / 1080);
 
    const color_f = f;
    // const color_f = tri(f);
@@ -115,7 +113,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, f: number, global_t: nu
       const y = lerp(t_f, y1, y2);
 
       ctx.beginPath();
-      ctx.arc(screenX(x), screenY(y), lineWidth / 2 + radius_offset, 0, Math.PI * 2);
+      ctx.arc(layout.getX(x), layout.getY(y), lineWidth / 2 + radius_offset, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
    }

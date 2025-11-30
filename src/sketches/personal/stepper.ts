@@ -1,5 +1,5 @@
 import { createAnimationLoop, createAnimationLoopParameter, createParameter, createSketch } from "../../rendr/rendr";
-import { Layout, cos, getColor, getLayout, inv_cosn, map, mod, sin, sinn, step, tri } from "../../rendr/utils";
+import { Layout, cos, createColor, getLayout, inv_cosn, map, mod, sin, sinn, step, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 500;
 const GLOBAL_FPS = 60;
@@ -84,19 +84,17 @@ export default createSketch<Props>((engine, ui, props) => {
 });
 
 function animation(ctx: CanvasRenderingContext2D, layout: Layout, t: number) {
-   const { width, height, screenX, screenY } = layout;
+   const gradient = ctx.createLinearGradient(0, 0, layout.width, layout.height);
+   gradient.addColorStop(0, createColor(1, 0.4, 0.0));
+   gradient.addColorStop(1, createColor(1, 0.1, 0.4));
 
-   const gradient = ctx.createLinearGradient(0, 0, width, height);
-   gradient.addColorStop(0, getColor(1, 0.4, 0.0));
-   gradient.addColorStop(1, getColor(1, 0.1, 0.4));
-
-   // const gradient = ctx.createConicGradient(0.5 * Math.PI, screenX(0.5), screenY(0.5));
-   // gradient.addColorStop(0, getColor(0.5, 0.0, 1.0));
-   // gradient.addColorStop(0.5, getColor(1.0, 0.5, 0.0));
-   // gradient.addColorStop(1, getColor(0.5, 0.0, 1.0));
+   // const gradient = ctx.createConicGradient(0.5 * Math.PI, layout.getX(0.5), layout.getY(0.5));
+   // gradient.addColorStop(0, createColor(0.5, 0.0, 1.0));
+   // gradient.addColorStop(0.5, createColor(1.0, 0.5, 0.0));
+   // gradient.addColorStop(1, createColor(0.5, 0.0, 1.0));
 
    ctx.fillStyle = gradient;
-   ctx.fillRect(0, 0, width, height);
+   ctx.fillRect(0, 0, layout.width, layout.height);
 
    const min = -0.1
    const { arms, steps, angle_offset } = timeline(t,
@@ -126,16 +124,16 @@ function animation(ctx: CanvasRenderingContext2D, layout: Layout, t: number) {
       // const r = map(color_f, 0.5, 1.0) * brightness;
       // const g = map(color_f, 0.0, 0.5) * brightness;
       // const b = map(color_f, 1.0, 0.0) * brightness;
-      return getColor(r, g, b);
+      return createColor(r, g, b);
    }
 
    const offset = 0.03;
-   draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: getColor(0, 0, 0) }));
-   draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: getColor(0, 0, 0) }));
+   draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: createColor(0, 0, 0) }));
+   draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: createColor(0, 0, 0) }));
    draw(ctx, layout, 0.06, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle) }));
 
-   // draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: getColor(1, 1, 1, 0.1) }));
-   // draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: getColor(1, 1, 1, 0.25) }));
+   // draw(ctx, layout, 0.06, 0, (angle) => ({ p: getP(angle, offset, offset * 2), color: createColor(1, 1, 1, 0.1) }));
+   // draw(ctx, layout, 0.08, 0, (angle) => ({ p: getP(angle, 0, 0), color: createColor(1, 1, 1, 0.25) }));
    // draw(ctx, layout, 0.06, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle, 0) }));
    // draw(ctx, layout, 0.005, 1, (angle) => ({ p: getP(angle, 0, 0), color: getGradient(angle, 1.1) }));
 }
@@ -144,11 +142,9 @@ const COUNT = 1000;
 function draw(ctx: CanvasRenderingContext2D, layout: Layout, lineWidth: number, mode: 0 | 1, getProps:
    (angle: number) => { p: { x: number, y: number }, color: string }
 ) {
-   const { screenX, screenY, size } = layout;
-
    ctx.lineCap = "round";
    ctx.lineJoin = "round";
-   ctx.lineWidth = lineWidth * size;
+   ctx.lineWidth = layout.getSize(lineWidth);
 
    if (mode === 0) {
       ctx.beginPath();
@@ -158,8 +154,8 @@ function draw(ctx: CanvasRenderingContext2D, layout: Layout, lineWidth: number, 
          let { p, color } = getProps(i_fract)
          ctx.strokeStyle = color;
 
-         if (i === 0) ctx.moveTo(screenX(p.x), screenY(p.y));
-         else ctx.lineTo(screenX(p.x), screenY(p.y))
+         if (i === 0) ctx.moveTo(layout.getX(p.x), layout.getY(p.y));
+         else ctx.lineTo(layout.getX(p.x), layout.getY(p.y))
       }
       ctx.closePath();
       ctx.stroke();
@@ -176,8 +172,8 @@ function draw(ctx: CanvasRenderingContext2D, layout: Layout, lineWidth: number, 
          ctx.strokeStyle = color;
 
          ctx.beginPath();
-         ctx.moveTo(screenX(p1.x), screenY(p1.y));
-         ctx.lineTo(screenX(p2.x), screenY(p2.y))
+         ctx.moveTo(layout.getX(p1.x), layout.getY(p1.y));
+         ctx.lineTo(layout.getX(p2.x), layout.getY(p2.y))
          ctx.stroke();
       }
    }

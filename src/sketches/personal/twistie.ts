@@ -1,5 +1,5 @@
 import { createAnimationLoopParameter, createSketch } from "../../rendr/rendr";
-import { cos, getColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, sin, sinn, tri } from "../../rendr/utils";
+import { cos, createColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 600;
 const GLOBAL_FPS = 60;
@@ -122,12 +122,10 @@ function pushTwist(shapes: Shape[], f: number, t: number, ring_x: number, ring_y
 }
 
 function draw(ctx: CanvasRenderingContext2D, width: number, height: number, shapes: Shape[], layout: Layout) {
-    const { screenX, screenY, screenSize, max_size } = layout;
+    const bg = createColor(0.1, 0, 0.3);
+    const fg = createColor(0, 0, 0.1);
 
-    const bg = getColor(0.1, 0, 0.3);
-    const fg = getColor(0, 0, 0.1);
-
-    const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, max_size / 2)
+    const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, layout.max_size / 2)
     gradient.addColorStop(0, bg);
     gradient.addColorStop(1, fg);
 
@@ -148,25 +146,25 @@ function draw(ctx: CanvasRenderingContext2D, width: number, height: number, shap
 
                     case "ring":
                         ctx.beginPath();
-                        ctx.arc(screenX(x), screenY(y), screenSize(radius), 0, Math.PI * 2);
+                        ctx.arc(layout.getX(x), layout.getY(y), layout.getSize(radius), 0, Math.PI * 2);
 
                         ctx.strokeStyle = bg;
                         const ring_width = 0.025 * scale;
-                        ctx.lineWidth = screenSize(ring_width);
+                        ctx.lineWidth = layout.getSize(ring_width);
                         ctx.stroke();
 
                         ctx.strokeStyle = fg;
                         const ring_outline_width = Math.max(0.000001, ring_width - 0.0075 * line_scale);
-                        ctx.lineWidth = screenSize(ring_outline_width);
+                        ctx.lineWidth = layout.getSize(ring_outline_width);
                         ctx.stroke();
                         break;
 
                     case "circle":
                         ctx.beginPath();
-                        ctx.arc(screenX(x), screenY(y), screenSize(radius), 0, Math.PI * 2);
+                        ctx.arc(layout.getX(x), layout.getY(y), layout.getSize(radius), 0, Math.PI * 2);
 
                         ctx.strokeStyle = bg
-                        ctx.lineWidth = screenSize(0.003 * line_scale);
+                        ctx.lineWidth = layout.getSize(0.003 * line_scale);
 
                         ctx.fillStyle = lerpColor(tri(x + scale),
                             0.5, 0, 1,

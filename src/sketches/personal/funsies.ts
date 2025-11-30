@@ -75,12 +75,10 @@ function animation(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
 }
 
 function scene(ctx: CanvasRenderingContext2D, t: number, f: number, layout: Layout) {
-   const { screenX, screenY, size } = layout;
-
    const x1 = sinn(t);
    const x2 = cosn(t);
 
-   const lineWidth = size * 50 / 1080
+   const lineWidth = layout.getSize(50 / 1080);
 
    const color_f = f;
    const g2_f = tri(f + t);
@@ -92,8 +90,8 @@ function scene(ctx: CanvasRenderingContext2D, t: number, f: number, layout: Layo
    const colorOutline = `rgb(${r * 200}, ${g * 200}, ${b * 200})`
 
    ctx.beginPath();
-   ctx.moveTo(screenX(x1), screenY(1));
-   ctx.lineTo(screenX(x2), screenY(0));
+   ctx.moveTo(layout.getX(x1), layout.getY(1));
+   ctx.lineTo(layout.getX(x2), layout.getY(0));
 
    ctx.lineCap = 'round';
 

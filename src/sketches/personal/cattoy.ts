@@ -5,14 +5,14 @@ const GLOBAL_FRAMES = 1500;
 const GLOBAL_FPS = 60;
 
 // ... portraid ...
-// const WIDTH = 1080;
-// const HEIGHT = 1920;
-// const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+const WIDTH = 1080;
+const HEIGHT = 1920;
+const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
 
 // ... landscape  ...
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+// const WIDTH = 1920;
+// const HEIGHT = 1080;
+// const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
 
 // ... fit screen ...
 // const WIDTH = window.outerWidth;
@@ -128,8 +128,6 @@ function update(input_x: number, input_y: number, positions: Position[]) {
 }
 
 function draw(ctx: CanvasRenderingContext2D, t: number, positions: Position[], layout: Layout) {
-  const { min_size, screenX, screenY } = layout;
-
   for (let i = 0; i < positions.length - 1; i++) {
     const index = i;
     const next_index = i + 1;
@@ -154,11 +152,11 @@ function draw(ctx: CanvasRenderingContext2D, t: number, positions: Position[], l
     {
       ctx.strokeStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a * 255})`;
       ctx.lineCap = "round";
-      ctx.lineWidth = radius * min_size / 3;
+      ctx.lineWidth = layout.min_size * radius / 3;
 
       ctx.beginPath();
-      ctx.moveTo(screenX(getX(index)), screenY(getY(index)));
-      ctx.lineTo(screenX(getX(next_index)), screenY(getY(next_index)));
+      ctx.moveTo(layout.getX(getX(index)), layout.getY(getY(index)));
+      ctx.lineTo(layout.getX(getX(next_index)), layout.getY(getY(next_index)));
       ctx.stroke();
     }
   }

@@ -63,8 +63,6 @@ export default createSketch((engine, ui, props: Props) => {
 });
 
 function scene(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
-   const { screenX, screenY, size } = layout;
-
    const count = 1000;
    for (let i = 0; i < count; i++) {
       const f = mod(i / count);
@@ -81,7 +79,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
       ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
       ctx.globalAlpha = mod(f - t)
       ctx.beginPath();
-      ctx.arc(screenX(x), screenY(y), radius * size, 0, Math.PI * 2);
+      ctx.arc(layout.getX(x), layout.getY(y), layout.getSize(radius), 0, Math.PI * 2);
       ctx.fill();
    }
 }

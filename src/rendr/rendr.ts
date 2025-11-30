@@ -269,7 +269,7 @@ export function createEngine(): Engine {
          const ctx = canvas.getContext("2d")!;
 
          scheduler.schedule(createTask(() => {
-            // ctx.clearRect(0, 0, width, height);
+            ctx.clearRect(0, 0, width, height);
             create(ctx, { width, height })
          }, settings));
 
