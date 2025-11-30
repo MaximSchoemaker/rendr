@@ -1,8 +1,23 @@
-import { createLoop, createParameter, createSketch, AnimateProps, VideoProps, createAnimationLoopParameter } from "../../rendr/rendr";
+import { createSketch, AnimateProps, VideoProps, createAnimationLoopParameter } from "../../rendr/rendr";
 import { for_n, lerp, sinn, cosn, getLayout, n_arr, Layout } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 1500;
 const GLOBAL_FPS = 60;
+
+// ... portraid ...
+// const WIDTH = 1080;
+// const HEIGHT = 1920;
+// const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+
+// ... landscape  ...
+const WIDTH = 1920;
+const HEIGHT = 1080;
+const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+
+// ... fit screen ...
+// const WIDTH = window.outerWidth;
+// const HEIGHT = window.outerHeight;
+// const LAYOUT = getLayout("stretch", WIDTH, HEIGHT);
 
 const SMOOTHING = 0.15;
 const BUFFER_LENGTH = 200;
@@ -24,10 +39,6 @@ export default createSketch<Props>((engine, ui, props) => {
   const { REALTIME, ANIMATION, VIDEO, REFRESH_RATE = 60 } = props;
 
   if (REALTIME) {
-    const WIDTH = window.outerWidth;
-    const HEIGHT = window.outerHeight;
-    const LAYOUT = getLayout("stretch", WIDTH, HEIGHT);
-
     const FPS = REFRESH_RATE;
     const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
@@ -66,10 +77,6 @@ export default createSketch<Props>((engine, ui, props) => {
   }
 
   if (ANIMATION || VIDEO) {
-    const WIDTH = 1080;
-    const HEIGHT = 1920;
-    const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
-
     const FPS = 60;
     const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 

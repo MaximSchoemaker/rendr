@@ -354,7 +354,7 @@ export function createEngine(): Engine {
                   const blob = new Blob([buffer], { type: 'video/mp4' });
                   const url = URL.createObjectURL(blob);
                   video.src = url;
-               });
+               }).catch(err => console.error("Error finalizing video:", err));
             }
          }, settings));
 
@@ -366,9 +366,6 @@ export function createEngine(): Engine {
          video.controls = true;
          video.width = width;
          video.height = height;
-         // video.style.width = width + 'px';
-         // video.style.height = height + 'px';
-         video.style.aspectRatio = `${width} / ${height}`
 
          return video;
       },
@@ -509,7 +506,7 @@ function createScheduler() {
 
 function handleTaskError(err: any) {
    if (err instanceof ParameterUndefinedError) {
-      console.warn("tried to get an undefined parameter");
+      // console.warn("tried to get an undefined parameter");
       // Silently ignore parameter undefined errors in tasks
       return;
    }

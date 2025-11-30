@@ -9,15 +9,15 @@ const GLOBAL_FPS = 60;
 // const HEIGHT = 1920;
 
 // ... landscape ...
-// const WIDTH = 1920;
-// const HEIGHT = 1080;
+const WIDTH = 1920;
+const HEIGHT = 1080;
 
 // ... fit screen ...
-const WIDTH = window.outerWidth;
-const HEIGHT = window.outerHeight;
+// const WIDTH = window.outerWidth;
+// const HEIGHT = window.outerHeight;
 
 // ... video ...
-const LOOPS = 2;
+const LOOPS = 3;
 
 type Circle = {
     x: number;

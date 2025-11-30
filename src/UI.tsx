@@ -34,7 +34,7 @@ export function createUI(create: (ui: UI) => void) {
 
       createView: (canvas, style) => elements.push(<View canvas={canvas} style={style} />),
       createCacheView: (cache, frame_par, style) => elements.push(<CacheView cache={cache} frame_par={frame_par} style={style} />),
-      createVideo: (video, style) => elements.push(video),
+      createVideo: (video, style) => elements.push(<VideoView video={video} style={style} />),
 
       createStatus: (engine, max_tasks, style) => elements.push(<Status engine={engine} max_tasks={max_tasks} style={style} />),
    });
@@ -70,7 +70,7 @@ export const Container: Component<ContainerProps> = (props) => {
 
 export const Row: Component<ContainerProps> = (props) => <Container {...props} style={{
    "display": "flex",
-   "align-items": "flex-start",
+   "align-items": "center",
    "justify-content": "center",
    "gap": "4px",
    ...props.style,
@@ -78,8 +78,6 @@ export const Row: Component<ContainerProps> = (props) => <Container {...props} s
 
 export const Column: Component<ContainerProps> = (props) => <Row {...props} style={{
    "flex-direction": "column",
-   "align-items": "center",
-   "justify-content": "flex-start",
    ...props.style,
 }} />
 
@@ -106,9 +104,8 @@ export const View: Component<ViewProps> = (props) => {
    const [recording, set_recording] = createSignal(false);
    const [fullscreen, setFullscreen] = createSignal(false);
 
-   const { canvas } = props;
-   canvas.className = styles.ViewCanvas;
-   const aspect_ratio = canvas.width / canvas.height;
+   props.canvas.className = styles.ViewCanvas;
+   const aspect_ratio = props.canvas.width / props.canvas.height;
 
    function onKeyDown(evt: KeyboardEvent) {
       switch (evt.key) {
@@ -145,9 +142,9 @@ export const View: Component<ViewProps> = (props) => {
    }
 
    function screenshot(name = "screenshot") {
-      const image_blob_url = canvas.toDataURL("image/png", 1);
+      const image_blob_url = props.canvas.toDataURL("image/png", 1);
 
-      const { width, height } = canvas;
+      const { width, height } = props.canvas;
       const date = new Date().toLocaleString();
       const file_name = `${name} - ${date} - ${width}x${height}.png`;
 
@@ -273,6 +270,27 @@ export const CacheView: Component<CacheViewProps> = (props) => {
       <div class={styles.recordIcon} hidden={!recording()}>🔴</div>
       <div style={{ inset: "0", "position": "absolute" }} ></div>
       {canvas()}
+   </div>;
+}
+
+type VideoViewProps = {
+   video: HTMLVideoElement
+   style?: JSX.CSSProperties
+}
+
+export const VideoView: Component<VideoViewProps> = (props) => {
+
+   props.video.className = styles.ViewCanvas;
+   props.video.style.width = props.video.width + 'px';
+   props.video.style.height = props.video.height + 'px';
+
+   const aspect_ratio = props.video.width / props.video.height;
+
+   return <div class={styles.ViewContainer} tabIndex={0} style={{
+      "aspect-ratio": aspect_ratio,
+      ...props.style,
+   }}>
+      {props.video}
    </div>;
 }
 

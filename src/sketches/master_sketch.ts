@@ -40,7 +40,7 @@ export default createSketch((master_engine, ui) => {
       // funsies,
       // funsies2,
       // cattoy,
-      // stepper
+      // stepper,
       // twistie,
       growth,
    ];
@@ -93,7 +93,9 @@ export default createSketch((master_engine, ui) => {
          sketches.forEach(sketch => {
             ui.createColumn(ui => {
                let engine: Engine | null = null;
-               ui.createRow(ui => engine = master_engine.mount(sketch, ui, props));
+               ui.createRow(ui => engine = master_engine.mount(sketch, ui, props),
+                  { "align-items": "flex-start" }
+               );
                if (!engine) throw new Error("Engine failed to mount");
                ui.createStatus(engine, 8,
                   { "max-height": "25%" }

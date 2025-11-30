@@ -5,19 +5,19 @@ const GLOBAL_FRAMES = 500;
 const GLOBAL_FPS = 60;
 
 // ... portraid ...
-// const WIDTH = 1080;
-// const HEIGHT = 1920;
+const WIDTH = 1080;
+const HEIGHT = 1920;
 
 // ... landscape ...
 // const WIDTH = 1920;
 // const HEIGHT = 1080;
 
 // ... fit screen ...
-const WIDTH = window.outerWidth;
-const HEIGHT = window.outerHeight;
+// const WIDTH = window.outerWidth;
+// const HEIGHT = window.outerHeight;
 
 // ... video ...
-const LOOPS = 3;
+const LOOPS = 1;
 
 type Node = {
     x: number;

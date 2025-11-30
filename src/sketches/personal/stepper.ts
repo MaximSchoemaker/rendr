@@ -12,12 +12,17 @@ const PAD = 0.15;
 // const LAYOUT = getLayout('fill', WIDTH, HEIGHT, PAD);
 
 // ... landscape  ...
-const WIDTH = window.innerWidth;
-const HEIGHT = window.innerHeight;
+const WIDTH = 1920;
+const HEIGHT = 1080;
 const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
 
+// ... fit screen ...
+// const WIDTH = window.outerWidth;
+// const HEIGHT = window.outerHeight;
+// const LAYOUT = getLayout('fit', WIDTH, HEIGHT, PAD);
+
 // ... video ...
-const LOOPS = 2;
+const LOOPS = 3;
 
 type Props = {
    REALTIME?: boolean,
