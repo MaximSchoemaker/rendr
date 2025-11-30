@@ -156,14 +156,14 @@ export const getLayout = (type: LayoutType,
             get size(): number { return this.min_size; },
             get range(): number { return this.min_range; },
 
-            getX(v: number) {
-               return map(v / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.width
+            getX(x: number) {
+               return map((x + this.offset_x) / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.width
             },
-            getY(v: number) {
-               return map(v / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.height
+            getY(y: number) {
+               return map((y + this.offset_y) / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.height
             },
-            getSize(v: number) {
-               return map(v / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
+            getSize(size: number) {
+               return map(size / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
             }
          }
       }
@@ -174,14 +174,14 @@ export const getLayout = (type: LayoutType,
             get size(): number { return this.min_size; },
             get range(): number { return this.min_range; },
 
-            getX(v: number) {
-               return map(v / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.width) / 2;
+            getX(x: number) {
+               return map((x + this.offset_x) / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.width) / 2;
             },
-            getY(v: number) {
-               return map(v / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.height) / 2
+            getY(y: number) {
+               return map((y + this.offset_y) / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.height) / 2
             },
-            getSize(v: number) {
-               return map(v / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
+            getSize(size: number) {
+               return map(size / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
             }
          }
       }
@@ -192,14 +192,14 @@ export const getLayout = (type: LayoutType,
             get size(): number { return this.max_size; },
             get range(): number { return this.max_range; },
 
-            getX(v: number) {
-               return map(v / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.width) / 2;
+            getX(x: number) {
+               return map((x + this.offset_x) / this.x_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.width) / 2;
             },
-            getY(v: number) {
-               return map(v / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.height) / 2
+            getY(y: number) {
+               return map((y + this.offset_y) / this.y_range, 0, 1, this.padding, 1 - this.padding) * this.size - (this.size - this.height) / 2
             },
-            getSize(v: number) {
-               return map(v / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
+            getSize(size: number) {
+               return map(size / this.range, 0, 1, 0, 1 - this.padding * 2) * this.size
             }
          }
       }

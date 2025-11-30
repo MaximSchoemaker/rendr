@@ -55,7 +55,6 @@ export default createSketch<Props>((engine, ui, props) => {
 
     const FPS = 60;
     const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
-    const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
 
     const getInitalPos = (f: number) => ({
         x: 0.5 + cos(f) * INITIAL_NODES_RADIUS,
@@ -67,6 +66,7 @@ export default createSketch<Props>((engine, ui, props) => {
 
     if (REALTIME) {
         const MAX_NODES = 750;
+        const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
 
         const nodes_par = engine.update<Node[]>(initial_nodes, (nodes) => {
             const frame = Math.floor(frame_par.get());
@@ -85,8 +85,11 @@ export default createSketch<Props>((engine, ui, props) => {
             const nodes = nodes_par.get();
             const nodes_f = nodes.length / MAX_NODES;
 
-            drawLines(ctx, nodes, 1, nodes_f, LAYOUT);
-            drawCircles(ctx, nodes, 1, nodes_f, LAYOUT);
+            const lineWidth = stackLineWidth(1);
+            const getColor = (f: number) => getGradient(f, 1, nodes_f);
+
+            drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
+            drawCircles(ctx, nodes, getColor, LAYOUT);
         });
 
         ui.createView(canvas);
@@ -96,6 +99,7 @@ export default createSketch<Props>((engine, ui, props) => {
         const MAX_NODES = 1000;
         const STACK_COUNT = 50;
         const REST_FRAMES = 25;
+        const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
 
         const nodes_cache = engine.simulate<Node[]>(initial_nodes, FRAMES * LOOPS, (nodes, props) => {
             const { index, max_steps } = props;
@@ -130,7 +134,14 @@ export default createSketch<Props>((engine, ui, props) => {
                     const stack_f = i / (STACK_COUNT - 1);
                     const nodes_f = nodes.length / MAX_NODES;
 
-                    drawLines(ctx, nodes, stack_f, nodes_f, LAYOUT);
+                    const offset = stackOffset(stack_f);
+                    LAYOUT.offset_x = offset;
+                    LAYOUT.offset_y = offset;
+
+                    const lineWidth = stackLineWidth(stack_f);
+                    const getColor = (f: number) => getGradient(f, stack_f, nodes_f);
+
+                    drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
                 }
             });
 
@@ -148,7 +159,14 @@ export default createSketch<Props>((engine, ui, props) => {
                     const stack_f = i / (STACK_COUNT - 1);
                     const nodes_f = nodes.length / MAX_NODES;
 
-                    drawLines(ctx, nodes, stack_f, nodes_f, LAYOUT);
+                    const offset = stackOffset(stack_f);
+                    LAYOUT.offset_x = offset;
+                    LAYOUT.offset_y = offset;
+
+                    const lineWidth = stackLineWidth(stack_f);
+                    const getColor = (f: number) => getGradient(f, stack_f, nodes_f);
+
+                    drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
                 }
             });
 
@@ -286,7 +304,7 @@ function moveNodes(
     node2.y -= move_y;
 }
 
-function drawLines(ctx: CanvasRenderingContext2D, nodes: Node[], stack_f: number, nodes_f: number, layout: Layout) {
+function drawLines(ctx: CanvasRenderingContext2D, nodes: Node[], lineWidth: number, getColor: (f: number) => string, layout: Layout) {
     for (let i = 0; i < nodes.length; i++) {
         const node1 = nodes[i];
         const node2 = nodes[mod(i + 1, nodes.length)];
@@ -294,22 +312,20 @@ function drawLines(ctx: CanvasRenderingContext2D, nodes: Node[], stack_f: number
         const f = i / nodes.length;
         const node_f = nodeSig(node1, f);
 
-        const offset = stackOffset(stack_f);
-
         ctx.beginPath();
-        ctx.moveTo(layout.getX(node1.x + offset), layout.getY(node1.y + offset));
-        ctx.lineTo(layout.getX(node2.x + offset), layout.getY(node2.y + offset));
+        ctx.moveTo(layout.getX(node1.x), layout.getY(node1.y));
+        ctx.lineTo(layout.getX(node2.x), layout.getY(node2.y));
 
-        ctx.lineWidth = layout.getSize(stackLineWidth(stack_f));
+        ctx.lineWidth = layout.getSize(lineWidth);
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
-        ctx.strokeStyle = getGradient(node_f, stack_f, nodes_f);
+        ctx.strokeStyle = getColor(node_f);
         ctx.stroke();
     }
 
 }
 
-function drawCircles(ctx: CanvasRenderingContext2D, nodes: Node[], stack_f: number, nodes_f: number, layout: Layout) {
+function drawCircles(ctx: CanvasRenderingContext2D, nodes: Node[], getColor: (f: number) => string, layout: Layout) {
     for (let i = 0; i < nodes.length; i++) {
         const f = i / nodes.length;
 
@@ -321,12 +337,10 @@ function drawCircles(ctx: CanvasRenderingContext2D, nodes: Node[], stack_f: numb
         const size_max = 0.005 * dist_mult;
         const size = map(node_f, size_min, size_max);
 
-        const offset = stackOffset(stack_f);
-
         ctx.beginPath();
-        ctx.arc(layout.getX(x + offset), layout.getY(y + offset), layout.getSize(size), 0, Math.PI * 2);
+        ctx.arc(layout.getX(x), layout.getY(y), layout.getSize(size), 0, Math.PI * 2);
 
-        ctx.fillStyle = getGradient(node_f, stack_f, nodes_f);
+        ctx.fillStyle = getColor(node_f);
         ctx.fill();
     }
 }

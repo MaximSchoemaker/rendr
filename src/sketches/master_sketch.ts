@@ -39,14 +39,14 @@ export default createSketch((master_engine, ui) => {
       // test_animate,
       // funsies,
       // funsies2,
-      cattoy,
+      // cattoy,
       // stepper,
       // twistie,
-      // growth,
+      growth,
    ];
 
    const props = {
-      // REALTIME: true,
+      REALTIME: true,
       ANIMATION: true,
       // VIDEO: true,
 
