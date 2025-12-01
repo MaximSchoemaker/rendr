@@ -1,4 +1,4 @@
-import { createAnimationFrameParameter, createSketch } from "../../rendr/rendr";
+import { AnimateProps, createAnimationFrameParameter, createSketch, VideoProps } from "../../rendr/rendr";
 import { clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 500;
@@ -65,14 +65,24 @@ export default createSketch<Props>((engine, ui, props) => {
     const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
     if (REALTIME) {
-        const MAX_NODES = 750;
+        const MAX_NODES = 500;
         const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
+
+        let pointer_x = 0.5;
+        let pointer_y = 0.5;
+        let pointer_down = false;
 
         const nodes_par = engine.update<Node[]>(initial_nodes, (nodes) => {
             const frame = Math.floor(frame_par.get());
             const t = mod(frame / FRAMES);
 
             manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, LAYOUT);
+            if (pointer_down) {
+                for (const node of nodes) {
+                    if (Math.hypot(node.x - pointer_x, node.y - pointer_y) > 0.5) continue;
+                    moveNodes(node, { x: pointer_x, y: pointer_y }, 0.1, 0.1, true, false);
+                }
+            }
             step(nodes, LAYOUT);
         });
 
@@ -85,12 +95,34 @@ export default createSketch<Props>((engine, ui, props) => {
             const nodes = nodes_par.get();
             const nodes_f = nodes.length / MAX_NODES;
 
-            const lineWidth = stackLineWidth(1);
+            const lineWidth = 0.015;
             const getColor = (f: number) => getGradient(f, 1, nodes_f);
 
             drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
             // drawCircles(ctx, nodes, getColor, LAYOUT);
         });
+
+
+        function setPointerCoords(x: number, y: number) {
+            const rect = canvas.getBoundingClientRect();
+
+            x -= rect.left;
+            y -= rect.top;
+
+            const size = Math.min(rect.width, rect.height);
+            pointer_x = (x - (rect.width - size) / 2) / size;
+            pointer_y = (y - (rect.height - size) / 2) / size;
+        }
+
+        canvas.onmousemove = (e) => setPointerCoords(e.clientX, e.clientY)
+        canvas.ontouchmove = (e) => setPointerCoords(e.touches[0].clientX, e.touches[0].clientY);
+        canvas.onmousedown = (e) => pointer_down = true;
+        canvas.onmouseup = (e) => pointer_down = false;
+        canvas.addEventListener("touchstart", (e) => {
+            setPointerCoords(e.touches[0].clientX, e.touches[0].clientY);
+            pointer_down = true;
+        });
+        canvas.addEventListener("touchend", (e) => pointer_down = false);
 
         ui.createView(canvas);
     }
@@ -110,66 +142,41 @@ export default createSketch<Props>((engine, ui, props) => {
             if (index > max_steps - REST_FRAMES) {
                 const reset_t = (index - (max_steps - REST_FRAMES)) / REST_FRAMES;
                 const reset_f = Math.pow(reset_t, 2);
-                for (let i = 0; i < nodes.length; i++) {
-                    const node = nodes[i];
-                    const f = i / nodes.length;
-
-                    const initial_pos = getInitalPos(f);
-                    moveNodes(node, initial_pos, 0, reset_f, true, true);
-                }
+                moveNodesTo(nodes, reset_f, getInitalPos);
             }
 
             step(nodes, LAYOUT);
         });
 
+        function render(ctx: CanvasRenderingContext2D, props: AnimateProps | VideoProps, perfect_loop: boolean) {
+            const { index, max_steps } = props;
+
+            for (let i = 0; i < STACK_COUNT; i++) {
+                const frame_index = index - STACK_COUNT + i;
+                if (frame_index < 0 && !perfect_loop) continue;
+                const nodes = nodes_cache.get(mod(frame_index, max_steps));
+
+                const stack_f = i / (STACK_COUNT - 1);
+                const nodes_f = nodes.length / MAX_NODES;
+
+                const offset = stackOffset(stack_f);
+                LAYOUT.offset_x = offset;
+                LAYOUT.offset_y = offset;
+
+                const lineWidth = stackLineWidth(stack_f);
+                const getColor = (f: number) => getGradient(f, stack_f, nodes_f);
+
+                drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
+            }
+        }
+
         if (ANIMATION) {
-            const canvas_cache = engine.animate(WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
-                const { index, max_steps } = props;
-
-                for (let i = 0; i < STACK_COUNT; i++) {
-                    const frame_index = index - STACK_COUNT + i;
-                    if (frame_index < 0) continue;
-                    const nodes = nodes_cache.get(mod(frame_index, max_steps));
-
-                    const stack_f = i / (STACK_COUNT - 1);
-                    const nodes_f = nodes.length / MAX_NODES;
-
-                    const offset = stackOffset(stack_f);
-                    LAYOUT.offset_x = offset;
-                    LAYOUT.offset_y = offset;
-
-                    const lineWidth = stackLineWidth(stack_f);
-                    const getColor = (f: number) => getGradient(f, stack_f, nodes_f);
-
-                    drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
-                }
-            });
-
+            const canvas_cache = engine.animate(WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => render(ctx, props, false));
             ui.createCacheView(canvas_cache, frame_par);
         }
 
         if (VIDEO) {
-            const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
-                const { index, max_steps } = props;
-
-                for (let i = 0; i < STACK_COUNT; i++) {
-                    const frame_index = index - STACK_COUNT + i;
-                    const nodes = nodes_cache.get(mod(frame_index, max_steps));
-
-                    const stack_f = i / (STACK_COUNT - 1);
-                    const nodes_f = nodes.length / MAX_NODES;
-
-                    const offset = stackOffset(stack_f);
-                    LAYOUT.offset_x = offset;
-                    LAYOUT.offset_y = offset;
-
-                    const lineWidth = stackLineWidth(stack_f);
-                    const getColor = (f: number) => getGradient(f, stack_f, nodes_f);
-
-                    drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
-                }
-            });
-
+            const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => render(ctx, props, true));
             ui.createVideo(video);
         }
     }
@@ -276,6 +283,20 @@ function avoid(nodes: Node[]) {
             if (node1 === node2) continue;
             moveNodes(node1, node2, dist, factor, false, true);
         }
+    }
+}
+
+function moveNodesTo(
+    nodes: Node[],
+    move_factor: number,
+    getPos: (f: number, node: Node) => Node
+) {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        const f = i / nodes.length;
+
+        const pos = getPos(f, node);
+        moveNodes(node, pos, 0, move_factor, true, true);
     }
 }
 
