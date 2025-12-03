@@ -73,7 +73,7 @@ export default createSketch<Props>((engine, ui, props) => {
       pointer_y = (touch.clientY - rect.y) / rect.height;
     }
 
-    ui.createView(view);
+    ui.mountCanvas(view);
   }
 
   if (ANIMATION || VIDEO) {
@@ -101,12 +101,12 @@ export default createSketch<Props>((engine, ui, props) => {
     if (ANIMATION) {
       const cache = engine.animate(WIDTH, HEIGHT, FRAMES, render);
       const frame_par = createAnimationLoopParameter(FRAMES, FPS)
-      ui.createCacheView(cache, frame_par);
+      ui.mountCanvasAnimation(cache, frame_par);
     }
 
     if (VIDEO) {
       const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES, render);
-      ui.createVideo(video);
+      ui.mountVideo(video);
     }
   }
 });

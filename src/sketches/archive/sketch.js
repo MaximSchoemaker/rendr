@@ -268,11 +268,11 @@ export default rendr.createSetup("/sketches/sketch.js", createUI => {
                if (gen1_count_par) ui.createParameterNumber("Gen 1 Count", gen1_count_par, { min: 0, max: 100000, step: 1 });
             });
 
-            ui.createViewContainer(ui => {
-               if (frame_par) ui.createView(frame_par);
-               if (frame_cache) ui.createCacheView(tick_par, running_par, frame_cache);
-               if (gen1_frame_par) ui.createView(gen1_frame_par);
-               if (gen2_frame_par) ui.createView(gen2_frame_par);
+            ui.mountCanvasContainer(ui => {
+               if (frame_par) ui.mountCanvas(frame_par);
+               if (frame_cache) ui.mountCanvasAnimation(tick_par, running_par, frame_cache);
+               if (gen1_frame_par) ui.mountCanvas(gen1_frame_par);
+               if (gen2_frame_par) ui.mountCanvas(gen2_frame_par);
             });
 
             ui.createTimeline(FRAMES, tick_par, running_par, [

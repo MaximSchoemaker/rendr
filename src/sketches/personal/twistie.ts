@@ -58,7 +58,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const shapes = shapes_cache.getLatest(frame);
             draw(ctx, width, height, shapes, LAYOUT);
         })
-        ui.createView(view);
+        ui.mountCanvas(view);
     }
 
     if (ANIMATION) {
@@ -67,7 +67,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const shapes = shapes_cache.get(index);
             draw(ctx, width, height, shapes, LAYOUT);
         })
-        ui.createCacheView(view_cache, frame_par);
+        ui.mountCanvasAnimation(view_cache, frame_par);
     }
 
     if (VIDEO) {
@@ -76,7 +76,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const shapes = shapes_cache.get(mod(index, FRAMES));
             draw(ctx, width, height, shapes, LAYOUT);
         })
-        ui.createVideo(video);
+        ui.mountVideo(video);
     }
 });
 

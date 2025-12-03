@@ -43,5 +43,5 @@ export default createSketch((engine, ui) => {
       ctx.fill();
    });
 
-   ui.createView(view);
+   ui.mountCanvas(view);
 });

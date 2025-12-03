@@ -1,4 +1,4 @@
-import { AnimateProps, createAnimationFrameParameter, createSketch, VideoProps } from "../../rendr/rendr";
+import { AnimateProps, createAnimationFrameParameter, createParameter, createSketch, VideoProps } from "../../rendr/rendr";
 import { clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, Pointer, registerPointers, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 500;
@@ -123,8 +123,7 @@ export default createSketch<Props>((engine, ui, props) => {
             // }
         });
 
-        ui.createView(canvas);
-
+        ui.mountCanvas(canvas);
         registerPointers(canvas, pointers);
     }
 
@@ -180,12 +179,12 @@ export default createSketch<Props>((engine, ui, props) => {
 
         if (ANIMATION) {
             const canvas_cache = engine.animate(WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => render(ctx, props, false));
-            ui.createCacheView(canvas_cache, frame_par);
+            ui.mountCanvasAnimation(canvas_cache, frame_par);
         }
 
         if (VIDEO) {
             const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => render(ctx, props, true));
-            ui.createVideo(video);
+            ui.mountVideo(video);
         }
     }
 });

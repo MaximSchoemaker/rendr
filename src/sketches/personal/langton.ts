@@ -120,5 +120,5 @@ export default createSketch((engine, ui) => {
       frame_par.set(frame => (frame + 1) % FRAMES)
    });
 
-   ui.createCacheView(frame_cache, frame_par);
+   ui.mountCanvasAnimation(frame_cache, frame_par);
 });

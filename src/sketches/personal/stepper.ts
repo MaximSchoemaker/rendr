@@ -53,7 +53,7 @@ export default createSketch<Props>((engine, ui, props) => {
          const t = mod(index / FRAMES);
          animation(ctx, LAYOUT, t);
       });
-      ui.createView(canvas, frame_par);
+      ui.mountCanvas(canvas, frame_par);
    }
 
    if (ANIMATION) {
@@ -67,7 +67,7 @@ export default createSketch<Props>((engine, ui, props) => {
          const t = mod(index / FRAMES);
          animation(ctx, LAYOUT, t);
       });
-      ui.createCacheView(canvas_cache, frame_par);
+      ui.mountCanvasAnimation(canvas_cache, frame_par);
    }
 
    if (VIDEO) {
@@ -79,7 +79,7 @@ export default createSketch<Props>((engine, ui, props) => {
          const t = mod(index / FRAMES);
          animation(ctx, LAYOUT, t);
       });
-      ui.createVideo(video);
+      ui.mountVideo(video);
    }
 });
 

@@ -44,5 +44,5 @@ export default createSketch((engine, ui) => {
       // if (Math.random() < 0.000001) done();
    });
 
-   ui.createView(view);
+   ui.mountCanvas(view);
 });

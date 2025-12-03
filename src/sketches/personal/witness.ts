@@ -71,5 +71,5 @@ export default createSketch((engine, ui) => {
         ctx.stroke();
     })
 
-    ui.createView(view)
+    ui.mountCanvas(view)
 });

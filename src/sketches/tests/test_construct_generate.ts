@@ -67,5 +67,5 @@ export default createSketch((engine, ui) => {
 
    });
 
-   ui.createView(view);
+   ui.mountCanvas(view);
 });

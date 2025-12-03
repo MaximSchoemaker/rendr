@@ -149,8 +149,8 @@ export default rendr.createSetup("/sketches/boids.js", createUI => {
             ui.createParameterNumber("max_speed", max_speed_par, { min: 0, max: 0.02, step: 0.0001 });
          });
 
-         ui.createViewContainer(ui => {
-            ui.createCacheView(tick_par, running_par, frame_cache);
+         ui.mountCanvasContainer(ui => {
+            ui.mountCanvasAnimation(tick_par, running_par, frame_cache);
          });
 
          ui.createTimeline(FRAMES, tick_par, running_par, [

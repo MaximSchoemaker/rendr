@@ -1,7 +1,7 @@
 import { type Component, createSignal, untrack } from 'solid-js';
 import styles from './App.module.css';
 
-import { Column, UI } from './UI';
+import { Column, UI } from './ui/UI';
 import { Engine, createAnimationLoop, createLoop, mount } from './rendr/rendr';
 
 import master_sketch from './sketches/master_sketch';

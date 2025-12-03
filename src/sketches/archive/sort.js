@@ -206,8 +206,8 @@ export default rendr.createSetup("/sketches/sort.js", createUI => {
             ui.createParameterNumber("count", count_par, { min: 1, max: 30, step: 1 });
          });
 
-         ui.createViewContainer(ui => {
-            ui.createView(frame_par);
+         ui.mountCanvasContainer(ui => {
+            ui.mountCanvas(frame_par);
          });
 
          ui.createTimeline(FRAMES, tick_par, running_par, [

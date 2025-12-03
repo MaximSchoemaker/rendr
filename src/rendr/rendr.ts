@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, untrack, Setter, Accessor, createReaction, createEffect } from 'solid-js';
-import { UI } from '../UI';
+import { UI } from '../ui/UI';
 import { mod, n_arr } from './utils';
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_VERY_HIGH } from 'mediabunny';
 
@@ -617,7 +617,7 @@ function createTaskQueue(max_steps: number, callbacks: TaskQueueCallbacks, setti
       },
       progress: () => {
          return is_done ? 1 : index / max_steps;
-      }
+      },
    }
 }
 
