@@ -28,7 +28,7 @@
   height: 100%;
   width: 100%;
   object-fit: contain;
-  cursor: none;
+  /* cursor: none; */
 }
 
 .ViewContainer:focus {

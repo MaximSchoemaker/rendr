@@ -30,6 +30,8 @@ body {
 
   /* background-color: black; */
   overscroll-behavior: none;
+
+  /* zoom: reset; */
 }
 
 code {

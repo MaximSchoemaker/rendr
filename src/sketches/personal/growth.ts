@@ -1,5 +1,5 @@
 import { AnimateProps, createAnimationFrameParameter, createSketch, VideoProps } from "../../rendr/rendr";
-import { clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, sin, sinn, tri } from "../../rendr/utils";
+import { clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, Pointer, registerPointers, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 500;
 const GLOBAL_FPS = 60;
@@ -58,7 +58,6 @@ export default createSketch<Props>((engine, ui, props) => {
     const { REALTIME, ANIMATION, VIDEO } = props;
 
     const FPS = 60;
-    const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
 
     const getInitalPos = (f: number) => ({
         x: 0.5 + cos(f) * INITIAL_NODES_RADIUS,
@@ -66,27 +65,30 @@ export default createSketch<Props>((engine, ui, props) => {
     })
     const initial_nodes: Node[] = n_arr(INITIAL_NODES_COUNT, (_, f) => getInitalPos(f));
 
-    const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
-
     if (REALTIME) {
-        const MAX_NODES = 450;
+        const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
+
         const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
+
+        const MAX_NODES = 450;
         const PAD = 0;
 
-        let pointer_x = 0.5;
-        let pointer_y = 0.5;
-        let pointer_down = false;
+        const pointers: Pointer[] = []
+
+        const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
         const nodes_par = engine.update<Node[]>(initial_nodes, (nodes) => {
             const frame = frame_par.get();
             const t = mod(frame / FRAMES);
 
             manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
-            if (pointer_down) {
+
+            for (const { x, y, down } of pointers) {
+                if (!down) continue;
                 for (const node of nodes) {
-                    const dist = Math.hypot(node.x - pointer_x, node.y - pointer_y);
+                    const dist = Math.hypot(node.x - x, node.y - y);
                     const control_move_factor = clamp((CONTROL_DIST - dist) / CONTROL_DIST, 0, CONTROL_MOVE_FACTOR_MAX);
-                    moveNodes(node, { x: pointer_x, y: pointer_y }, CONTROL_TARGET_DIST, control_move_factor, true, false);
+                    moveNodes(node, { x, y }, CONTROL_TARGET_DIST, control_move_factor, true, false);
                 }
             }
             step(nodes, PAD, LAYOUT);
@@ -95,9 +97,11 @@ export default createSketch<Props>((engine, ui, props) => {
         const canvas = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
             const { width, height } = props;
 
+            // clear screen
             ctx.fillStyle = createColor(0);
             ctx.fillRect(0, 0, width, height);
 
+            // draw nodes
             const nodes = nodes_par.get();
             const nodes_f = nodes.length / MAX_NODES;
 
@@ -106,34 +110,26 @@ export default createSketch<Props>((engine, ui, props) => {
 
             drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
             drawCircles(ctx, nodes, getColor, LAYOUT);
+
+            // draw pointers
+            // for (const { x, y, down } of pointers) {
+            //     if (!down) continue;
+            //     ctx.beginPath();
+            //     ctx.arc(LAYOUT.getX(x), LAYOUT.getY(y), LAYOUT.getSize(0.05), 0, Math.PI * 2);
+            //     ctx.fillStyle = createColor(0.5, 0, 1, 0.5);
+            //     ctx.fill();
+            // }
         });
-
-
-        function setPointerCoords(x: number, y: number) {
-            const rect = canvas.getBoundingClientRect();
-
-            x -= rect.left;
-            y -= rect.top;
-
-            const size = Math.min(rect.width, rect.height);
-            pointer_x = (x - (rect.width - size) / 2) / size;
-            pointer_y = (y - (rect.height - size) / 2) / size;
-        }
-
-        canvas.onmousemove = (e) => setPointerCoords(e.clientX, e.clientY)
-        canvas.ontouchmove = (e) => setPointerCoords(e.touches[0].clientX, e.touches[0].clientY);
-        canvas.onmousedown = (e) => pointer_down = true;
-        canvas.onmouseup = (e) => pointer_down = false;
-        canvas.addEventListener("touchstart", (e) => {
-            setPointerCoords(e.touches[0].clientX, e.touches[0].clientY);
-            pointer_down = true;
-        });
-        canvas.addEventListener("touchend", (e) => pointer_down = false);
 
         ui.createView(canvas);
+
+        registerPointers(canvas, pointers);
     }
 
     if (ANIMATION || VIDEO) {
+        const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
+        const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
+
         const PAD = 0.15;
         const MAX_NODES = 1000;
         const STACK_COUNT = 50;
@@ -146,6 +142,7 @@ export default createSketch<Props>((engine, ui, props) => {
 
             manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
 
+            // reset at end
             if (index > max_steps - REST_FRAMES) {
                 const reset_t = (index - (max_steps - REST_FRAMES)) / REST_FRAMES;
                 const reset_f = Math.pow(reset_t, 2);

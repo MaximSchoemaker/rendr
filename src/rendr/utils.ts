@@ -1,3 +1,5 @@
+import { onCleanup } from "solid-js";
+
 export function n_arr<T>(n: number, callback: T | ((index: number, f: number, ff: number) => T)) {
    n = Math.max(0, Math.floor(n));
    return new Array(n).fill(null).map((_, i) => typeof callback === "function"
@@ -225,4 +227,71 @@ export function fillGrid(item_count: number, width: number, height: number) {
       }
    }
    return { rows, cols };
+}
+
+export type Pointer = {
+   x: number,
+   y: number,
+   down: boolean,
+}
+
+export function registerPointers(el: HTMLElement, pointers: Pointer[]) {
+   function setPointerCoords(index: number, x: number, y: number) {
+      const rect = el.getBoundingClientRect();
+
+      x -= rect.left;
+      y -= rect.top;
+
+      const size = Math.min(rect.width, rect.height);
+      const pointer = getPointer(index);
+      pointer.x = (x - (rect.width - size) / 2) / size;
+      pointer.y = (y - (rect.height - size) / 2) / size;
+   }
+
+   function getPointer(index: number) {
+      if (pointers[index]) return pointers[index];
+      const new_pointer = { x: 0.5, y: 0.5, down: false };
+      pointers[index] = new_pointer;
+      return new_pointer;
+   }
+
+   const onMouseDown = (e: MouseEvent) => getPointer(0).down = true;
+   const onMouseUp = (e: MouseEvent) => getPointer(0).down = false;
+   const onMouseMove = (e: MouseEvent) => setPointerCoords(0, e.clientX, e.clientY)
+
+   const onTouchStart = (e: TouchEvent) => {
+      for (const touch of e.changedTouches) {
+         setPointerCoords(touch.identifier, touch.clientX, touch.clientY);
+         getPointer(touch.identifier).down = true;
+      }
+   }
+   const onTouchEnd = (e: TouchEvent) => {
+      for (const touch of e.changedTouches) {
+         getPointer(touch.identifier).down = false
+      }
+   }
+   const onTouchMove = (e: TouchEvent) => {
+      for (const touch of e.changedTouches) {
+         setPointerCoords(touch.identifier, touch.clientX, touch.clientY);
+      }
+   }
+
+   el.addEventListener("mousedown", onMouseDown);
+   el.addEventListener("mouseup", onMouseUp);
+   el.addEventListener("mousemove", onMouseMove);
+
+   el.addEventListener("touchstart", onTouchStart);
+   el.addEventListener("touchend", onTouchEnd);
+   el.addEventListener("touchmove", onTouchMove);
+
+
+   onCleanup(() => {
+      el.removeEventListener("mousedown", onMouseDown);
+      el.removeEventListener("mouseup", onMouseUp);
+      el.removeEventListener("mousemove", onMouseMove);
+
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchmove", onTouchMove);
+   })
 }
