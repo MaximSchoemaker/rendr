@@ -134,7 +134,7 @@ export default createSketch<Props>((engine, ui, props) => {
         const PAD = 0.15;
         const MAX_NODES = 1000;
         const STACK_COUNT = 50;
-        const REST_FRAMES = 25;
+        const RESET_FRAMES = 25;
         const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
 
         const nodes_cache = engine.simulate<Node[]>(initial_nodes, FRAMES * LOOPS, (nodes, props) => {
@@ -146,8 +146,8 @@ export default createSketch<Props>((engine, ui, props) => {
             manageNodeCount(nodes, count, PAD, LAYOUT);
 
             // reset at end
-            if (index > max_steps - REST_FRAMES) {
-                const reset_t = (index - (max_steps - REST_FRAMES)) / REST_FRAMES;
+            if (index > max_steps - RESET_FRAMES) {
+                const reset_t = (index - (max_steps - RESET_FRAMES)) / RESET_FRAMES;
                 const reset_f = Math.pow(reset_t, 2);
                 moveNodesTo(nodes, reset_f, getInitalPos);
             }

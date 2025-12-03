@@ -29,6 +29,10 @@ export const floorTo = (val: number, step: number) => {
    return Math.floor(val * step) / step;
 }
 
+export const roundTo = (val: number, step: number) => {
+   return Math.round(val * step) / step;
+}
+
 export function map(v: number, in_from: number, in_to: number, out_from?: number, out_to?: number) {
    if (out_from === undefined && out_to === undefined) {
       out_from = in_from;
@@ -84,11 +88,20 @@ export const step = (v: number, steps = 2) => {
    );
 }
 
+export const angle_diff = (a1: number, a2: number) => mod(a1 - a2 + 0.5) - 0.5;
+
 export const createColor = (r: number, g: number = r, b: number = r, a: number = 1) => {
    const r_int = Math.floor(r * 256);
    const g_int = Math.floor(g * 256);
    const b_int = Math.floor(b * 256);
    return `rgb(${r_int}, ${g_int}, ${b_int}, ${a})`
+}
+
+export const createHSL = (h: number, s: number = 1.0, l: number = 0.5, a: number = 1) => {
+   const h_int = Math.floor(h * 360);
+   const s_int = Math.floor(s * 100);
+   const l_int = Math.floor(l * 100);
+   return `hsl(${h_int}, ${s_int}%, ${l_int}%, ${a})`
 }
 
 export const lerpColor = (v: number, r1: number, g1: number, b1: number, r2: number, g2: number, b2: number) => {

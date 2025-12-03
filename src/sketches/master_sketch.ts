@@ -19,6 +19,7 @@ import witness from "./personal/witness";
 import stepper from "./personal/stepper";
 import twistie from "./personal/twistie";
 import growth from "./personal/growth";
+import boids from "./personal/boids";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -42,7 +43,8 @@ export default createSketch((master_engine, ui) => {
       // cattoy,
       // stepper,
       // twistie,
-      growth,
+      // growth,
+      boids,
    ];
 
    const props = {

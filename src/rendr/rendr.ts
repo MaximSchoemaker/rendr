@@ -684,7 +684,7 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
       },
       progress: () => {
          return is_done ? 1 : valid_count / max_steps;
-      }
+      },
    }
 }
 
