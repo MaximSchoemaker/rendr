@@ -774,6 +774,7 @@ export function createLoop(callback: (delta: number) => void, interval = 0, runn
    return ret;
 }
 
+// TODO: remove and cleanup
 export const createAnimationLoopParameter = (frames: number, fps: number) => {
    const frame_par = createParameter(0);
    createAnimationLoop((delta) => frame_par.set(t => mod(t + (delta / 1000) * fps, frames)));

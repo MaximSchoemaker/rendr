@@ -37,6 +37,10 @@ const FACTOR_MULT = 1 / (DIST_MULT);
 const CONTRACT_FACTOR_MAX = CONTRACT_FACTOR_MIN * FACTOR_MULT;
 const AVOID_FACTOR_MAX = AVOID_FACTOR_MIN * FACTOR_MULT;
 
+const CONTROL_DIST = 0.5;
+const CONTROL_MOVE_FACTOR_MAX = 0.25;
+const CONTROL_TARGET_DIST = 0.15;
+
 // ... types ...
 type Node = {
     x: number;
@@ -65,25 +69,27 @@ export default createSketch<Props>((engine, ui, props) => {
     const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
     if (REALTIME) {
-        const MAX_NODES = 500;
+        const MAX_NODES = 450;
         const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
+        const PAD = 0;
 
         let pointer_x = 0.5;
         let pointer_y = 0.5;
         let pointer_down = false;
 
         const nodes_par = engine.update<Node[]>(initial_nodes, (nodes) => {
-            const frame = Math.floor(frame_par.get());
+            const frame = frame_par.get();
             const t = mod(frame / FRAMES);
 
-            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, LAYOUT);
+            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
             if (pointer_down) {
                 for (const node of nodes) {
-                    if (Math.hypot(node.x - pointer_x, node.y - pointer_y) > 0.5) continue;
-                    moveNodes(node, { x: pointer_x, y: pointer_y }, 0.1, 0.1, true, false);
+                    const dist = Math.hypot(node.x - pointer_x, node.y - pointer_y);
+                    const control_move_factor = clamp((CONTROL_DIST - dist) / CONTROL_DIST, 0, CONTROL_MOVE_FACTOR_MAX);
+                    moveNodes(node, { x: pointer_x, y: pointer_y }, CONTROL_TARGET_DIST, control_move_factor, true, false);
                 }
             }
-            step(nodes, LAYOUT);
+            step(nodes, PAD, LAYOUT);
         });
 
         const canvas = engine.draw(WIDTH, HEIGHT, (ctx, props) => {
@@ -99,7 +105,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const getColor = (f: number) => getGradient(f, 1, nodes_f);
 
             drawLines(ctx, nodes, lineWidth, getColor, LAYOUT);
-            // drawCircles(ctx, nodes, getColor, LAYOUT);
+            drawCircles(ctx, nodes, getColor, LAYOUT);
         });
 
 
@@ -128,6 +134,7 @@ export default createSketch<Props>((engine, ui, props) => {
     }
 
     if (ANIMATION || VIDEO) {
+        const PAD = 0.15;
         const MAX_NODES = 1000;
         const STACK_COUNT = 50;
         const REST_FRAMES = 25;
@@ -137,7 +144,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const { index, max_steps } = props;
             const t = mod(index / FRAMES);
 
-            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, LAYOUT);
+            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
 
             if (index > max_steps - REST_FRAMES) {
                 const reset_t = (index - (max_steps - REST_FRAMES)) / REST_FRAMES;
@@ -145,7 +152,7 @@ export default createSketch<Props>((engine, ui, props) => {
                 moveNodesTo(nodes, reset_f, getInitalPos);
             }
 
-            step(nodes, LAYOUT);
+            step(nodes, PAD, LAYOUT);
         });
 
         function render(ctx: CanvasRenderingContext2D, props: AnimateProps | VideoProps, perfect_loop: boolean) {
@@ -189,17 +196,17 @@ const stackLineWidth = (f: number) => 0.01 + (1 - f) * 0.01;
 // const stackLineWidth = (f: number) => 0.005 + (1 - f) * 0.01;
 // const stackLineWidth = (f: number) => 0.0025 + (1 - f) * 0.01;
 
-function manageNodeCount(nodes: Node[], t: number, min_nodes: number, max_nodes: number, layout: Layout) {
+function manageNodeCount(nodes: Node[], t: number, min_nodes: number, max_nodes: number, padding: number, layout: Layout) {
     const count_f = inv_cosn(t);
     const count = Math.floor(map(count_f, min_nodes, max_nodes));
 
     while (nodes.length < count) {
         addNode(nodes);
-        step(nodes, layout)
+        step(nodes, padding, layout)
     }
     while (nodes.length > count) {
         removeNode(nodes);
-        step(nodes, layout)
+        step(nodes, padding, layout)
     }
 }
 
@@ -237,14 +244,13 @@ function removeNode(nodes: Node[]) {
     nodes.splice(index, 1);
 }
 
-function step(nodes: Node[], layout: Layout) {
+function step(nodes: Node[], padding: number, layout: Layout) {
     contract(nodes)
     avoid(nodes);
 
     const { width, height, size } = layout
-    const pad = 0.3;
-    const pad_x = width / size - 1 - pad;
-    const pad_y = height / size - 1 - pad;
+    const pad_x = width / size - 1 - padding * 2;
+    const pad_y = height / size - 1 - padding * 2;
 
     for (const node of nodes) {
         node.x = clamp(node.x, -pad_x * 0.5, 1 + pad_x * 0.5);
