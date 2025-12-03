@@ -10,7 +10,7 @@ import cattoy_sketch from './sketches/personal/cattoy';
 import { lerp } from './rendr/utils';
 
 const AVG_TIME_LERP = 0.01;
-const TARGET_FPS = 30;
+const TARGET_FPS = 60;
 
 const App: Component = () => {
   const target_time = 1000 / TARGET_FPS;
@@ -29,7 +29,8 @@ const App: Component = () => {
       const execution_time = performance.now() - start_time;
 
       set_avg_execution_time(avg_execution_time => lerp(AVG_TIME_LERP, avg_execution_time, execution_time));
-      set_avg_time(avg_time => lerp(AVG_TIME_LERP, avg_time, delta));
+      const clamped_delta = Math.min(delta, target_time);
+      set_avg_time(avg_time => lerp(AVG_TIME_LERP, avg_time, clamped_delta));
     });
 
     addEventListener("keydown", evt => {
