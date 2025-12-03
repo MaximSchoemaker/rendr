@@ -66,7 +66,7 @@ export default createSketch<Props>((engine, ui, props) => {
     const initial_nodes: Node[] = n_arr(INITIAL_NODES_COUNT, (_, f) => getInitalPos(f));
 
     if (REALTIME) {
-        const FRAMES = GLOBAL_FRAMES * FPS / GLOBAL_FPS;
+        const FRAMES = 1000 * FPS / GLOBAL_FPS;
 
         const LAYOUT = getLayout('fit', WIDTH, HEIGHT);
 
@@ -81,7 +81,9 @@ export default createSketch<Props>((engine, ui, props) => {
             const frame = frame_par.get();
             const t = mod(frame / FRAMES);
 
-            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
+            const count_f = Math.pow(inv_cosn(t), 0.5);
+            const count = Math.floor(map(count_f, INITIAL_NODES_COUNT, MAX_NODES));
+            manageNodeCount(nodes, count, PAD, LAYOUT);
 
             for (const { x, y, down } of pointers) {
                 if (!down) continue;
@@ -140,7 +142,9 @@ export default createSketch<Props>((engine, ui, props) => {
             const { index, max_steps } = props;
             const t = mod(index / FRAMES);
 
-            manageNodeCount(nodes, t, INITIAL_NODES_COUNT, MAX_NODES, PAD, LAYOUT);
+            const count_f = inv_cosn(t);
+            const count = Math.floor(map(count_f, INITIAL_NODES_COUNT, MAX_NODES));
+            manageNodeCount(nodes, count, PAD, LAYOUT);
 
             // reset at end
             if (index > max_steps - REST_FRAMES) {
@@ -193,10 +197,7 @@ const stackLineWidth = (f: number) => 0.01 + (1 - f) * 0.01;
 // const stackLineWidth = (f: number) => 0.005 + (1 - f) * 0.01;
 // const stackLineWidth = (f: number) => 0.0025 + (1 - f) * 0.01;
 
-function manageNodeCount(nodes: Node[], t: number, min_nodes: number, max_nodes: number, padding: number, layout: Layout) {
-    const count_f = inv_cosn(t);
-    const count = Math.floor(map(count_f, min_nodes, max_nodes));
-
+function manageNodeCount(nodes: Node[], count: number, padding: number, layout: Layout) {
     while (nodes.length < count) {
         addNode(nodes);
         step(nodes, padding, layout)
