@@ -21,6 +21,8 @@ const App: Component = () => {
 
   const scheduleEngine = (engine: Engine) => {
     const loop = createAnimationLoop(delta => {
+      if (delta > 1000) return; // skip large deltas (e.g. when tab is inactive)
+
       const draw_time = untrack(avg_draw_time);
       const max_execution_time = target_time - draw_time;
 
@@ -29,8 +31,7 @@ const App: Component = () => {
       const execution_time = performance.now() - start_time;
 
       set_avg_execution_time(avg_execution_time => lerp(AVG_TIME_LERP, avg_execution_time, execution_time));
-      const clamped_delta = Math.min(delta, target_time);
-      set_avg_time(avg_time => lerp(AVG_TIME_LERP, avg_time, clamped_delta));
+      set_avg_time(avg_time => lerp(AVG_TIME_LERP, avg_time, delta));
     });
 
     addEventListener("keydown", evt => {
