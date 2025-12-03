@@ -37,10 +37,6 @@ const FACTOR_MULT = 1 / (DIST_MULT);
 const CONTRACT_FACTOR_MAX = CONTRACT_FACTOR_MIN * FACTOR_MULT;
 const AVOID_FACTOR_MAX = AVOID_FACTOR_MIN * FACTOR_MULT;
 
-const CONTROL_DIST = 0.5;
-const CONTROL_MOVE_FACTOR_MAX = 0.25;
-const CONTROL_TARGET_DIST = 0.15;
-
 // ... types ...
 type Node = {
     x: number;
@@ -72,6 +68,10 @@ export default createSketch<Props>((engine, ui, props) => {
 
         const MAX_NODES = 450;
         const PAD = 0;
+
+        const CONTROL_DIST = 0.4;
+        const CONTROL_MOVE_FACTOR_MAX = 0.25;
+        const CONTROL_TARGET_DIST = 0.15;
 
         const pointers: Pointer[] = []
 
