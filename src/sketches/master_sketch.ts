@@ -43,8 +43,8 @@ export default createSketch((master_engine, ui) => {
       // cattoy,
       // stepper,
       // twistie,
-      // growth,
-      boids,
+      growth,
+      // boids,
    ];
 
    const props = {

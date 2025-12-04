@@ -1,3 +1,4 @@
+import { l } from "vite/dist/node/types.d-jgA8ss1A";
 import { createAnimationFrameParameter, createSketch } from "../../rendr/rendr";
 import { angle_diff, clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, map, mod, n_arr, sin } from "../../rendr/utils";
 
@@ -5,22 +6,25 @@ const GLOBAL_FRAMES = 1000;
 const GLOBAL_FPS = 60;
 
 // ... portraid ...
-const WIDTH = 1080;
-const HEIGHT = 1920;
-const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+// const WIDTH = 1080;
+// const HEIGHT = 1920;
+// const LAYOUT = getLayout("fill", WIDTH, HEIGHT);
+// const RESET_FRAMES = 75;
 
 // ... landscape ...
 // const WIDTH = 1920;
 // const HEIGHT = 1080;
 // const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
+// const RESET_FRAMES = 74;
 
 // ... fit screen ...
-// const WIDTH = window.outerWidth;
-// const HEIGHT = window.outerHeight;
-// const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
+const WIDTH = window.outerWidth;
+const HEIGHT = window.outerHeight;
+const LAYOUT = getLayout("fit", WIDTH, HEIGHT);
+const RESET_FRAMES = 74;
 
 // ... video ...
-const LOOPS = 1;
+const LOOPS = 6;
 
 // ... params ...
 const LAYOUT_BG = getLayout("fill", WIDTH, HEIGHT);
@@ -48,7 +52,7 @@ type Boid = {
 }
 
 type Props = {
-    REALTIME: boolean;
+    REALTIME?: boolean;
     ANIMATION?: boolean;
     VIDEO?: boolean;
 }
@@ -60,7 +64,6 @@ export default createSketch<Props>((engine, ui, props) => {
     const FPS = GLOBAL_FPS;
 
     const BOIDS_COUNT = 500;
-    const RESET_FRAMES = 75;
 
     const getInitalConfig = (f: number) => ({
         x: 0.5,
@@ -89,14 +92,15 @@ export default createSketch<Props>((engine, ui, props) => {
     }
 
     if (ANIMATION || VIDEO) {
-        const boids_par = engine.simulate<Boid[]>(initial_boids, FRAMES, (boids, props) => {
+        const boids_par = engine.simulate<Boid[]>(initial_boids, FRAMES * LOOPS, (boids, props) => {
             const { index } = props;
+            const frame = index % FRAMES;
             updateBoids(boids);
-            resetBoids(boids, index, RESET_FRAMES, FRAMES, getInitalConfig);
+            resetBoids(boids, frame, RESET_FRAMES, FRAMES, getInitalConfig);
         });
 
         if (ANIMATION) {
-            const canvas_animation = engine.animate(WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+            const canvas_animation = engine.animate(WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
                 const { index } = props;
                 const boids = boids_par.get(index);
                 drawScene(ctx, boids, LAYOUT);
@@ -105,7 +109,7 @@ export default createSketch<Props>((engine, ui, props) => {
         }
 
         if (VIDEO) {
-            const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES, (ctx, props) => {
+            const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
                 const { index } = props;
                 const boids = boids_par.get(index);
                 drawScene(ctx, boids, LAYOUT);
@@ -202,7 +206,7 @@ function updateBoids(boids: Boid[]) {
 
 function resetBoids(boids: Boid[], frame: number, reset_frames: number, frames: number, getInitalConfig: (f: number) => Boid) {
     if (frame > frames - reset_frames) {
-        const reset_t = (frame - (frames - reset_frames)) / (reset_frames - 1);
+        const reset_t = (frame - (frames - reset_frames)) / (reset_frames);
         const reset_f = Math.pow(reset_t, 3);
         for (let i = 0; i < boids.length; i++) {
             const boid = boids[i];
