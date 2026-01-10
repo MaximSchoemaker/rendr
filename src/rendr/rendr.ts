@@ -282,7 +282,9 @@ export function createEngine(): Engine {
 
          scheduler.schedule(createTaskQueue(max_steps, {
             reset: () => {
-               ctx.clearRect(0, 0, width, height);
+               ctx.fillStyle = "black";
+               ctx.fillRect(0, 0, width, height);
+               // ctx.clearRect(0, 0, width, height);
             },
             execute: ({ index, done }) => {
                create(ctx, { width, height, index, max_steps, done });

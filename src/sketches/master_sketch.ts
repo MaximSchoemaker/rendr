@@ -20,6 +20,7 @@ import stepper from "./personal/stepper";
 import twistie from "./personal/twistie";
 import growth from "./personal/growth";
 import boids from "./personal/boids";
+import marbles from "./personal/marbles";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -43,14 +44,15 @@ export default createSketch((master_engine, ui) => {
       // cattoy,
       // stepper,
       // twistie,
-      growth,
+      // growth,
       // boids,
+      marbles,
    ];
 
    const props = {
       REALTIME: true,
-      // ANIMATION: true,
-      // VIDEO: true,
+      ANIMATION: true,
+      VIDEO: true,
 
       REFRESH_RATE: 120,
    }
