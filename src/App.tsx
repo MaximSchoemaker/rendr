@@ -24,7 +24,7 @@ const App: Component = () => {
       if (delta > 1000) return; // skip large deltas (e.g. when tab is inactive)
 
       const draw_time = untrack(avg_draw_time);
-      const max_execution_time = target_time - draw_time;
+      const max_execution_time = Math.max(1, target_time - draw_time);
 
       const start_time = performance.now();
       engine.scheduler.execute(max_execution_time);

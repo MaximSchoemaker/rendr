@@ -35,24 +35,25 @@ const RANGE = 0.1;
 
 const COARSE = 100 * Math.random();
 const C_COARSE = 10 * Math.random();
-const C_STEPS = 3;
+const C_USE_STEPS = false;
+const C_STEPS = 5;
 
 const START_X = 0.5;
 const START_Y = 0.5;
 const STEP = 0.0025;
-const VEL_LERP = 0.005;
+const VEL_LERP = STEP;
 
-const P_ALPHA = 0.01;
+const P_ALPHA = 2 / 255;
 const P_SIZE = 1 * SCALE;
 const COLOR_LERP = 1; //Math.random();
 
-const getRange = () => 1
-const getOffset = () => Math.random();
-const getShift = () => 1;
-
-// const getRange = () => Math.random() > 0.5 ? 1 : Math.random()
+// const getRange = () => 1
 // const getOffset = () => Math.random();
-// const getShift = () => Math.random();
+// const getShift = () => 1;
+
+const getRange = () => Math.random() > 0.5 ? 1 : Math.random()
+const getOffset = () => Math.random();
+const getShift = () => Math.random();
 
 const r_offset = getOffset();
 const g_offset = getOffset();
@@ -138,10 +139,13 @@ function value(x: number, y: number, field: number) {
         y * C_COARSE + 1
     );
 
-    const coarse_f = Math.floor(f * C_STEPS) / C_STEPS;
-    const coarse = COARSE * coarse_f;
-
-    // const coarse = COARSE * f;
+    let coarse;
+    if (C_USE_STEPS) {
+        const coarse_f = Math.floor(f * C_STEPS) / C_STEPS;
+        coarse = COARSE * coarse_f;
+    } else {
+        coarse = COARSE * f;
+    }
 
     field++;
     return noise(
