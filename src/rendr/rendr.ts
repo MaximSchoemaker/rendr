@@ -693,11 +693,12 @@ function createTaskCache(max_steps: number, callbacks: TaskCacheCallbacks, setti
 export function createAnimationLoop(callback: (delta: number) => void, running = true) {
 
    let animationFrame: number;
-   let prev_time: number;
+   let prev_time: number | undefined;
    const loop = (timestamp = 0) => {
       if (!ret.running) return
       animationFrame = requestAnimationFrame(loop);
 
+      if (prev_time === undefined) prev_time = timestamp;
       let delta = timestamp - prev_time;
       prev_time = timestamp;
 
@@ -712,9 +713,8 @@ export function createAnimationLoop(callback: (delta: number) => void, running =
       },
       start() {
          this.running = true;
-         prev_time = performance.now();
+         prev_time = undefined;
          animationFrame = requestAnimationFrame(loop);
-         // loop(prev_time);
       },
       toggle() {
          if (this.running)
