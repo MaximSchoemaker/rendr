@@ -1,4 +1,3 @@
-import { l } from "vite/dist/node/types.d-jgA8ss1A";
 import { createAnimationFrameParameter, createSketch } from "../../rendr/rendr";
 import { angle_diff, clamp, cos, createColor, getLayout, inv_cosn, Layout, lerp, map, mod, n_arr, sin } from "../../rendr/utils";
 

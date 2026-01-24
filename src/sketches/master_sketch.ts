@@ -21,6 +21,7 @@ import twistie from "./personal/twistie";
 import growth from "./personal/growth";
 import boids from "./personal/boids";
 import marbles from "./personal/marbles";
+import hatching from "./personal/hatching";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -46,7 +47,8 @@ export default createSketch((master_engine, ui) => {
       // twistie,
       // growth,
       // boids,
-      marbles,
+      // marbles,
+      hatching,
    ];
 
    const props = {
