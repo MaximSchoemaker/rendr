@@ -64,7 +64,7 @@ export default createSketch<Props>((engine, ui, props) => {
         const count_f = Math.pow(inv_cosn(t), 3);
         const SQUARE_COUNT = lerp(count_f, 9, 50);
 
-        ctx.fillStyle = createColor(1, 0, 0.25, 0.05);
+        ctx.fillStyle = createColor(1, 0, 0.5, 0.1);
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
         let squares = [];
@@ -95,8 +95,8 @@ export default createSketch<Props>((engine, ui, props) => {
             const color_f = Math.pow(f, 1);
             ctx.strokeStyle = createColor(
                 lerp(Math.pow(color_f, 1), COL_1.r, COL_2.r),
-                lerp(Math.pow(color_f, 3), COL_1.g, COL_2.g),
-                lerp(Math.pow(color_f, 4), COL_1.b, COL_2.b),
+                lerp(Math.pow(color_f, 6), COL_1.g, COL_2.g),
+                lerp(Math.pow(color_f, 1), COL_1.b, COL_2.b),
 
                 // lerp(Math.pow(color_f, 3), COL_1.r, COL_2.r),
                 // lerp(Math.pow(color_f, 4), COL_1.g, COL_2.g),
