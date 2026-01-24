@@ -23,8 +23,6 @@ const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
 // ... video ...
 const LOOPS = 6;
 
-const E = 0.00001;
-
 type Props = {
     REALTIME?: boolean;
     ANIMATION?: boolean;
@@ -72,20 +70,26 @@ export default createSketch<Props>((engine, ui, props) => {
 
         const shapes = [
             { lines: getPolygon(0.5, 0.5, 3, 0.3, 1 / 12), type: "refractor" as const, onesided: false },
-            { lines: getBoundingBox(LAYOUT), type: "reflector" as const, onesided: true }
+            { lines: getBoundingBox(LAYOUT, 0), type: "reflector" as const, onesided: true }
         ];
 
-        const beams_radius = 1;
-        const beams_angle = t + 0;
-        let beams = getLightCone(
-            0.5 + cos(beams_angle) * beams_radius,
-            0.5 + sin(beams_angle) * beams_radius,
-            beams_angle + 0.5,
-            0.025,
-            false,
-            1500,
-            6,
-        );
+        let beams: Beam[] = [];
+
+        const BEAMS_COUNT = 1;
+        for (let i = 0; i < BEAMS_COUNT; i++) {
+            const f = i / BEAMS_COUNT;
+            const beams_radius = 1;
+            const beams_angle = t + f;
+            beams.push(...getLightCone(
+                0.5 + cos(beams_angle) * beams_radius,
+                0.5 + sin(beams_angle) * beams_radius,
+                beams_angle + 0.5,
+                0.025,
+                false,
+                1500 / BEAMS_COUNT,
+                6,
+            ));
+        }
 
         const light_lines: LightLine[] = [];
         for (let i = 0; i < 5; i++)
@@ -146,8 +150,8 @@ function intersectLineLine(line1: Line, line2: Line) {
     let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator
 
     // is the intersection along the segments
-    const width = 0.0001;
-    if (ua < 0 - width || ua > 1 + width || ub < 0 - width || ub > 1 + width) {
+    const extra = 0.0001;
+    if (ua < 0 - extra || ua > 1 + extra || ub < 0 - extra || ub > 1 + extra) {
         return false
     }
 
@@ -167,11 +171,14 @@ function intersectBeamLine(beam: Beam, line: Line) {
     return intersectLineLine(line, line2);
 }
 
-function getBoundingBox(layout: Layout) {
-    const w = layout.width / layout.size
-    const h = layout.height / layout.size;
-    const x = -(layout.width - layout.size) * 0.5 / layout.size;
-    const y = -(layout.height - layout.size) * 0.5 / layout.size
+function getBoundingBox(layout: Layout, border: number) {
+    let { width, height, size } = layout;
+    width -= size * border;
+    height -= size * border;
+    const w = width / size
+    const h = height / size;
+    const x = -(width - size) * 0.5 / size;
+    const y = -(height - size) * 0.5 / size
     return [
         { x1: x, y1: y, x2: x, y2: y + h },
         { x1: x, y1: y + h, x2: x + w, y2: y + h },
