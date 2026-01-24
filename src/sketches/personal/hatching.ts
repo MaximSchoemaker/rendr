@@ -51,12 +51,12 @@ export default createSketch<Props>((engine, ui, props) => {
     const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
     const COL_1 = { r: 0, g: 0, b: 0, a: 0 };
-    const COL_2 = { r: 1, g: 0.5, b: 0.2, a: 1 };
+    const COL_2 = { r: 1, g: 0.45, b: 0.25, a: 1 };
 
     // const COL_1 = { r: 0, g: 0, b: 0, a: 0 };
     // const COL_2 = { r: 0.75, g: 0, b: 0.5, a: 1 };
 
-    const HATCHING_COUNT = 42 * 2;
+    const HATCHING_COUNT = 41 * 2;
     const canvas = engine.draw(WIDTH, HEIGHT, (ctx) => {
         const index = frame_par.get();
         const t = mod(index / FRAMES);
@@ -94,7 +94,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const { square, f } = squares[squares.length - 1 - i];
             const color_f = Math.pow(f, 1);
             ctx.strokeStyle = createColor(
-                lerp(Math.pow(color_f, 1), COL_1.r, COL_2.r),
+                lerp(Math.pow(color_f, 2), COL_1.r, COL_2.r),
                 lerp(Math.pow(color_f, 6), COL_1.g, COL_2.g),
                 lerp(Math.pow(color_f, 1), COL_1.b, COL_2.b),
 
