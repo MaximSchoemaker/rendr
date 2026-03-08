@@ -12,7 +12,7 @@ export const Status: Component<StatusProps> = (props) => {
 
     const tasks = props.engine.scheduler.tasks;
 
-    const [hidden, setHidden] = createSignal(false);
+    const [hidden, setHidden] = createSignal(true);
 
     function onKeyDown(evt: KeyboardEvent) {
         switch (evt.key) {

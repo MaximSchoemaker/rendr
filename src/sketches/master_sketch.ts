@@ -23,6 +23,7 @@ import boids from "./personal/boids";
 import marbles from "./personal/marbles";
 import hatching from "./personal/hatching";
 import light from "./personal/light";
+import game from "./personal/game";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -50,7 +51,8 @@ export default createSketch((master_engine, ui) => {
       // boids,
       // marbles,
       // hatching,
-      light,
+      // light,
+      game,
    ];
 
    const props = {

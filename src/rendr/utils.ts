@@ -308,3 +308,36 @@ export function registerPointers(el: HTMLElement, pointers: Pointer[]) {
       el.removeEventListener("touchmove", onTouchMove);
    })
 }
+
+export function keyDown(key: string, callback: () => void) {
+   const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === key) callback();
+   }
+
+   window.addEventListener("keydown", onKeyDown);
+
+   onCleanup(() => {
+      window.removeEventListener("keydown", onKeyDown);
+   })
+}
+
+export function keyUp(key: string, callback: () => void) {
+   const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === key) callback();
+   }
+
+   window.addEventListener("keyup", onKeyUp);
+
+   onCleanup(() => {
+      window.removeEventListener("keyup", onKeyUp);
+   })
+}
+
+export function keyState(key: string) {
+   let down = false;
+
+   keyDown(key, () => down = true);
+   keyUp(key, () => down = false);
+
+   return () => down;
+}

@@ -23,6 +23,17 @@ const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
 // ... video ...
 const LOOPS = 6;
 
+const INTERSECTION_EXTRA = 0.0001;
+
+// ... variations ...
+const POLYGON_SIDES = 3;
+const SIMULATION_STEPS = 5;
+const LIGHT_CONE_SPREAD = 0.025;
+
+// const POLYGON_SIDES = 6;
+// const SIMULATION_STEPS = 6;
+// const LIGHT_CONE_SPREAD = 0.05;
+
 type Props = {
     REALTIME?: boolean;
     ANIMATION?: boolean;
@@ -36,13 +47,19 @@ type Line = {
     y2: number;
 }
 
+type Circle = {
+    x: number;
+    y: number;
+    r: number;
+}
+
 type Beam = {
     x: number;
     y: number;
     angle: number;
     color_f: number;
     inside: boolean;
-    previous_intersection: Line | null;
+    previous_intersection: Line | Circle | null;
 }
 
 type LightLine = Line & {
@@ -52,6 +69,7 @@ type LightLine = Line & {
 type Shape = {
     type: "reflector" | "refractor" | "absorber";
     lines: Line[];
+    // circles?: Circle[];
     onesided: boolean
 }
 
@@ -69,12 +87,11 @@ export default createSketch<Props>((engine, ui, props) => {
         const t = mod(index / FRAMES);
 
         const shapes = [
-            { lines: getPolygon(0.5, 0.5, 3, 0.3, 1 / 12), type: "refractor" as const, onesided: false },
+            { lines: getPolygon(0.5, 0.5, POLYGON_SIDES, 0.3, 1 / 12), type: "refractor" as const, onesided: false },
             { lines: getBoundingBox(LAYOUT, 0), type: "reflector" as const, onesided: true }
         ];
 
         let beams: Beam[] = [];
-
         const BEAMS_COUNT = 1;
         for (let i = 0; i < BEAMS_COUNT; i++) {
             const f = i / BEAMS_COUNT;
@@ -84,7 +101,7 @@ export default createSketch<Props>((engine, ui, props) => {
                 0.5 + cos(beams_angle) * beams_radius,
                 0.5 + sin(beams_angle) * beams_radius,
                 beams_angle + 0.5,
-                0.025,
+                LIGHT_CONE_SPREAD,
                 false,
                 1500 / BEAMS_COUNT,
                 6,
@@ -92,7 +109,7 @@ export default createSketch<Props>((engine, ui, props) => {
         }
 
         const light_lines: LightLine[] = [];
-        for (let i = 0; i < 5; i++)
+        for (let i = 0; i < SIMULATION_STEPS; i++)
             beams = stepSimulation(beams, shapes, light_lines);
 
 
@@ -150,8 +167,7 @@ function intersectLineLine(line1: Line, line2: Line) {
     let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator
 
     // is the intersection along the segments
-    const extra = 0.0001;
-    if (ua < 0 - extra || ua > 1 + extra || ub < 0 - extra || ub > 1 + extra) {
+    if (ua < 0 - INTERSECTION_EXTRA || ua > 1 + INTERSECTION_EXTRA || ub < 0 - INTERSECTION_EXTRA || ub > 1 + INTERSECTION_EXTRA) {
         return false
     }
 
@@ -228,15 +244,16 @@ function stepSimulation(beams: Beam[], shapes: Shape[], light_lines: LightLine[]
     for (const beam of beams) {
         let intersections: { x: number; y: number, shape: Shape, line: Line }[] = [];
         for (const shape of shapes) {
-            for (const line of shape.lines) {
+            for (const line of shape.lines ?? []) {
                 if (line === beam.previous_intersection) continue;
                 const inter = intersectBeamLine(beam, line);
-                if (inter) {
-                    // const inter_len = Math.hypot(inter.x - beam.x, inter.y - beam.y);
-                    // if (inter_len > E)
-                    intersections.push({ ...inter, shape, line });
-                }
+                if (inter) intersections.push({ ...inter, shape, line });
             }
+            // for (const circle of shape.circles ?? []) {
+            //     if (circle === beam.previous_intersection) continue;
+            //     const inter = intersectBeamLine(beam, circle);
+            //     if (inter) intersections.push({ ...inter, shape, line: circle });
+            // }
         }
         if (intersections.length > 0) {
             intersections.sort((a, b) => {
@@ -309,7 +326,6 @@ function stepSimulation(beams: Beam[], shapes: Shape[], light_lines: LightLine[]
     }
     return new_beams;
 }
-
 
 function drawLine(ctx: CanvasRenderingContext2D, line: Line, layout: Layout) {
     ctx.beginPath();
