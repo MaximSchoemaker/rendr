@@ -2,7 +2,7 @@
 import { createAnimationFrameParameter, createSketch } from "../../rendr/rendr";
 import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, sin, sinn } from "../../rendr/utils";
 
-const GLOBAL_FRAMES = 1500;
+const GLOBAL_FRAMES = 1501;
 const GLOBAL_FPS = 60;
 
 // ... portraid ...
@@ -26,17 +26,17 @@ const LOOPS = 1;
 const INTERSECTION_EXTRA = 0.0001;
 
 // ... variations ...
-// const POLYGON_SIDES = 3;
-// const SIMULATION_STEPS = 5;
-// const LIGHT_CONE_SPREAD = 0.025;
-// const BEAMS_COUNT = 1;
-// const COLOR_COUNT = 6;
-// const RAY_COUNT = 1500;
-// const REFRACTION_MIN = 1;
-// const REFRACTION_MAX = 2;
-// const ALPHA = 5 / 255;
-// const SATURATION = 0.5;
-// const HUE_RANGE = 1;
+const POLYGON_SIDES = 3;
+const SIMULATION_STEPS = 5;
+const LIGHT_CONE_SPREAD = 0.025;
+const BEAMS_COUNT = 1;
+const COLOR_COUNT = 6;
+const RAY_COUNT = 1500;
+const REFRACTION_MIN = 1;
+const REFRACTION_MAX = 2;
+const ALPHA = 5 / 255;
+const SATURATION = 0.5;
+const HUE_RANGE = 1;
 
 // const POLYGON_SIDES = 6;
 // const SIMULATION_STEPS = 6;
@@ -74,17 +74,17 @@ const INTERSECTION_EXTRA = 0.0001;
 // const SATURATION = 0.66;
 // const HUE_RANGE = 0.875;
 
-const POLYGON_SIDES = 3;
-const SIMULATION_STEPS = 20;
-const LIGHT_CONE_SPREAD = 0.001;
-const BEAMS_COUNT = 3;
-const COLOR_COUNT = 256;
-const RAY_COUNT = 25;
-const REFRACTION_MIN = 1.5;
-const REFRACTION_MAX = 1.7;
-const ALPHA = 1 / 256;
-const SATURATION = 0.66;
-const HUE_RANGE = 0.875;
+// const POLYGON_SIDES = 3;
+// const SIMULATION_STEPS = 20;
+// const LIGHT_CONE_SPREAD = 0.001;
+// const BEAMS_COUNT = 3;
+// const COLOR_COUNT = 256;
+// const RAY_COUNT = 25;
+// const REFRACTION_MIN = 1.5;
+// const REFRACTION_MAX = 1.7;
+// const ALPHA = 1 / 256;
+// const SATURATION = 0.66;
+// const HUE_RANGE = 0.875;
 
 type Props = {
     REALTIME?: boolean;
