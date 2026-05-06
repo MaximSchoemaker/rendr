@@ -94,7 +94,7 @@ const App: Component = () => {
         <div style={hudStyle}>exec: {avg_execution_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
         <div style={hudStyle}>draw: {avg_draw_time().toString().slice(0, 5).padEnd(5, "0")}ms</div>
       </div>
-      <div style={{ display: 'flex', 'flex-direction': 'row', gap: '4px', 'align-items': 'center', 'text-align': 'left' }}>
+      {/* <div style={{ display: 'flex', 'flex-direction': 'row', gap: '4px', 'align-items': 'center', 'text-align': 'left' }}>
         <button
           onClick={() => {
             void testTauriCommand();
@@ -104,7 +104,7 @@ const App: Component = () => {
           {tauri_pending() ? 'Testing command...' : 'Test Tauri command'}
         </button>
         <div style={{ ...hudStyle, flex: '2' }}>tauri: {tauri_message()}</div>
-      </div>
+      </div> */}
       <Column create={setup}
         style={{
           background: 'var(--background-color)',
