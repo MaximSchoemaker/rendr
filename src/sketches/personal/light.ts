@@ -6,33 +6,85 @@ const GLOBAL_FRAMES = 1500;
 const GLOBAL_FPS = 60;
 
 // ... portraid ...
-// const WIDTH = 1080;
-// const HEIGHT = 1920;
+const WIDTH = 1080;
+const HEIGHT = 1920;
 
 // ... landscape ...
 // const WIDTH = 1920;
 // const HEIGHT = 1080;
 
 // ... fit screen ...
-const WIDTH = window.outerWidth;
-const HEIGHT = window.outerHeight;
+// const WIDTH = window.outerWidth;
+// const HEIGHT = window.outerHeight;
 
 const PAD = 0.0;
 const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
 
 // ... video ...
-const LOOPS = 6;
+const LOOPS = 1;
 
 const INTERSECTION_EXTRA = 0.0001;
 
 // ... variations ...
-const POLYGON_SIDES = 3;
-const SIMULATION_STEPS = 5;
-const LIGHT_CONE_SPREAD = 0.025;
+// const POLYGON_SIDES = 3;
+// const SIMULATION_STEPS = 5;
+// const LIGHT_CONE_SPREAD = 0.025;
+// const BEAMS_COUNT = 1;
+// const COLOR_COUNT = 6;
+// const RAY_COUNT = 1500;
+// const REFRACTION_MIN = 1;
+// const REFRACTION_MAX = 2;
+// const ALPHA = 5 / 255;
+// const SATURATION = 0.5;
+// const HUE_RANGE = 1;
 
 // const POLYGON_SIDES = 6;
 // const SIMULATION_STEPS = 6;
 // const LIGHT_CONE_SPREAD = 0.05;
+// const BEAMS_COUNT = 1;
+// const COLOR_COUNT = 6;
+// const RAY_COUNT = 1500;
+// const REFRACTION_MIN = 1;
+// const REFRACTION_MAX = 2;
+// const ALPHA = 5 / 255;
+// const SATURATION = 0.5;
+// const HUE_RANGE = 1;
+
+// const POLYGON_SIDES = 6;
+// const SIMULATION_STEPS = 8;
+// const LIGHT_CONE_SPREAD = 0.04;
+// const BEAMS_COUNT = 1;
+// const COLOR_COUNT = 256;
+// const RAY_COUNT = 200;
+// const REFRACTION_MIN = 1;
+// const REFRACTION_MAX = 2;
+// const ALPHA = 1 / 256;
+// const SATURATION = 0.5;
+// const HUE_RANGE = 1;
+
+// const POLYGON_SIDES = 3;
+// const SIMULATION_STEPS = 10;
+// const LIGHT_CONE_SPREAD = 0.002;
+// const BEAMS_COUNT = 2;
+// const COLOR_COUNT = 256;
+// const RAY_COUNT = 15;
+// const REFRACTION_MIN = 1.5;
+// const REFRACTION_MAX = 1.7;
+// const ALPHA = 1 / 256;
+// const SATURATION = 0.66;
+// const HUE_RANGE = 0.875;
+
+const POLYGON_SIDES = 3;
+const SIMULATION_STEPS = 20;
+const LIGHT_CONE_SPREAD = 0.001;
+const BEAMS_COUNT = 3;
+const COLOR_COUNT = 256;
+const RAY_COUNT = 25;
+const REFRACTION_MIN = 1.5;
+const REFRACTION_MAX = 1.7;
+const ALPHA = 1 / 256;
+const SATURATION = 0.66;
+const HUE_RANGE = 0.875;
 
 type Props = {
     REALTIME?: boolean;
@@ -81,68 +133,88 @@ export default createSketch<Props>((engine, ui, props) => {
 
     const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
-    const canvas = engine.draw(WIDTH, HEIGHT, (ctx) => {
-        const layout = LAYOUT;
-        const index = frame_par.get();
-        const t = mod(index / FRAMES);
+    if (REALTIME) {
+        const canvas = engine.draw(WIDTH, HEIGHT, (ctx) => {
+            const index = frame_par.get();
+            const t = mod(index / FRAMES);
+            scene(ctx, t, LAYOUT);
+        })
+        ui.mountCanvas(canvas);
+    }
 
-        const shapes = [
-            { lines: getPolygon(0.5, 0.5, POLYGON_SIDES, 0.3, 1 / 12), type: "refractor" as const, onesided: false },
-            { lines: getBoundingBox(LAYOUT, 0), type: "reflector" as const, onesided: true }
-        ];
+    if (ANIMATION) {
+        const animation = engine.animate(WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
+            const { index } = props;
+            const t = mod(index / FRAMES);
+            scene(ctx, t, LAYOUT);
+        })
+        ui.mountCanvasAnimation(animation, frame_par);
+    }
 
-        let beams: Beam[] = [];
-        const BEAMS_COUNT = 1;
-        for (let i = 0; i < BEAMS_COUNT; i++) {
-            const f = i / BEAMS_COUNT;
-            const beams_radius = 1;
-            const beams_angle = t + f;
-            beams.push(...getLightCone(
-                0.5 + cos(beams_angle) * beams_radius,
-                0.5 + sin(beams_angle) * beams_radius,
-                beams_angle + 0.5,
-                LIGHT_CONE_SPREAD,
-                false,
-                1500 / BEAMS_COUNT,
-                6,
-            ));
-        }
-
-        const light_lines: LightLine[] = [];
-        for (let i = 0; i < SIMULATION_STEPS; i++)
-            beams = stepSimulation(beams, shapes, light_lines);
-
-
-        ctx.fillStyle = createColor(0);
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-        ctx.lineCap = "round";
-        ctx.globalCompositeOperation = "lighter";
-
-        ctx.lineWidth = layout.getSize(0.002);
-        for (const light_line of light_lines) {
-            const { color_f } = light_line
-            ctx.strokeStyle = createHSL(color_f, 1, 0.5, 5 / 255)
-            // ctx.strokeStyle = createColor(
-            //     cos(color_f + 0 / 3 + 0.1),
-            //     cos(color_f + 1 / 3),
-            //     cos(color_f + 2 / 3),
-            //     10 / 255
-            // )
-            drawLine(ctx, light_line, LAYOUT);
-        }
-
-        ctx.globalCompositeOperation = "source-over"
-        ctx.lineWidth = layout.getSize(0.005);
-        ctx.strokeStyle = createColor(1);
-        // drawShape(ctx, shapes[0], layout);
-
-        ctx.strokeStyle = createColor(1);
-        // drawShape(ctx, shapes[1], layout);
-    })
-
-    ui.mountCanvas(canvas);
+    if (VIDEO) {
+        const video = engine.video(FPS, WIDTH, HEIGHT, FRAMES * LOOPS, (ctx, props) => {
+            const { index } = props;
+            const t = mod(index / FRAMES);
+            scene(ctx, t, LAYOUT);
+        })
+        ui.mountVideo(video);
+    }
 });
+
+function scene(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
+    const shapes = [
+        { lines: getPolygon(0.5, 0.5, POLYGON_SIDES, 0.3, 1 / 12), type: "refractor" as const, onesided: false },
+        { lines: getBoundingBox(LAYOUT, 0), type: "reflector" as const, onesided: true }
+    ];
+
+    let beams: Beam[] = [];
+    for (let i = 0; i < BEAMS_COUNT; i++) {
+        const f = i / BEAMS_COUNT;
+        const beams_radius = 1;
+        const beams_angle = inv_cosn(mod((f + t) * 0.5, 0.5)) + 0.425;
+        beams.push(...getLightCone(
+            0.5 + cos(beams_angle) * beams_radius,
+            0.5 + sin(beams_angle) * beams_radius,
+            beams_angle + 0.5,
+            LIGHT_CONE_SPREAD,
+            false,
+            RAY_COUNT,
+            COLOR_COUNT,
+        ));
+    }
+
+    const light_lines: LightLine[] = [];
+    for (let i = 0; i < SIMULATION_STEPS; i++)
+        beams = stepSimulation(beams, shapes, light_lines);
+
+
+    ctx.fillStyle = createColor(0);
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    ctx.lineCap = "round";
+    ctx.globalCompositeOperation = "lighter";
+
+    ctx.lineWidth = layout.getSize(0.002);
+    for (const light_line of light_lines) {
+        const { color_f } = light_line
+        ctx.strokeStyle = createHSL(color_f * HUE_RANGE, 1, SATURATION, ALPHA)
+        // ctx.strokeStyle = createColor(
+        //     cos(color_f + 0 / 3 + 0.1),
+        //     cos(color_f + 1 / 3),
+        //     cos(color_f + 2 / 3),
+        //     10 / 255
+        // )
+        drawLine(ctx, light_line, LAYOUT);
+    }
+
+    ctx.globalCompositeOperation = "source-over"
+    ctx.lineWidth = layout.getSize(0.005);
+    ctx.strokeStyle = createColor(1);
+    // drawShape(ctx, shapes[0], layout);
+
+    ctx.strokeStyle = createColor(1);
+    // drawShape(ctx, shapes[1], layout);
+}
 
 // line intercept math by Paul Bourke http://paulbourke.net/geometry/pointlineplane/
 // Determine the intersection point of two line segments
@@ -301,7 +373,7 @@ function stepSimulation(beams: Beam[], shapes: Shape[], light_lines: LightLine[]
                         const normal_angle = Math.abs(angle_diff(beam.angle, normal_angle_1)) < Math.abs(angle_diff(beam.angle, normal_angle_2)) ? normal_angle_1 : normal_angle_2;
 
                         const incidence_angle = angle_diff(beam.angle, normal_angle);
-                        const refraction = lerp(beam.color_f, 1, 2);
+                        const refraction = lerp(beam.color_f, REFRACTION_MIN, REFRACTION_MAX);
                         const refraction_index = beam.inside ? refraction : 1.0 / refraction;
                         const refract_angle = (Math.asin(sin(incidence_angle) * refraction_index)) / (Math.PI * 2);
 

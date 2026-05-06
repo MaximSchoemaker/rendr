@@ -51,14 +51,14 @@ export default createSketch((master_engine, ui) => {
       // boids,
       // marbles,
       // hatching,
-      // light,
-      game,
+      light,
+      // game,
    ];
 
    const props = {
-      REALTIME: true,
+      // REALTIME: true,
       // ANIMATION: true,
-      // VIDEO: true,
+      VIDEO: true,
 
       REFRESH_RATE: 120,
    }
@@ -121,8 +121,8 @@ export default createSketch((master_engine, ui) => {
       });
    }
 
-   // layout1();
+   layout1();
    // layout2();
-   layout3();
+   // layout3();
 });
 
