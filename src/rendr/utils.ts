@@ -104,11 +104,12 @@ export const createHSL = (h: number, s: number = 1.0, l: number = 0.5, a: number
    return `hsl(${h_int}, ${s_int}%, ${l_int}%, ${a})`
 }
 
-export const lerpColor = (v: number, r1: number, g1: number, b1: number, r2: number, g2: number, b2: number) => {
+export const lerpColor = (v: number, r1: number, g1: number, b1: number, r2: number, g2: number, b2: number, a = 1) => {
    return createColor(
       lerp(v, r1, r2),
       lerp(v, g1, g2),
       lerp(v, b1, b2),
+      a
    )
 }
 

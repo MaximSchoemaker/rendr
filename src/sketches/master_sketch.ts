@@ -24,6 +24,7 @@ import marbles from "./personal/marbles";
 import hatching from "./personal/hatching";
 import light from "./personal/light";
 import game from "./personal/game";
+import audio_reactive from "./personal/audio_reactive";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -51,14 +52,15 @@ export default createSketch((master_engine, ui) => {
       // boids,
       // marbles,
       // hatching,
-      light,
+      // light,
       // game,
+      audio_reactive
    ];
 
    const props = {
-      // REALTIME: true,
+      REALTIME: true,
       // ANIMATION: true,
-      VIDEO: true,
+      // VIDEO: true,
 
       REFRESH_RATE: 120,
    }

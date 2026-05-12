@@ -27,7 +27,7 @@ const INTERSECTION_EXTRA = 0.0001;
 
 // ... variations ...
 const POLYGON_SIDES = 3;
-const SIMULATION_STEPS = 5;
+const SIMULATION_STEPS = 10;
 const LIGHT_CONE_SPREAD = 0.025;
 const BEAMS_COUNT = 1;
 const COLOR_COUNT = 6;
@@ -171,7 +171,9 @@ function scene(ctx: CanvasRenderingContext2D, t: number, layout: Layout) {
     for (let i = 0; i < BEAMS_COUNT; i++) {
         const f = i / BEAMS_COUNT;
         const beams_radius = 1;
+        // const beams_angle = inv_cosn(mod((f + t * 2) * 0.5, 0.5)) + 0.425;
         const beams_angle = inv_cosn(mod((f + t) * 0.5, 0.5)) + 0.425;
+        // const beams_angle = t + f + 0.425;
         beams.push(...getLightCone(
             0.5 + cos(beams_angle) * beams_radius,
             0.5 + sin(beams_angle) * beams_radius,
