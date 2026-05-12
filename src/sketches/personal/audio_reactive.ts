@@ -96,7 +96,8 @@ export default createSketch<Props>((engine, ui, props) => {
 
             // analyser.minDecibels = -90;
             // analyser.maxDecibels = -10;
-            console.log(analyser.minDecibels, analyser.maxDecibels);
+            analyser.smoothingTimeConstant = 0;
+            // console.log(analyser.minDecibels, analyser.maxDecibels);
 
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
