@@ -341,8 +341,8 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
     const mic_level = frequency.reduce((a, b) => a + b, 0) / frequency.length;
     mic_buf.push(mic_level);
 
-    const max_level = mic_buf.buffer.reduce((a, b) => Math.max(a, b), 0);
-    const mic_f = mic_level / max_level;
+    // const max_level = mic_buf.buffer.reduce((a, b) => Math.max(a, b), 0);
+    // const mic_f = mic_level / max_level;
 
     const gap = 10;
 
@@ -363,7 +363,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
         ]),
 
         (layout) => layoutRow(layout, "fit", gap, [
-            (layout) => drawMicF(ctx, layout, mic_f),
+            (layout) => drawMicLevel(ctx, layout, mic_level),
         ]),
 
         (layout) => layoutRow(layout, "stretch", gap, [
@@ -426,11 +426,11 @@ function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout) {
     ctx.stroke();
 }
 
-function drawMicF(ctx: CanvasRenderingContext2D, layout: Layout, mic_f: number) {
+function drawMicLevel(ctx: CanvasRenderingContext2D, layout: Layout, mic_level: number) {
     // ctx.fillStyle = "white";
     // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
-    const radius = mic_f / 2;
+    const radius = mic_level / 2;
 
     ctx.beginPath();
     ctx.arc(layout.getX(0.5), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
