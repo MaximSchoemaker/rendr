@@ -1,5 +1,5 @@
 
-import { createAnimationFrameParameter, createSketch } from "../../rendr/rendr";
+import { createAnimationFrameParameter, createCanvas, createSketch } from "../../rendr/rendr";
 import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, sin, sinn } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 1501;
@@ -28,7 +28,7 @@ const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
 const LOOPS = 1;
 
 const FFT_SIZE = 1024;
-const BUFFER_SIZE = 64;
+const BUFFER_SIZE = 128;
 
 
 type Props = {
@@ -168,10 +168,10 @@ function scene(ctx: CanvasRenderingContext2D, t: number, frequency: Uint8Array, 
 
     const gap = PAD;
     // drawMicF(ctx, layout, mic_f, 0, 0, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawMicBuf(ctx, layout, mic_buf, 0.5 + gap / 2, 0, 0.5 - gap / 2, 0.5 - gap / 2);
     drawWaveform(ctx, layout, waveform, 0, 0, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawFrequencyBars(ctx, layout, frequency, 0, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawSpectrogram(ctx, layout, frequency_buffers, 0.5 + gap / 2, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
+    drawMicBufPixel(ctx, layout, mic_buf, 0.5 + gap / 2, 0, 0.5 - gap / 2, 0.5 - gap / 2);
+    drawFrequencyBarsPixel(ctx, layout, frequency, 0, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
+    drawSpectrogramPixel(ctx, layout, frequency_buffers, 0.5 + gap / 2, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
 }
 
 function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout, x: number, y: number, w: number, h: number) {
@@ -215,6 +215,53 @@ function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: Ring
     };
 }
 
+const mic_buf_canvas = createCanvas(BUFFER_SIZE, 128);
+function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer, x: number, y: number, w: number, h: number) {
+    drawBorder(ctx, layout, x, y, w, h);
+
+    const mic_buf_ctx = mic_buf_canvas.getContext("2d");
+    if (!mic_buf_ctx) return;
+
+    const width = mic_buf_canvas.width;
+    const height = mic_buf_canvas.height;
+    const imageData = mic_buf_ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Clear the pixel buffer
+    for (let i = 0; i < data.length; i++) {
+        data[i] = 0;
+    }
+
+    // Write pixels directly to buffer
+    for (let i = 0; i < mic_buf.size; i++) {
+        const level = mic_buf.get(i);
+        const x_start = Math.floor(i / mic_buf.size * width);
+        const x_width = Math.ceil(width / mic_buf.size);
+        const y_center = height * 0.5;
+        const y_height = height * level * 0.5;
+
+        const y_start = Math.floor(y_center - y_height);
+        const y_end = Math.ceil(y_center + y_height);
+
+        for (let px = x_start; px < x_start + x_width && px < width; px++) {
+            for (let py = y_start; py < y_end && py < height; py++) {
+                if (py >= 0) {
+                    const index = (py * width + px) * 4;
+                    data[index] = 255;       // R
+                    data[index + 1] = 255;   // G
+                    data[index + 2] = 255;   // B
+                    data[index + 3] = 255;   // A
+                }
+            }
+        }
+    }
+
+    mic_buf_ctx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(mic_buf_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+}
+
 function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: Uint8Array, x: number, y: number, w: number, h: number) {
     drawBorder(ctx, layout, x, y, w, h);
 
@@ -232,6 +279,47 @@ function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: U
     ctx.lineWidth = 2;
     ctx.strokeStyle = "white";
     ctx.stroke();
+}
+
+const waveform_canvas = createCanvas(FFT_SIZE, 128);
+function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: Uint8Array, x: number, y: number, w: number, h: number) {
+    drawBorder(ctx, layout, x, y, w, h);
+
+    const waveform_ctx = waveform_canvas.getContext("2d");
+    if (!waveform_ctx) return;
+
+    const width = waveform_canvas.width;
+    const height = waveform_canvas.height;
+    const imageData = waveform_ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Clear the pixel buffer
+    for (let i = 0; i < data.length; i++) {
+        data[i] = 0;
+    }
+
+    // Write pixels directly to buffer
+    for (let i = 0; i < waveform.length; i++) {
+        const v = waveform[i] / 255;
+        const f = i / (waveform.length - 1);
+        const x_pos = Math.floor(f * width);
+        const y_pos = Math.floor((1 - v) * height);
+
+        // Draw a vertical line at this x position for thickness
+        const line_thickness = 1;
+        for (let ly = Math.max(0, y_pos - line_thickness); ly < Math.min(height, y_pos + line_thickness); ly++) {
+            const index = (ly * width + x_pos) * 4;
+            data[index] = 255;       // R
+            data[index + 1] = 255;   // G
+            data[index + 2] = 255;   // B
+            data[index + 3] = 255;   // A
+        }
+    }
+
+    waveform_ctx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(waveform_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
 }
 
 function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, frequency: Uint8Array, x: number, y: number, w: number, h: number) {
@@ -252,6 +340,50 @@ function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, freque
         ctx.fill();
     });
 }
+
+const frequency_bars_canvas = createCanvas(FFT_SIZE / 2, 128);
+function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: Uint8Array, x: number, y: number, w: number, h: number) {
+    drawBorder(ctx, layout, x, y, w, h);
+
+    const frequency_bars_ctx = frequency_bars_canvas.getContext("2d");
+    if (!frequency_bars_ctx) return;
+
+    const width = frequency_bars_canvas.width;
+    const height = frequency_bars_canvas.height;
+    const imageData = frequency_bars_ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Clear the pixel buffer
+    for (let i = 0; i < data.length; i++) {
+        data[i] = 0;
+    }
+
+    // Write pixels directly to buffer
+    frequency.forEach((value, i) => {
+        const f = i / frequency.length;
+        const bar_h = value / 255;
+        const x_start = Math.floor(f * width);
+        const x_width = Math.ceil(width / frequency.length);
+        const y_height = Math.floor(bar_h * height);
+        const y_start = height - y_height;
+
+        for (let px = x_start; px < x_start + x_width && px < width; px++) {
+            for (let py = y_start; py < height; py++) {
+                const index = (py * width + px) * 4;
+                data[index] = 255;       // R
+                data[index + 1] = 255;   // G
+                data[index + 2] = 255;   // B
+                data[index + 3] = 255;   // A
+            }
+        }
+    });
+
+    frequency_bars_ctx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(frequency_bars_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+}
+
 
 function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
     drawBorder(ctx, layout, x, y, w, h);
@@ -287,7 +419,56 @@ function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequenc
     });
 }
 
-function getPlasmaColor(value: number): string {
+const spectrogram_canvas = createCanvas(BUFFER_SIZE, FFT_SIZE / 2);
+function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
+    drawBorder(ctx, layout, x, y, w, h);
+
+    const spectrogram_ctx = spectrogram_canvas.getContext("2d");
+    if (!spectrogram_ctx) return;
+
+    const width = spectrogram_canvas.width;
+    const height = spectrogram_canvas.height;
+    const imageData = spectrogram_ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Clear the pixel buffer
+    for (let i = 0; i < data.length; i++) {
+        data[i] = 0;
+    }
+
+    // Write pixels directly to buffer (flipped vertically - high frequencies at top)
+    frequency_buffers.forEach((buf, i) => {
+        const y_pos = height - 1 - i;
+
+        for (let j = 0; j < buf.size; j++) {
+            const value = buf.get(j) / 255;
+
+            if (value === 0) continue;
+
+            const x_pos = Math.floor(j / buf.size * width);
+            const x_width = Math.ceil(width / buf.size);
+
+            const color = getPlasmaColorRGB(value);
+
+            for (let px = x_pos; px < x_pos + x_width && px < width; px++) {
+                if (y_pos >= 0 && y_pos < height) {
+                    const index = (y_pos * width + px) * 4;
+                    data[index] = color.r;       // R
+                    data[index + 1] = color.g;   // G
+                    data[index + 2] = color.b;   // B
+                    data[index + 3] = 255;       // A
+                }
+            }
+        }
+    });
+
+    spectrogram_ctx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(spectrogram_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+}
+
+function getPlasmaColorRGB(value: number): { r: number; g: number; b: number } {
     value = clamp(value, 0, 1);
 
     // Plasma colormap with 6 color stops
@@ -317,5 +498,10 @@ function getPlasmaColor(value: number): string {
     const g = Math.round(color1.g + (color2.g - color1.g) * t);
     const b = Math.round(color1.b + (color2.b - color1.b) * t);
 
-    return `rgb(${r}, ${g}, ${b}, ${value})`;
+    return { r, g, b };
+}
+
+function getPlasmaColor(value: number): string {
+    const color = getPlasmaColorRGB(value);
+    return `rgb(${color.r}, ${color.g}, ${color.b})`;
 }
