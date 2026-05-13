@@ -28,8 +28,8 @@ const LAYOUT = makeLayout("stretch", PAD, PAD, WIDTH - PAD, HEIGHT - PAD);
 // ... video ...
 const LOOPS = 1;
 
-const FFT_SIZE = 2 ** 11;
-const BUFFER_SIZE = 128;
+const FFT_SIZE = 2 ** 10;
+const BUFFER_SIZE = 256;
 const BYTE_SIZE = 256;
 const SMOOTHING_TIME_CONSTANT = 0;
 
@@ -357,7 +357,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
         ]),
 
         (layout) => layoutRow(layout, "fit", gap, [
-            // (layout) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right),
+            (layout) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right),
             (layout) => drawOscilloscope(ctx, layout, waveform_left, waveform_right),
         ]),
 
@@ -371,8 +371,9 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
         ]),
 
         (layout) => layoutRow(layout, "stretch", gap, [
+            (layout) => drawFrequencyLine(ctx, layout, frequency),
             // (layout) => drawFrequencyBars(ctx, layout, frequency),
-            (layout) => drawFrequencyBarsPixel(ctx, layout, frequency),
+            // (layout) => drawFrequencyBarsPixel(ctx, layout, frequency),
         ]),
 
         (layout) => layoutRow(layout, "stretch", gap, [
@@ -591,6 +592,27 @@ function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, freque
         ctx.fillStyle = "white";
         ctx.fill();
     });
+
+    drawBorder(ctx, layout);
+}
+
+function drawFrequencyLine(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[]) {
+    ctx.beginPath();
+    frequency.forEach((value, i) => {
+        const f = i / frequency.length;
+        const bar_h = value;
+        const x = layout.getX(f);
+        const y = layout.getY(1 - bar_h);
+
+        if (i === 0)
+            ctx.moveTo(x, y);
+        else
+            ctx.lineTo(x, y);
+    });
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
 
     drawBorder(ctx, layout);
 }
