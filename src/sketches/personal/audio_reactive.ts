@@ -180,13 +180,10 @@ export default createSketch<Props>((engine, ui, props) => {
             console.log("Analyser FFT size:", analyser.fftSize);
             console.log("Analyser smoothing time constant:", analyser.smoothingTimeConstant);
 
-            // analyser.minDecibels = -90;
-            // analyser.maxDecibels = -10;
             const minDecibels = analyser.minDecibels;
             const maxDecibels = analyser.maxDecibels;
             const decibelRange = maxDecibels - minDecibels;
             console.log("Analyser decibel range:", minDecibels, "to", maxDecibels, "range", decibelRange);
-            // console.log(analyser.minDecibels, analyser.maxDecibels);
 
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
@@ -353,6 +350,8 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
     layoutGrid(layout, "stretch", rows, cols, gap, [
 
         (layout) => layoutCol(layout, "stretch", gap, [
+            // (layout) => drawWaveformPixel(ctx, layout, waveform_left),
+            // (layout) => drawWaveformPixel(ctx, layout, waveform_right),
             (layout) => drawWaveform(ctx, layout, waveform_left),
             (layout) => drawWaveform(ctx, layout, waveform_right),
         ]),
@@ -467,7 +466,7 @@ function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: Ring
 
 const mic_buf_canvas = createCanvas(BUFFER_SIZE, BYTE_SIZE);
 function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer) {
-    const mic_buf_ctx = mic_buf_canvas.getContext("2d");
+    const mic_buf_ctx = mic_buf_canvas.getContext("2d", { willReadFrequently: true });
     if (!mic_buf_ctx) return;
 
     const width = mic_buf_canvas.width;
@@ -535,7 +534,7 @@ function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: n
 
 const waveform_canvas = createCanvas(FFT_SIZE, BYTE_SIZE);
 function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[]) {
-    const waveform_ctx = waveform_canvas.getContext("2d");
+    const waveform_ctx = waveform_canvas.getContext("2d", { willReadFrequently: true });
     if (!waveform_ctx) return;
 
     const width = waveform_canvas.width;
@@ -598,7 +597,7 @@ function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, freque
 
 const frequency_bars_canvas = createCanvas(FFT_SIZE / 2, BYTE_SIZE);
 function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[]) {
-    const frequency_bars_ctx = frequency_bars_canvas.getContext("2d");
+    const frequency_bars_ctx = frequency_bars_canvas.getContext("2d", { willReadFrequently: true });
     if (!frequency_bars_ctx) return;
 
     const width = frequency_bars_canvas.width;
