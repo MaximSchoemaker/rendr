@@ -349,7 +349,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
         ]),
 
         (layout) => layoutRow(layout, "fit", gap, [
-            (layout) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right),
+            // (layout) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right),
             (layout) => drawOscilloscope(ctx, layout, waveform_left, waveform_right),
         ]),
 
