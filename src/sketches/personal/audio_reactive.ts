@@ -28,9 +28,10 @@ const LAYOUT = makeLayout("stretch", PAD, PAD, WIDTH - PAD, HEIGHT - PAD);
 // ... video ...
 const LOOPS = 1;
 
-const FFT_SIZE = 2 ** 10;
+const FFT_SIZE = 2 ** 11;
 const BUFFER_SIZE = 128;
 const BYTE_SIZE = 256;
+const SMOOTHING_TIME_CONSTANT = 0;
 
 type Props = {
     REALTIME?: boolean;
@@ -163,9 +164,21 @@ export default createSketch<Props>((engine, ui, props) => {
             console.log("Microphone access granted");
 
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
             const analyser = audioContext.createAnalyser();
             analyser.fftSize = FFT_SIZE;
+            analyser.smoothingTimeConstant = SMOOTHING_TIME_CONSTANT;
+
+            const analyserL = audioContext.createAnalyser();
+            analyserL.fftSize = FFT_SIZE;
+            analyserL.smoothingTimeConstant = SMOOTHING_TIME_CONSTANT
+
+            const analyserR = audioContext.createAnalyser();
+            analyserR.fftSize = FFT_SIZE;
+            analyserR.smoothingTimeConstant = SMOOTHING_TIME_CONSTANT
+
             console.log("Analyser FFT size:", analyser.fftSize);
+            console.log("Analyser smoothing time constant:", analyser.smoothingTimeConstant);
 
             // analyser.minDecibels = -90;
             // analyser.maxDecibels = -10;
@@ -173,16 +186,12 @@ export default createSketch<Props>((engine, ui, props) => {
             const maxDecibels = analyser.maxDecibels;
             const decibelRange = maxDecibels - minDecibels;
             console.log("Analyser decibel range:", minDecibels, "to", maxDecibels, "range", decibelRange);
-            analyser.smoothingTimeConstant = 0;
             // console.log(analyser.minDecibels, analyser.maxDecibels);
 
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
 
             const splitter = audioContext.createChannelSplitter(2);
-            const analyserL = audioContext.createAnalyser();
-            const analyserR = audioContext.createAnalyser();
-
             source.connect(splitter);
             splitter.connect(analyserL, 0); // left channel
             splitter.connect(analyserR, 1); // right channel
@@ -298,7 +307,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const waveform_left = getWaveform("left", "float");
             const waveform_right = getWaveform("right", "float");
 
-            const frequency = getFrequency("left", "float");
+            const frequency = getFrequency("mono", "float");
             scene(ctx, t, waveform, waveform_left, waveform_right, frequency, LAYOUT);
         })
         ui.mountCanvas(canvas);
