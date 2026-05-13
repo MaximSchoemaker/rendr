@@ -361,6 +361,16 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
             (layout) => drawOscilloscope(ctx, layout, waveform_left, waveform_right),
         ]),
 
+        (layout) => layoutRow(layout, "stretch", gap, [
+            (layout) => drawFrequencyLine(ctx, layout, frequency),
+            // (layout) => drawFrequencyBars(ctx, layout, frequency),
+            (layout) => drawFrequencyBarsPixel(ctx, layout, frequency),
+        ]),
+
+        (layout) => layoutRow(layout, "stretch", gap, [
+            // (layout) => drawSpectrogram(ctx, layout, frequency_buffers),
+            (layout) => drawSpectrogramPixel(ctx, layout, frequency_buffers),
+        ]),
         (layout) => layoutRow(layout, "fit", gap, [
             (layout) => drawMicLevel(ctx, layout, mic_level),
         ]),
@@ -370,16 +380,8 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
             (layout) => drawMicBufPixel(ctx, layout, mic_buf),
         ]),
 
-        (layout) => layoutRow(layout, "stretch", gap, [
-            (layout) => drawFrequencyLine(ctx, layout, frequency),
-            // (layout) => drawFrequencyBars(ctx, layout, frequency),
-            // (layout) => drawFrequencyBarsPixel(ctx, layout, frequency),
-        ]),
 
-        (layout) => layoutRow(layout, "stretch", gap, [
-            // (layout) => drawSpectrogram(ctx, layout, frequency_buffers),
-            (layout) => drawSpectrogramPixel(ctx, layout, frequency_buffers),
-        ]),
+
     ])
 }
 
