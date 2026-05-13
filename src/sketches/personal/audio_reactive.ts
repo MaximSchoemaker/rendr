@@ -39,6 +39,9 @@ type Props = {
 
 type RingBuffer = ReturnType<typeof makeRingBuffer>;
 
+type Channel = "mono" | "left" | "right";
+type DataType = "byte" | "float";
+
 const makeRingBuffer = (size: number) => {
     const buffer = new Array(size).fill(0);
     let index = 0;
@@ -68,10 +71,22 @@ export default createSketch<Props>((engine, ui, props) => {
 
     const frame_par = createAnimationFrameParameter(FRAMES * LOOPS, FPS);
 
-    const frequencyArray = new Uint8Array(FFT_SIZE / 2);
-    const waveformArray = new Uint8Array(FFT_SIZE);
-    let getFrequency = () => frequencyArray;
-    let getWaveform = () => waveformArray;
+    const waveformByteArray = new Uint8Array(FFT_SIZE);
+    const waveformFloatArray = new Float32Array(FFT_SIZE);
+    const waveformArray = new Array(FFT_SIZE).fill(0);
+
+    let getByteWaveform = (channel: Channel) => waveformByteArray;
+    let getFloatWaveform = (channel: Channel) => waveformFloatArray;
+    let getWaveform = (channel: Channel, type: DataType) => waveformArray;
+
+    const frequencyByteArray = new Uint8Array(FFT_SIZE / 2);
+    const frequencyFloatArray = new Float32Array(FFT_SIZE / 2);
+    const frequencyArray = new Array(FFT_SIZE / 2).fill(0);
+
+    let getByteFrequency = (channel: Channel) => frequencyByteArray;
+    let getFloatFrequency = (channel: Channel) => frequencyFloatArray;
+    let getFrequency = (channel: Channel, type: DataType) => frequencyArray;
+
     (async () => {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -96,21 +111,116 @@ export default createSketch<Props>((engine, ui, props) => {
 
             // analyser.minDecibels = -90;
             // analyser.maxDecibels = -10;
+            const minDecibels = analyser.minDecibels;
+            const maxDecibels = analyser.maxDecibels;
+            const decibelRange = maxDecibels - minDecibels;
+            console.log("Analyser decibel range:", minDecibels, "to", maxDecibels, "range", decibelRange);
             analyser.smoothingTimeConstant = 0;
             // console.log(analyser.minDecibels, analyser.maxDecibels);
 
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
 
-            getFrequency = () => {
-                analyser.getByteFrequencyData(frequencyArray);
-                return frequencyArray;
+            const splitter = audioContext.createChannelSplitter(2);
+            const analyserL = audioContext.createAnalyser();
+            const analyserR = audioContext.createAnalyser();
+
+            source.connect(splitter);
+            splitter.connect(analyserL, 0); // left channel
+            splitter.connect(analyserR, 1); // right channel
+
+            getByteWaveform = (channel: Channel) => {
+                switch (channel) {
+                    case "mono":
+                        analyser.getByteTimeDomainData(waveformByteArray);
+                        return waveformByteArray;
+                    case "left":
+                        analyserL.getByteTimeDomainData(waveformByteArray);
+                        return waveformByteArray;
+                    case "right":
+                        analyserR.getByteTimeDomainData(waveformByteArray);
+                        return waveformByteArray;
+                    default:
+                        throw new Error(`Unknown channel: ${channel}`);
+                }
+            }
+            getFloatWaveform = (channel: Channel) => {
+                switch (channel) {
+                    case "mono":
+                        analyser.getFloatTimeDomainData(waveformFloatArray);
+                        return waveformFloatArray;
+                    case "left":
+                        analyserL.getFloatTimeDomainData(waveformFloatArray);
+                        return waveformFloatArray;
+                    case "right":
+                        analyserR.getFloatTimeDomainData(waveformFloatArray);
+                        return waveformFloatArray;
+                    default:
+                        throw new Error(`Unknown channel: ${channel}`);
+                }
+            }
+
+            getWaveform = (channel: Channel, type: DataType) => {
+                switch (type) {
+                    case "byte":
+                        const byteWave = getByteWaveform(channel);
+                        return Array.from(byteWave).map(v => (v) / 255);
+                    case "float":
+                        const floatWave = getFloatWaveform(channel);
+                        // Float waveform data is typically in the range [-1, 1], so we can normalize it to [0, 1]
+                        return Array.from(floatWave).map(v => (v + 1) / 2);
+                    default:
+                        throw new Error(`Unknown waveform type: ${type}`);
+                }
+            }
+
+            getByteFrequency = (channel: Channel) => {
+                switch (channel) {
+                    case "mono":
+                        analyser.getByteFrequencyData(frequencyByteArray);
+                        return frequencyByteArray;
+                    case "left":
+                        analyserL.getByteFrequencyData(frequencyByteArray);
+                        return frequencyByteArray;
+                    case "right":
+                        analyserR.getByteFrequencyData(frequencyByteArray);
+                        return frequencyByteArray;
+                    default:
+                        throw new Error(`Unknown channel: ${channel}`);
+                }
             };
 
-            getWaveform = () => {
-                analyser.getByteTimeDomainData(waveformArray);
-                return waveformArray;
+            getFloatFrequency = (channel: Channel) => {
+                switch (channel) {
+                    case "mono":
+                        analyser.getFloatFrequencyData(frequencyFloatArray);
+                        return frequencyFloatArray;
+                    case "left":
+                        analyserL.getFloatFrequencyData(frequencyFloatArray);
+                        return frequencyFloatArray;
+                    case "right":
+                        analyserR.getFloatFrequencyData(frequencyFloatArray);
+                        return frequencyFloatArray;
+                    default:
+                        throw new Error(`Unknown channel: ${channel}`);
+                }
+            };
+
+            getFrequency = (channel: Channel, type: DataType) => {
+                switch (type) {
+                    case "byte":
+                        const byteFreq = getByteFrequency(channel);
+                        return Array.from(byteFreq).map(v => v / 255);
+                    case "float":
+                        const floatFreq = getFloatFrequency(channel);
+                        // Normalize to [0, 1]
+                        return Array.from(floatFreq).map(v => clamp(map(v, minDecibels, maxDecibels, 0, 1), 0, 1));
+                    default:
+                        throw new Error(`Unknown frequency type: ${type}`);
+                }
             }
+
+
         } catch (err) {
             console.warn("Microphone access denied:", err);
         }
@@ -127,9 +237,12 @@ export default createSketch<Props>((engine, ui, props) => {
             const index = frame_par.get();
             const t = mod(index / FRAMES);
 
-            const frequency = getFrequency();
-            const waveform = getWaveform();
-            scene(ctx, t, frequency, waveform, LAYOUT);
+            const waveform = getWaveform("mono", "float");
+            const waveform_left = getWaveform("left", "float");
+            const waveform_right = getWaveform("right", "float");
+
+            const frequency = getFrequency("left", "float");
+            scene(ctx, t, waveform, waveform_left, waveform_right, frequency, LAYOUT);
         })
         ui.mountCanvas(canvas);
     }
@@ -156,28 +269,79 @@ export default createSketch<Props>((engine, ui, props) => {
 const mic_buf = makeRingBuffer(BUFFER_SIZE);
 const frequency_buffers = n_arr(FFT_SIZE / 2, () => makeRingBuffer(BUFFER_SIZE));
 
-function scene(ctx: CanvasRenderingContext2D, t: number, frequency: Uint8Array, waveform: Uint8Array, layout: Layout) {
+function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], waveform_left: number[], waveform_right: number[], frequency: number[], layout: Layout) {
     frequency.forEach((value, i) => frequency_buffers[i].push(value));
 
-    const mic_level = frequency.reduce((a, b) => a + b, 0) / frequency.length / 255;
+    const mic_level = frequency.reduce((a, b) => a + b, 0) / frequency.length;
     mic_buf.push(mic_level);
 
     const max_level = mic_buf.buffer.reduce((a, b) => Math.max(a, b), 0);
     const mic_f = mic_level / max_level;
 
-
     const gap = PAD;
-    // drawMicF(ctx, layout, mic_f, 0, 0, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawWaveform(ctx, layout, waveform, 0, 0, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawMicBufPixel(ctx, layout, mic_buf, 0.5 + gap / 2, 0, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawFrequencyBarsPixel(ctx, layout, frequency, 0, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
-    drawSpectrogramPixel(ctx, layout, frequency_buffers, 0.5 + gap / 2, 0.5 + gap / 2, 0.5 - gap / 2, 0.5 - gap / 2);
+
+    const cols = 2;
+    const rows = 3;
+
+    layoutGrid(0, 0, 1, 1, rows, cols, gap, [
+        (x, y, w, h) => layoutCol(x, y, w, h, gap, [
+            (x, y, w, h) => drawWaveform(ctx, layout, waveform_left, x, y, w, h),
+            (x, y, w, h) => drawWaveform(ctx, layout, waveform_right, x, y, w, h),
+            // (x, y, w, h) => drawWaveformPixel(ctx, layout, waveform, x, y, w, h),
+        ]),
+
+        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
+            // (x, y, w, h) => drawOscilloscope(ctx, layout, waveform_left, waveform_right, x, y, w, h),
+            (x, y, w, h) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right, x, y, w, h),
+        ]),
+
+        (x, y, w, h) => drawMicF(ctx, layout, mic_f, x, y, w, h),
+
+        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
+            // (x, y, w, h) => drawMicBuf(ctx, layout, mic_buf, x, y, w, h),
+            (x, y, w, h) => drawMicBufPixel(ctx, layout, mic_buf, x, y, w, h),
+        ]),
+
+        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
+            // (x, y, w, h) => drawFrequencyBars(ctx, layout, frequency, x, y, w, h),
+            (x, y, w, h) => drawFrequencyBarsPixel(ctx, layout, frequency, x, y, w, h),
+        ]),
+
+        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
+            // (x, y, w, h) => drawSpectrogram(ctx, layout, frequency_buffers, x, y, w, h),
+            (x, y, w, h) => drawSpectrogramPixel(ctx, layout, frequency_buffers, x, y, w, h),
+        ]),
+    ])
+}
+
+function layoutGrid(x: number, y: number, w: number, h: number, rows: number, cols: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+    const cell_w = (w - gap * (cols - 1)) / cols;
+    const cell_h = (h - gap * (rows - 1)) / rows;
+    items.forEach((item, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cell_x = x + col * (cell_w + gap);
+        const cell_y = y + row * (cell_h + gap);
+        item(cell_x, cell_y, cell_w, cell_h);
+    });
+}
+
+function layoutRow(x: number, y: number, w: number, h: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+    const cols = items.length;
+    const rows = 1;
+    layoutGrid(x, y, w, h, rows, cols, gap, items);
+}
+
+function layoutCol(x: number, y: number, w: number, h: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+    const cols = 1;
+    const rows = items.length;
+    layoutGrid(x, y, w, h, rows, cols, gap, items);
 }
 
 function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout, x: number, y: number, w: number, h: number) {
     ctx.beginPath();
     ctx.rect(layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.stroke();
 }
@@ -185,23 +349,22 @@ function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout, x: number, y:
 function drawMicF(ctx: CanvasRenderingContext2D, layout: Layout, mic_f: number, x: number, y: number, w: number, h: number) {
     drawBorder(ctx, layout, x, y, w, h);
 
-    const radius = mic_f / 6;
+    const radius = mic_f / 2;
+    const s = Math.min(w, h);
 
     ctx.beginPath();
-    ctx.arc(layout.getX(x + 0.5 * w), layout.getY(y + 0.5 * h), layout.getSize(radius), 0, 2 * Math.PI);
+    ctx.arc(layout.getX(x + 0.5 * w), layout.getY(y + 0.5 * h), layout.getSize(radius * s), 0, 2 * Math.PI);
     ctx.fillStyle = "white"
     ctx.fill();
 }
 
 function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
     for (let i = 0; i < mic_buf.size; i++) {
         const level = mic_buf.get(i);
 
         const f = i / mic_buf.size;
 
-        const bar_h = level * h;
+        const bar_h = level;
         const bar_w = w / mic_buf.size;
 
         ctx.beginPath();
@@ -213,12 +376,12 @@ function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: Ring
         ctx.fillStyle = "white";
         ctx.fill();
     };
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 const mic_buf_canvas = createCanvas(BUFFER_SIZE, 128);
 function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
     const mic_buf_ctx = mic_buf_canvas.getContext("2d");
     if (!mic_buf_ctx) return;
 
@@ -260,14 +423,14 @@ function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf:
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(mic_buf_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
-function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: Uint8Array, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
+function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[], x: number, y: number, w: number, h: number) {
     ctx.beginPath();
     for (let i = 0; i < waveform.length; i++) {
-        const v = waveform[i] / 255;
+        const v = waveform[i];
         const f = i / (waveform.length - 1);
         const bar_h = v * h;
 
@@ -276,15 +439,15 @@ function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: U
         else
             ctx.lineTo(layout.getX(x + f * w), layout.getY(y + h - bar_h));
     }
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.stroke();
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 const waveform_canvas = createCanvas(FFT_SIZE, 128);
-function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: Uint8Array, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
+function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[], x: number, y: number, w: number, h: number) {
     const waveform_ctx = waveform_canvas.getContext("2d");
     if (!waveform_ctx) return;
 
@@ -300,7 +463,7 @@ function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, wavefo
 
     // Write pixels directly to buffer
     for (let i = 0; i < waveform.length; i++) {
-        const v = waveform[i] / 255;
+        const v = waveform[i];
         const f = i / (waveform.length - 1);
         const x_pos = Math.floor(f * width);
         const y_pos = Math.floor((1 - v) * height);
@@ -320,15 +483,15 @@ function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, wavefo
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(waveform_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
-function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, frequency: Uint8Array, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
+function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[], x: number, y: number, w: number, h: number) {
     frequency.forEach((value, i) => {
         const f = i / frequency.length;
 
-        const bar_h = value / 255 * h;
+        const bar_h = value * h;
         const bar_w = w / frequency.length;
 
         ctx.beginPath();
@@ -339,12 +502,12 @@ function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, freque
         ctx.fillStyle = "white";
         ctx.fill();
     });
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 const frequency_bars_canvas = createCanvas(FFT_SIZE / 2, 128);
-function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: Uint8Array, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
+function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[], x: number, y: number, w: number, h: number) {
     const frequency_bars_ctx = frequency_bars_canvas.getContext("2d");
     if (!frequency_bars_ctx) return;
 
@@ -361,7 +524,7 @@ function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, f
     // Write pixels directly to buffer
     frequency.forEach((value, i) => {
         const f = i / frequency.length;
-        const bar_h = value / 255;
+        const bar_h = value;
         const x_start = Math.floor(f * width);
         const x_width = Math.ceil(width / frequency.length);
         const y_height = Math.floor(bar_h * height);
@@ -382,18 +545,18 @@ function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, f
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(frequency_bars_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 
 function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
     frequency_buffers.forEach((buf, i) => {
         const f = i / frequency_buffers.length;
 
         for (let j = 0; j < buf.size; j++) {
             const buf_f = j / buf.size;
-            const value = buf.get(j) / 255;
+            const value = buf.get(j);
 
             if (value === 0) continue;
 
@@ -417,13 +580,13 @@ function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequenc
             ctx.stroke();
         }
     });
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 const spectrogram_canvas = createCanvas(BUFFER_SIZE, FFT_SIZE / 2);
 function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
-
-    const spectrogram_ctx = spectrogram_canvas.getContext("2d");
+    const spectrogram_ctx = spectrogram_canvas.getContext("2d", { willReadFrequently: true });
     if (!spectrogram_ctx) return;
 
     const width = spectrogram_canvas.width;
@@ -441,7 +604,7 @@ function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, fre
         const y_pos = height - 1 - i;
 
         for (let j = 0; j < buf.size; j++) {
-            const value = buf.get(j) / 255;
+            const value = buf.get(j);
 
             if (value === 0) continue;
 
@@ -466,6 +629,70 @@ function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, fre
 
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(spectrogram_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+
+    drawBorder(ctx, layout, x, y, w, h);
+}
+
+function drawOscilloscope(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[], x: number, y: number, w: number, h: number) {
+    ctx.beginPath();
+    for (let i = 0; i < waveform_left.length; i++) {
+        const vL = waveform_left[i];
+        const vR = waveform_right[i];
+        const f = i / (waveform_left.length - 1);
+
+        const x_pos = x + vL * w;
+        const y_pos = y + vR * h;
+        if (i === 0)
+            ctx.moveTo(layout.getX(x_pos), layout.getY(y_pos));
+        else
+            ctx.lineTo(layout.getX(x_pos), layout.getY(y_pos));
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+
+    drawBorder(ctx, layout, x, y, w, h);
+}
+
+const oscilloscope_canvas = createCanvas(FFT_SIZE / 2, FFT_SIZE / 2);
+function drawOscilloscopePixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[], x: number, y: number, w: number, h: number) {
+    const oscilloscope_ctx = oscilloscope_canvas.getContext("2d", { willReadFrequently: true });
+    if (!oscilloscope_ctx) return;
+
+    const width = oscilloscope_canvas.width;
+    const height = oscilloscope_canvas.height;
+    const imageData = oscilloscope_ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Clear the pixel buffer
+    for (let i = 0; i < data.length; i++) {
+        data[i] = 0;
+    }
+
+    // Write pixels directly to buffer
+    for (let i = 0; i < waveform_left.length; i++) {
+        const vL = waveform_left[i];
+        const vR = waveform_right[i];
+
+        const x_pos = Math.floor(vL * width);
+        const y_pos = Math.floor(vR * height);
+
+        // Draw a point at this position
+        if (x_pos >= 0 && x_pos < width && y_pos >= 0 && y_pos < height) {
+            const index = (y_pos * width + x_pos) * 4;
+            data[index] = 255;       // R
+            data[index + 1] = 255;   // G
+            data[index + 2] = 255;   // B
+            data[index + 3] = 255;   // A
+        }
+    }
+
+    oscilloscope_ctx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(oscilloscope_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+
+    drawBorder(ctx, layout, x, y, w, h);
 }
 
 function getPlasmaColorRGB(value: number): { r: number; g: number; b: number } {
