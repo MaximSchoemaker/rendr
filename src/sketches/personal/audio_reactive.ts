@@ -1,6 +1,7 @@
 
+import { l } from "vite/dist/node/types.d-jgA8ss1A";
 import { createAnimationFrameParameter, createCanvas, createSketch } from "../../rendr/rendr";
-import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, Layout, lerp, lerpColor, map, mod, n_arr, sin, sinn } from "../../rendr/utils";
+import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, LayoutType, lerp, lerpColor, map, mod, n_arr, sin, sinn } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 1501;
 const GLOBAL_FPS = 60;
@@ -21,15 +22,15 @@ const GLOBAL_FPS = 60;
 const WIDTH = window.outerWidth;
 const HEIGHT = window.outerHeight;
 
-const PAD = 0.01;
-const LAYOUT = getLayout("fit", WIDTH, HEIGHT, PAD);
+const PAD = 10;
+const LAYOUT = makeLayout("stretch", PAD, PAD, WIDTH - PAD, HEIGHT - PAD);
 
 // ... video ...
 const LOOPS = 1;
 
-const FFT_SIZE = 1024;
+const FFT_SIZE = 2 ** 10;
 const BUFFER_SIZE = 128;
-
+const BYTE_SIZE = 256;
 
 type Props = {
     REALTIME?: boolean;
@@ -41,6 +42,62 @@ type RingBuffer = ReturnType<typeof makeRingBuffer>;
 
 type Channel = "mono" | "left" | "right";
 type DataType = "byte" | "float";
+type Layout = ReturnType<typeof makeLayout>;
+
+function makeLayout(type: LayoutType, start_x: number, start_y: number, end_x: number, end_y: number) {
+    const width = end_x - start_x;
+    const height = end_y - start_y;
+
+    switch (type) {
+        case "stretch":
+            const size = Math.min(width, height);
+            return {
+                getX: (x: number) => lerp(x, start_x, end_x),
+                getY: (y: number) => lerp(y, start_y, end_y),
+                getWidth: (w: number) => lerp(w, 0, width),
+                getHeight: (w: number) => lerp(w, 0, height),
+                getSize: (s: number) => lerp(s, 0, size),
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+            }
+        case "fit": {
+            const size = Math.min(width, height);
+            const offset_x = (width - size) / 2;
+            const offset_y = (height - size) / 2;
+            return {
+                getX: (x: number) => lerp(x, start_x, start_x + size) + offset_x,
+                getY: (y: number) => lerp(y, start_y, start_y + size) + offset_y,
+                getWidth: (w: number) => lerp(w, 0, size),
+                getHeight: (w: number) => lerp(w, 0, size),
+                getSize: (s: number) => lerp(s, 0, size),
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+            }
+        }
+        case "fill": {
+            const size = Math.max(width, height);
+            const offset_x = (width - size) / 2;
+            const offset_y = (height - size) / 2;
+            return {
+                getX: (x: number) => lerp(x, start_x, start_x + size) + offset_x,
+                getY: (y: number) => lerp(y, start_y, start_y + size) + offset_y,
+                getWidth: (w: number) => lerp(w, 0, size),
+                getHeight: (w: number) => lerp(w, 0, size),
+                getSize: (s: number) => lerp(s, 0, size),
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+            }
+        }
+        default:
+            throw new Error(`Unknown layout type: ${type}`);
+    }
+}
 
 const makeRingBuffer = (size: number) => {
     const buffer = new Array(size).fill(0);
@@ -108,6 +165,7 @@ export default createSketch<Props>((engine, ui, props) => {
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const analyser = audioContext.createAnalyser();
             analyser.fftSize = FFT_SIZE;
+            console.log("Analyser FFT size:", analyser.fftSize);
 
             // analyser.minDecibels = -90;
             // analyser.maxDecibels = -10;
@@ -164,10 +222,9 @@ export default createSketch<Props>((engine, ui, props) => {
                 switch (type) {
                     case "byte":
                         const byteWave = getByteWaveform(channel);
-                        return Array.from(byteWave).map(v => (v) / 255);
+                        return Array.from(byteWave).map(v => v / 255);
                     case "float":
                         const floatWave = getFloatWaveform(channel);
-                        // Float waveform data is typically in the range [-1, 1], so we can normalize it to [0, 1]
                         return Array.from(floatWave).map(v => (v + 1) / 2);
                     default:
                         throw new Error(`Unknown waveform type: ${type}`);
@@ -278,43 +335,51 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
     const max_level = mic_buf.buffer.reduce((a, b) => Math.max(a, b), 0);
     const mic_f = mic_level / max_level;
 
-    const gap = PAD;
+    const gap = 10;
 
     const cols = 2;
     const rows = 3;
 
-    layoutGrid(0, 0, 1, 1, rows, cols, gap, [
-        (x, y, w, h) => layoutCol(x, y, w, h, gap, [
-            (x, y, w, h) => drawWaveform(ctx, layout, waveform_left, x, y, w, h),
-            (x, y, w, h) => drawWaveform(ctx, layout, waveform_right, x, y, w, h),
-            // (x, y, w, h) => drawWaveformPixel(ctx, layout, waveform, x, y, w, h),
+    // drawBorder(ctx, layout);
+    layoutGrid(layout, "stretch", rows, cols, gap, [
+
+        (layout) => layoutCol(layout, "stretch", gap, [
+            (layout) => drawWaveform(ctx, layout, waveform_left),
+            (layout) => drawWaveform(ctx, layout, waveform_right),
         ]),
 
-        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
-            // (x, y, w, h) => drawOscilloscope(ctx, layout, waveform_left, waveform_right, x, y, w, h),
-            (x, y, w, h) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right, x, y, w, h),
+        (layout) => layoutRow(layout, "fit", gap, [
+            (layout) => drawOscilloscopePixel(ctx, layout, waveform_left, waveform_right),
+            (layout) => drawOscilloscope(ctx, layout, waveform_left, waveform_right),
         ]),
 
-        (x, y, w, h) => drawMicF(ctx, layout, mic_f, x, y, w, h),
-
-        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
-            // (x, y, w, h) => drawMicBuf(ctx, layout, mic_buf, x, y, w, h),
-            (x, y, w, h) => drawMicBufPixel(ctx, layout, mic_buf, x, y, w, h),
+        (layout) => layoutRow(layout, "fit", gap, [
+            (layout) => drawMicF(ctx, layout, mic_f),
         ]),
 
-        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
-            // (x, y, w, h) => drawFrequencyBars(ctx, layout, frequency, x, y, w, h),
-            (x, y, w, h) => drawFrequencyBarsPixel(ctx, layout, frequency, x, y, w, h),
+        (layout) => layoutRow(layout, "stretch", gap, [
+            // (layout) => drawMicBuf(ctx, layout, mic_buf),
+            (layout) => drawMicBufPixel(ctx, layout, mic_buf),
         ]),
 
-        (x, y, w, h) => layoutRow(x, y, w, h, gap, [
-            // (x, y, w, h) => drawSpectrogram(ctx, layout, frequency_buffers, x, y, w, h),
-            (x, y, w, h) => drawSpectrogramPixel(ctx, layout, frequency_buffers, x, y, w, h),
+        (layout) => layoutRow(layout, "stretch", gap, [
+            // (layout) => drawFrequencyBars(ctx, layout, frequency),
+            (layout) => drawFrequencyBarsPixel(ctx, layout, frequency),
+        ]),
+
+        (layout) => layoutRow(layout, "stretch", gap, [
+            // (layout) => drawSpectrogram(ctx, layout, frequency_buffers),
+            (layout) => drawSpectrogramPixel(ctx, layout, frequency_buffers),
         ]),
     ])
 }
 
-function layoutGrid(x: number, y: number, w: number, h: number, rows: number, cols: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+function layoutGrid(layout: Layout, layoutType: LayoutType, rows: number, cols: number, gap: number, items: ((layout: Layout) => void)[]) {
+    const x = layout.getX(0);
+    const y = layout.getY(0);
+    const w = layout.getWidth(1);
+    const h = layout.getHeight(1);
+
     const cell_w = (w - gap * (cols - 1)) / cols;
     const cell_h = (h - gap * (rows - 1)) / rows;
     items.forEach((item, i) => {
@@ -322,66 +387,77 @@ function layoutGrid(x: number, y: number, w: number, h: number, rows: number, co
         const row = Math.floor(i / cols);
         const cell_x = x + col * (cell_w + gap);
         const cell_y = y + row * (cell_h + gap);
-        item(cell_x, cell_y, cell_w, cell_h);
+        const grid_layout = makeLayout(layoutType, cell_x, cell_y, cell_x + cell_w, cell_y + cell_h);
+        item(grid_layout);
     });
 }
 
-function layoutRow(x: number, y: number, w: number, h: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+function layoutRow(layout: Layout, layoutType: LayoutType, gap: number, items: ((layout: Layout) => void)[]) {
     const cols = items.length;
     const rows = 1;
-    layoutGrid(x, y, w, h, rows, cols, gap, items);
+    layoutGrid(layout, layoutType, rows, cols, gap, items);
 }
 
-function layoutCol(x: number, y: number, w: number, h: number, gap: number, items: ((x: number, y: number, width: number, height: number) => void)[]) {
+function layoutCol(layout: Layout, layoutType: LayoutType, gap: number, items: ((layout: Layout) => void)[]) {
     const cols = 1;
     const rows = items.length;
-    layoutGrid(x, y, w, h, rows, cols, gap, items);
+    layoutGrid(layout, layoutType, rows, cols, gap, items);
 }
 
-function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout, x: number, y: number, w: number, h: number) {
+function drawBorder(ctx: CanvasRenderingContext2D, layout: Layout) {
+    const x = layout.start_x;
+    const y = layout.start_y;
+    const w = layout.end_x - layout.start_x;
+    const h = layout.end_y - layout.start_y;
+
     ctx.beginPath();
-    ctx.rect(layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.rect(x, y, w, h);
     ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.stroke();
 }
 
-function drawMicF(ctx: CanvasRenderingContext2D, layout: Layout, mic_f: number, x: number, y: number, w: number, h: number) {
-    drawBorder(ctx, layout, x, y, w, h);
+function drawMicF(ctx: CanvasRenderingContext2D, layout: Layout, mic_f: number) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
     const radius = mic_f / 2;
-    const s = Math.min(w, h);
 
     ctx.beginPath();
-    ctx.arc(layout.getX(x + 0.5 * w), layout.getY(y + 0.5 * h), layout.getSize(radius * s), 0, 2 * Math.PI);
+    ctx.arc(layout.getX(0.5), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
     ctx.fillStyle = "white"
     ctx.fill();
+
+    drawBorder(ctx, layout);
 }
 
-function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer, x: number, y: number, w: number, h: number) {
+function drawMicBuf(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
     for (let i = 0; i < mic_buf.size; i++) {
         const level = mic_buf.get(i);
 
         const f = i / mic_buf.size;
 
         const bar_h = level;
-        const bar_w = w / mic_buf.size;
+        const bar_w = 1 / mic_buf.size;
 
         ctx.beginPath();
         ctx.rect(
-            layout.getX(x + f * w), layout.getY(y + h * 0.5 - bar_h * h / 2),
-            layout.getSize(bar_w) + 1, layout.getSize(bar_h * h)
+            layout.getX(f), layout.getY(0.5 - bar_h / 2),
+            layout.getWidth(bar_w) + 1, layout.getHeight(bar_h)
         );
 
         ctx.fillStyle = "white";
         ctx.fill();
     };
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-const mic_buf_canvas = createCanvas(BUFFER_SIZE, 128);
-function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer, x: number, y: number, w: number, h: number) {
+const mic_buf_canvas = createCanvas(BUFFER_SIZE, BYTE_SIZE);
+function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf: RingBuffer) {
     const mic_buf_ctx = mic_buf_canvas.getContext("2d");
     if (!mic_buf_ctx) return;
 
@@ -422,32 +498,34 @@ function drawMicBufPixel(ctx: CanvasRenderingContext2D, layout: Layout, mic_buf:
     mic_buf_ctx.putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(mic_buf_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.drawImage(mic_buf_canvas, layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[], x: number, y: number, w: number, h: number) {
+function drawWaveform(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[]) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
     ctx.beginPath();
     for (let i = 0; i < waveform.length; i++) {
         const v = waveform[i];
         const f = i / (waveform.length - 1);
-        const bar_h = v * h;
 
         if (i === 0)
-            ctx.moveTo(layout.getX(x + f * w), layout.getY(y + h - bar_h));
+            ctx.moveTo(layout.getX(f), layout.getY(v));
         else
-            ctx.lineTo(layout.getX(x + f * w), layout.getY(y + h - bar_h));
+            ctx.lineTo(layout.getX(f), layout.getY(v));
     }
     ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.stroke();
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-const waveform_canvas = createCanvas(FFT_SIZE, 128);
-function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[], x: number, y: number, w: number, h: number) {
+const waveform_canvas = createCanvas(FFT_SIZE, BYTE_SIZE);
+function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform: number[]) {
     const waveform_ctx = waveform_canvas.getContext("2d");
     if (!waveform_ctx) return;
 
@@ -482,32 +560,35 @@ function drawWaveformPixel(ctx: CanvasRenderingContext2D, layout: Layout, wavefo
     waveform_ctx.putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(waveform_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.drawImage(waveform_canvas, layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[], x: number, y: number, w: number, h: number) {
+function drawFrequencyBars(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[]) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
     frequency.forEach((value, i) => {
         const f = i / frequency.length;
 
-        const bar_h = value * h;
-        const bar_w = w / frequency.length;
+        const bar_h = value;
+        const bar_w = 1 / frequency.length;
 
         ctx.beginPath();
         ctx.rect(
-            layout.getX(x + f * w), layout.getY(y + h - bar_h),
-            layout.getSize(bar_w) + 1, layout.getSize(bar_h)
+            layout.getX(f), layout.getY(1 - bar_h),
+            layout.getWidth(bar_w) + 1, layout.getHeight(bar_h)
         );
         ctx.fillStyle = "white";
         ctx.fill();
     });
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-const frequency_bars_canvas = createCanvas(FFT_SIZE / 2, 128);
-function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[], x: number, y: number, w: number, h: number) {
+const frequency_bars_canvas = createCanvas(FFT_SIZE / 2, BYTE_SIZE);
+function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency: number[]) {
     const frequency_bars_ctx = frequency_bars_canvas.getContext("2d");
     if (!frequency_bars_ctx) return;
 
@@ -544,13 +625,16 @@ function drawFrequencyBarsPixel(ctx: CanvasRenderingContext2D, layout: Layout, f
     frequency_bars_ctx.putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(frequency_bars_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.drawImage(frequency_bars_canvas, layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
 
-function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
+function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[]) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
     frequency_buffers.forEach((buf, i) => {
         const f = i / frequency_buffers.length;
 
@@ -560,20 +644,12 @@ function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequenc
 
             if (value === 0) continue;
 
-            const bar_w = w / buf.size;
-            const bar_h = h / frequency_buffers.length;
-
-            // ctx.beginPath();
-            // ctx.rect(
-            //     layout.getX(x + buf_f * w), layout.getY(y + (1 - f) * h - bar_h),
-            //     layout.getSize(bar_w) + 1, layout.getSize(bar_h)
-            // );
-            // ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
-            // ctx.fill();
+            const bar_w = 1 / buf.size;
+            const bar_h = 1 / frequency_buffers.length;
 
             ctx.beginPath();
-            ctx.moveTo(layout.getX(x + buf_f * w + bar_w / 2), layout.getY(y + (1 - f) * h));
-            ctx.lineTo(layout.getX(x + buf_f * w + bar_w / 2), layout.getY(y + (1 - f) * h - bar_h));
+            ctx.moveTo(layout.getX(buf_f + bar_w / 2), layout.getY((1 - f)));
+            ctx.lineTo(layout.getX(buf_f + bar_w / 2), layout.getY((1 - f) - bar_h));
 
             ctx.lineWidth = layout.getSize(bar_w);
             ctx.strokeStyle = getPlasmaColor(value);
@@ -581,11 +657,11 @@ function drawSpectrogram(ctx: CanvasRenderingContext2D, layout: Layout, frequenc
         }
     });
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
 const spectrogram_canvas = createCanvas(BUFFER_SIZE, FFT_SIZE / 2);
-function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[], x: number, y: number, w: number, h: number) {
+function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, frequency_buffers: RingBuffer[]) {
     const spectrogram_ctx = spectrogram_canvas.getContext("2d", { willReadFrequently: true });
     if (!spectrogram_ctx) return;
 
@@ -628,34 +704,35 @@ function drawSpectrogramPixel(ctx: CanvasRenderingContext2D, layout: Layout, fre
     spectrogram_ctx.putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(spectrogram_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.drawImage(spectrogram_canvas, layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-function drawOscilloscope(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[], x: number, y: number, w: number, h: number) {
+function drawOscilloscope(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[]) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
     ctx.beginPath();
     for (let i = 0; i < waveform_left.length; i++) {
         const vL = waveform_left[i];
         const vR = waveform_right[i];
         const f = i / (waveform_left.length - 1);
 
-        const x_pos = x + vL * w;
-        const y_pos = y + vR * h;
         if (i === 0)
-            ctx.moveTo(layout.getX(x_pos), layout.getY(y_pos));
+            ctx.moveTo(layout.getX(vL), layout.getY(vR));
         else
-            ctx.lineTo(layout.getX(x_pos), layout.getY(y_pos));
+            ctx.lineTo(layout.getX(vL), layout.getY(vR));
     }
     ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.stroke();
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
-const oscilloscope_canvas = createCanvas(FFT_SIZE / 2, FFT_SIZE / 2);
-function drawOscilloscopePixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[], x: number, y: number, w: number, h: number) {
+const oscilloscope_canvas = createCanvas(BYTE_SIZE, BYTE_SIZE);
+function drawOscilloscopePixel(ctx: CanvasRenderingContext2D, layout: Layout, waveform_left: number[], waveform_right: number[]) {
     const oscilloscope_ctx = oscilloscope_canvas.getContext("2d", { willReadFrequently: true });
     if (!oscilloscope_ctx) return;
 
@@ -688,11 +765,14 @@ function drawOscilloscopePixel(ctx: CanvasRenderingContext2D, layout: Layout, wa
     }
 
     oscilloscope_ctx.putImageData(imageData, 0, 0);
+    ctx.imageSmoothingEnabled = false;
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(oscilloscope_canvas, layout.getX(x), layout.getY(y), layout.getSize(w), layout.getSize(h));
+    ctx.drawImage(oscilloscope_canvas,
+        layout.getX(0), layout.getY(0),
+        layout.getWidth(1), layout.getHeight(1)
+    );
 
-    drawBorder(ctx, layout, x, y, w, h);
+    drawBorder(ctx, layout);
 }
 
 function getPlasmaColorRGB(value: number): { r: number; g: number; b: number } {
@@ -703,7 +783,7 @@ function getPlasmaColorRGB(value: number): { r: number; g: number; b: number } {
         { pos: 0.0, r: 13, g: 8, b: 135 },    // #0D0887 Deep Blue
         { pos: 0.2, r: 106, g: 0, b: 168 },   // #6A00A8 Purple
         { pos: 0.4, r: 177, g: 42, b: 144 },  // #B12A90 Magenta
-        { pos: 0.6, r: 225, g: 100, b: 98 },  // #E16462 Red-Orange
+        { pos: 0.6, r: 225, g: 100, b: 98 },  // #E16462 white-Orange
         { pos: 0.8, r: 252, g: 166, b: 54 },  // #FCA636 Orange-Yellow
         { pos: 1.0, r: 240, g: 249, b: 33 }   // #F0F921 Bright Yellow
     ];
