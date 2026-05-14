@@ -379,7 +379,13 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
             && measure_buffer.get(-2) === 0
             && measure_buffer.get(-3) === 0
             && measure_buffer.get(-4) === 0
-            && measure_buffer.get(-5) === 0 ? 1 : 0
+            && measure_buffer.get(-5) === 0
+            && measure_buffer.get(-6) === 0
+            && measure_buffer.get(-7) === 0
+            && measure_buffer.get(-8) === 0
+            && measure_buffer.get(-9) === 0
+            && measure_buffer.get(-10) === 0
+            ? 1 : 0
     );
 
     const last_measures = [];
@@ -439,10 +445,10 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
         ]),
 
         (layout) => layoutCol(layout, "stretch", gap, [
-            (layout) => layoutRow(layout, "stretch", gap, [
-                (layout) => drawSpectrogramPixel(ctx, layout, impact_buffers),
-                (layout) => drawSpectrogramPixel(ctx, layout, impact_threshold_buffers),
-            ]),
+            // (layout) => layoutRow(layout, "stretch", gap, [
+            //     (layout) => drawSpectrogramPixel(ctx, layout, impact_buffers),
+            //     (layout) => drawSpectrogramPixel(ctx, layout, impact_threshold_buffers),
+            // ]),
             (layout) => drawSpectrogram(ctx, layout, beat_buffers),
             (layout) => drawMicBufPixel(ctx, layout, measure_buffer),
         ]),
@@ -532,7 +538,7 @@ function drawSig(ctx: CanvasRenderingContext2D, layout: Layout, sig: number) {
 
     const radius = 0.5;
     const rat = layout.getWidth(1) / layout.getHeight(1);
-    const x = lerp(Math.pow(sig, 5), radius / rat, 1 - radius / rat);
+    const x = lerp(Math.pow(sig, 4), radius / rat, 1 - radius / rat);
     ctx.beginPath();
     ctx.arc(layout.getX(x), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
     ctx.fillStyle = "white"
