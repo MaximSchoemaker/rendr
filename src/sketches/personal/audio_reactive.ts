@@ -1,7 +1,7 @@
 
 import { l } from "vite/dist/node/types.d-jgA8ss1A";
 import { createAnimationFrameParameter, createCanvas, createSketch } from "../../rendr/rendr";
-import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, LayoutType, lerp, lerpColor, map, mod, n_arr, sin, sinn } from "../../rendr/utils";
+import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, LayoutType, lerp, lerpColor, map, mod, n_arr, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 1501;
 const GLOBAL_FPS = 60;
@@ -331,12 +331,70 @@ export default createSketch<Props>((engine, ui, props) => {
 
 const mic_buf = makeRingBuffer(BUFFER_SIZE);
 const frequency_buffers = n_arr(FFT_SIZE / 2, () => makeRingBuffer(BUFFER_SIZE));
-
+const impact_buffers = n_arr(FFT_SIZE / 2, () => makeRingBuffer(BUFFER_SIZE));
+const impact_threshold_buffers = n_arr(FFT_SIZE / 2, () => makeRingBuffer(BUFFER_SIZE));
+const BIN_COUNT = 32;
+const beat_buffers = n_arr(BIN_COUNT, () => makeRingBuffer(BUFFER_SIZE));
+const measure_buffer = makeRingBuffer(BUFFER_SIZE);
+const sig_buffer = makeRingBuffer(32);
 function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], waveform_left: number[], waveform_right: number[], frequency: number[], layout: Layout) {
     frequency.forEach((value, i) => frequency_buffers[i].push(value));
 
     const mic_level = frequency.reduce((a, b) => a + b, 0) / frequency.length;
     mic_buf.push(mic_level);
+
+    frequency.forEach((value, i) => impact_buffers[i].push(value > mic_level ? value : 0));
+
+    const quiet_count = 50;
+    impact_buffers.forEach((buf, i) => {
+        if (buf.get(-1) === 0) {
+            impact_threshold_buffers[i].push(0)
+            return
+        }
+        for (let j = 0; j < quiet_count; j++)
+            if (buf.get(-2 - j) > buf.get(-1)) {
+                impact_threshold_buffers[i].push(0)
+                return;
+            }
+        impact_threshold_buffers[i].push(1)
+    });
+
+    for (let i = 0; i < BIN_COUNT; i++) {
+        const size = Math.floor(1 * frequency.length / BIN_COUNT);
+        const impact_threshold_bin = impact_threshold_buffers.slice(i * size, (i + 1) * size);
+        const onsetStrength = impact_threshold_bin.reduce((sum, buf) => sum + buf.get(-1), 0) / impact_threshold_bin.length;
+        beat_buffers[i].push(onsetStrength > 0.0 ? 1 : 0);
+    }
+
+
+    const avg_beat = beat_buffers.reduce((sum, buf) =>
+        sum +
+        buf.buffer.reduce((sum, value) => sum + value) / buf.size
+        , 0) / BIN_COUNT
+
+
+    measure_buffer.push(
+        beat_buffers.reduce((sum, buf) => sum + buf.get(-1), 0) / BIN_COUNT > avg_beat * 4
+            && measure_buffer.get(-1) === 0
+            && measure_buffer.get(-2) === 0
+            && measure_buffer.get(-3) === 0
+            && measure_buffer.get(-4) === 0
+            && measure_buffer.get(-5) === 0 ? 1 : 0
+    );
+
+    const last_measures = [];
+    for (let i = 0; i < measure_buffer.size; i++) {
+        if (measure_buffer.get(-1 - i) === 1) last_measures.push(i);
+    }
+
+    let sig = 1;
+    if (last_measures.length >= 2) {
+        const interval = last_measures[0] - last_measures[1];
+        const frames_since_last_measure = last_measures[0];
+        const measure_progress = frames_since_last_measure / interval;
+        sig = (1 - tri(measure_progress));
+    }
+    sig_buffer.push(sig);
 
     // const max_level = mic_buf.buffer.reduce((a, b) => Math.max(a, b), 0);
     // const mic_f = mic_level / max_level;
@@ -344,7 +402,7 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
     const gap = 10;
 
     const cols = 2;
-    const rows = 3;
+    const rows = 4;
 
     // drawBorder(ctx, layout);
     layoutGrid(layout, "stretch", rows, cols, gap, [
@@ -380,8 +438,33 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
             (layout) => drawMicBufPixel(ctx, layout, mic_buf),
         ]),
 
+        (layout) => layoutCol(layout, "stretch", gap, [
+            (layout) => layoutRow(layout, "stretch", gap, [
+                (layout) => drawSpectrogramPixel(ctx, layout, impact_buffers),
+                (layout) => drawSpectrogramPixel(ctx, layout, impact_threshold_buffers),
+            ]),
+            (layout) => drawSpectrogram(ctx, layout, beat_buffers),
+            (layout) => drawMicBufPixel(ctx, layout, measure_buffer),
+        ]),
 
+        (layout) => layoutCol(layout, "stretch", gap, [
+            (layout) => layoutRow(layout, "stretch", gap, [
+                (layout) => drawMicLevel(ctx, layout, measure_buffer.get(-1)),
+                (layout) => drawMicLevel(ctx, layout, sig),
+            ]),
+            (layout) => layoutRow(layout, "stretch", gap, [
+                (layout) => drawSig(ctx, layout, sig),
+            ]),
+            (layout) => drawMicBufPixel(ctx, layout, sig_buffer),
+        ]),
 
+        // (layout) => layoutRow(layout, "stretch", gap,
+        //     onset_strengths.map(strength => (layout) => layoutCol(layout, "stretch", gap, [
+        //         (layout) => drawMicLevel(ctx, layout, strength),
+        //         (layout) => drawMicLevel(ctx, layout, strength > 0.02 ? 1 : 0),
+        //     ])
+        //     )
+        // ),
     ])
 }
 
@@ -436,6 +519,22 @@ function drawMicLevel(ctx: CanvasRenderingContext2D, layout: Layout, mic_level: 
 
     ctx.beginPath();
     ctx.arc(layout.getX(0.5), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
+    ctx.fillStyle = "white"
+    ctx.fill();
+
+    drawBorder(ctx, layout);
+}
+
+function drawSig(ctx: CanvasRenderingContext2D, layout: Layout, sig: number) {
+
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
+    const radius = 0.5;
+    const rat = layout.getWidth(1) / layout.getHeight(1);
+    const x = lerp(Math.pow(sig, 5), radius / rat, 1 - radius / rat);
+    ctx.beginPath();
+    ctx.arc(layout.getX(x), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
     ctx.fillStyle = "white"
     ctx.fill();
 
@@ -803,6 +902,35 @@ function drawOscilloscopePixel(ctx: CanvasRenderingContext2D, layout: Layout, wa
         layout.getX(0), layout.getY(0),
         layout.getWidth(1), layout.getHeight(1)
     );
+
+    drawBorder(ctx, layout);
+}
+
+function drawImpact(ctx: CanvasRenderingContext2D, layout: Layout, impact_buffers: RingBuffer[]) {
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(layout.getX(0), layout.getY(0), layout.getWidth(1), layout.getHeight(1));
+
+    impact_buffers.forEach((buf, i) => {
+        const f = i / impact_buffers.length;
+
+        for (let j = 0; j < buf.size; j++) {
+            const buf_f = j / buf.size;
+            const value = buf.get(j);
+
+            if (value === 0) continue;
+
+            const bar_w = 1 / buf.size;
+            const bar_h = 1 / impact_buffers.length;
+
+            ctx.beginPath();
+            ctx.moveTo(layout.getX(buf_f + bar_w / 2), layout.getY((1 - f)));
+            ctx.lineTo(layout.getX(buf_f + bar_w / 2), layout.getY((1 - f) - bar_h));
+
+            ctx.lineWidth = layout.getSize(bar_w);
+            ctx.strokeStyle = getPlasmaColor(value);
+            ctx.stroke();
+        }
+    });
 
     drawBorder(ctx, layout);
 }
