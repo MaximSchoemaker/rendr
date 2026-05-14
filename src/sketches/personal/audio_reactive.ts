@@ -397,8 +397,8 @@ function scene(ctx: CanvasRenderingContext2D, t: number, waveform: number[], wav
     if (last_measures.length >= 2) {
         const interval = last_measures[0] - last_measures[1];
         const frames_since_last_measure = last_measures[0];
-        const measure_progress = frames_since_last_measure / interval;
-        sig = (1 - tri(measure_progress));
+        const measure_progress = -frames_since_last_measure / interval;
+        sig = (1 - tri(Math.min(measure_progress, 2)));
     }
     sig_buffer.push(sig);
 
