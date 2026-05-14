@@ -1,7 +1,7 @@
 
 import { l } from "vite/dist/node/types.d-jgA8ss1A";
 import { createAnimationFrameParameter, createCanvas, createSketch } from "../../rendr/rendr";
-import { angle_diff, clamp, cos, createColor, createHSL, getLayout, inv_cosn, LayoutType, lerp, lerpColor, map, mod, n_arr, sin, sinn, tri } from "../../rendr/utils";
+import { angle_diff, clamp, cos, cosn, createColor, createHSL, getLayout, inv_cosn, LayoutType, lerp, lerpColor, map, mod, n_arr, sin, sinn, tri } from "../../rendr/utils";
 
 const GLOBAL_FRAMES = 1501;
 const GLOBAL_FPS = 60;
@@ -538,7 +538,7 @@ function drawSig(ctx: CanvasRenderingContext2D, layout: Layout, sig: number) {
 
     const radius = 0.5;
     const rat = layout.getWidth(1) / layout.getHeight(1);
-    const x = lerp(Math.pow(sig, 4), radius / rat, 1 - radius / rat);
+    const x = lerp(1 - cosn(Math.pow(sig, 3) * 0.5), radius / rat, 1 - radius / rat);
     ctx.beginPath();
     ctx.arc(layout.getX(x), layout.getY(0.5), layout.getSize(radius), 0, 2 * Math.PI);
     ctx.fillStyle = "white"
