@@ -43,6 +43,7 @@ type RingBuffer = ReturnType<typeof makeRingBuffer>;
 
 type Channel = "mono" | "left" | "right";
 type DataType = "byte" | "float";
+
 type Layout = ReturnType<typeof makeLayout>;
 
 function makeLayout(type: LayoutType, start_x: number, start_y: number, end_x: number, end_y: number) {

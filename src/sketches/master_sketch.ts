@@ -25,6 +25,7 @@ import hatching from "./personal/hatching";
 import light from "./personal/light";
 import game from "./personal/game";
 import audio_reactive from "./personal/audio_reactive";
+import snake from "./personal/snake";
 
 export default createSketch((master_engine, ui) => {
    const sketches = [
@@ -54,7 +55,8 @@ export default createSketch((master_engine, ui) => {
       // hatching,
       // light,
       // game,
-      audio_reactive
+      // audio_reactive
+      snake
    ];
 
    const props = {
